@@ -1,4 +1,4 @@
-import { defineConfig, loadEnv } from 'vite'
+import { defineConfig, loadEnv, ProxyOptions } from 'vite'
 import react from '@vitejs/plugin-react'
 
 // https://vitejs.dev/config/
@@ -8,7 +8,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, '.', '');
 
   // Dynamically build the proxy configuration from environment variables
-  const proxyConfig = {};
+  const proxyConfig: Record<string, ProxyOptions> = {};
 
   // --- OpenAI Proxy ---
   const openaiProxyPath = env.OPENAI_PROXY_PATH || '/proxy/openai';
@@ -42,7 +42,7 @@ export default defineConfig(({ mode }) => {
 
   return {
     // Set the base path for deployment to the specific GitHub repository.
-    base: '/INF/',
+    base: '/INF3/',
     plugins: [react()],
     server: {
       watch: {

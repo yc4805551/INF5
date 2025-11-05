@@ -49,6 +49,13 @@ interface Source {
   score: number;
 }
 
+// New interface for strongly typing roaming results
+interface RoamingResultItem {
+  source: string;
+  relevantText: string;
+  conclusion: string;
+}
+
 type NoteChatMessage = {
   role: 'user' | 'model';
   text: string;
@@ -719,7 +726,7 @@ const NoteAnalysisView = ({
 
   // State for Roaming Notes
   const [isRoaming, setIsRoaming] = useState(false);
-  const [roamingResult, setRoamingResult] = useState<{ source: string; relevantText: string; conclusion: string }[] | null>(null);
+  const [roamingResult, setRoamingResult] = useState<RoamingResultItem[] | null>(null);
   const [roamingError, setRoamingError] = useState<string | null>(null);
 
 
@@ -747,7 +754,7 @@ const NoteAnalysisView = ({
     // Part 2: Roaming Result
     if (roamingResult && roamingResult.length > 0) {
       content += `\n\n---\n\n【笔记漫游】`;
-      roamingResult.forEach((result, index) => {
+      roamingResult.forEach((result: RoamingResultItem, index: number) => {
         content += `\n\n--- 漫游结果 ${index + 1} ---\n`;
         content += `来源: ${result.source}\n\n`;
         content += `关联原文:\n${result.relevantText}\n\n`;
@@ -844,7 +851,7 @@ const NoteAnalysisView = ({
         // Step 2: Call Generative AI for each source to create a conclusion
         const systemInstruction = `You are an AI assistant skilled at synthesizing information. Based on a user's note and a relevant passage from their knowledge base, create an "Associative Conclusion" connecting the two ideas. Your entire response must be a JSON object with one key: "conclusion" (your generated associative summary).`;
         
-        const roamingPromises = sources.map(async (source) => {
+        const roamingPromises = sources.map(async (source: Source) => {
             const userPrompt = `[Relevant Passage from Knowledge Base]:\n${source.content_chunk}\n\n[User's Original Note]:\n${analysisResult.organizedText}`;
             const genAiResponseText = await callGenerativeAi(provider, systemInstruction, userPrompt, true, apiKeys, 'roaming');
             const result = JSON.parse(genAiResponseText.replace(/```json\n?|\n?```/g, ''));
@@ -966,7 +973,7 @@ const NoteAnalysisView = ({
                     {roamingError && <div className="error-message">{roamingError}</div>}
                     {roamingResult && (
                         <div className="roaming-results-container">
-                            {roamingResult.map((result, index) => (
+                            {roamingResult.map((result: RoamingResultItem, index: number) => (
                                 <div key={index} className="roaming-result">
                                     <p><strong>来源 ({index + 1}):</strong> {result.source}</p>
                                     <p><strong>关联原文:</strong> {result.relevantText}</p>
@@ -1208,7 +1215,7 @@ const AuditView = ({
     // FIX: Explicitly cast the result of Object.entries to fix type inference
     // issues where 'result' was being inferred as 'unknown'.
     const allIssuesWithIds = (Object.entries(auditResults) as [string, AuditResult | undefined][]).flatMap(([model, result]) => {
-        return result?.issues?.map((issue, index) => ({
+        return result?.issues?.map((issue: AuditIssue, index: number) => ({
             ...issue,
             model: model as ModelProvider,
             id: `${model}-${index}`
@@ -1288,7 +1295,7 @@ const AuditView = ({
                 <div className="audit-status-area">
                     {/* FIX: Explicitly cast the result of Object.entries to fix type inference
                     // issues where 'result' was being inferred as 'unknown'. */}
-                    { (Object.entries(auditResults) as [string, AuditResult | undefined][]).map(([model, result]) => {
+                    { (Object.entries(auditResults) as [string, AuditResult | undefined][]).map(([model, result]: [string, AuditResult | undefined]) => {
                         if (!result) return null;
                         return (
                         <div key={model} className="audit-status-item">
@@ -1315,7 +1322,7 @@ const AuditView = ({
                         {!isLoading && Object.keys(auditResults).length > 0 && !hasAnyIssues && !hasAnyErrors && <div className="large-placeholder">未发现任何问题。</div>}
                         {/* FIX: Explicitly cast the result of Object.entries to fix type inference
                         // issues where 'result' was being inferred as 'unknown'. */}
-                        { (Object.entries(auditResults) as [string, AuditResult | undefined][]).map(([model, result]) => {
+                        { (Object.entries(auditResults) as [string, AuditResult | undefined][]).map(([model, result]: [string, AuditResult | undefined]) => {
                             if (!result) return null;
 
                             if (result.error && result.rawResponse) {
@@ -1344,7 +1351,7 @@ const AuditView = ({
                                         <span className={`model-indicator model-${model}`}>{model}</span> ({result.issues.length}个问题)
                                     </summary>
                                     <div className="issue-group-content">
-                                    {result.issues.map((issue, index) => {
+                                    {result.issues.map((issue: AuditIssue, index: number) => {
                                         const issueId = `${model}-${index}`;
                                         return (
                                             <div
@@ -1717,12 +1724,14 @@ const WritingView = ({
   const editorRef = useRef<HTMLTextAreaElement>(null);
   const styleFileRef = useRef<HTMLInputElement>(null);
   const suppressSuggestionFetch = useRef(false);
+  const fetchIdRef = useRef(0);
 
   const fetchSuggestions = useCallback(debounce(async (currentText: string, styleText: string) => {
     if (currentText.trim().length < 50) { // Don't run on very short text
       setSuggestions([]);
       return;
     }
+    const fetchId = ++fetchIdRef.current;
     setIsLoading(true);
     setError(null);
     setSelectedSuggestionIndex(null);
@@ -1749,6 +1758,10 @@ ${styleText.trim()}
 
     try {
       const responseText = await callGenerativeAi(selectedModel, systemInstruction, userPrompt, true, apiKeys, 'writing');
+      
+      // If another request has started, ignore the result of this one to prevent race conditions.
+      if (fetchId !== fetchIdRef.current) return;
+
       const { data, error: parseError, rawResponse } = parseJsonResponse<WritingSuggestion[]>(responseText);
 
       if (parseError || !data) {
@@ -1760,10 +1773,14 @@ ${styleText.trim()}
       setSuggestions(validSuggestions);
 
     } catch (err: any) {
-      setError(`获取建议失败: ${err.message}`);
-      setSuggestions([]);
+      if (fetchId === fetchIdRef.current) {
+          setError(`获取建议失败: ${err.message}`);
+          setSuggestions([]);
+      }
     } finally {
-      setIsLoading(false);
+      if (fetchId === fetchIdRef.current) {
+          setIsLoading(false);
+      }
     }
   }, 1500), [selectedModel, apiKeys]);
 
@@ -1992,7 +2009,7 @@ ${styleText.trim()}
             {kbResults && (
                 <div className="source-info-box" style={{marginTop: '8px'}}>
                     <ul className="source-list" style={{maxHeight: '150px', padding: '12px'}}>
-                        {kbResults.map((source, i) => (
+                        {kbResults.map((source: Source, i: number) => (
                             <li key={i} className="source-item" data-filename={source.source_file}>
                                 <div className="source-header">
                                     <span className="source-filename">{source.source_file}</span>
