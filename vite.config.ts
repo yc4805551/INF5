@@ -61,24 +61,20 @@ export default defineConfig(({ mode }) => {
         ...proxyConfig,
       }
     },
-    // This makes the environment variable available in your client-side code
-    // by replacing `process.env.VAR` with the value of the VAR
-    // environment variable from the build process or your local .env file.
+    // This makes the environment variables available in your client-side code
+    // on the `process.env` object.
     define: {
-      'process.env.OPENAI_API_KEY': JSON.stringify(env.OPENAI_API_KEY),
-      'process.env.DEEPSEEK_API_KEY': JSON.stringify(env.DEEPSEEK_API_KEY),
-      'process.env.ALI_API_KEY': JSON.stringify(env.ALI_API_KEY),
-
-      // Abstracted model configurations from .env file with fallbacks
-      // Endpoints are now constructed based on the proxy path variables
-      'process.env.OPENAI_ENDPOINT': JSON.stringify(`${openaiProxyPath}/v1/chat/completions`),
-      'process.env.OPENAI_MODEL': JSON.stringify(env.OPENAI_MODEL || 'gpt-5-ca'),
-      
-      'process.env.DEEPSEEK_ENDPOINT': JSON.stringify(`${deepseekProxyPath}/v1/chat/completions`),
-      'process.env.DEEPSEEK_MODEL': JSON.stringify(env.DEEPSEEK_MODEL || 'deepseek-chat'),
-      
-      'process.env.ALI_ENDPOINT': JSON.stringify(`${aliProxyPath}/v1/chat/completions`),
-      'process.env.ALI_MODEL': JSON.stringify(env.ALI_MODEL || 'doubao-seed-1-6-thinking-250715'),
+      'process.env.NODE_ENV': JSON.stringify(mode),
+      'process.env.API_KEY': JSON.stringify(env.VITE_GEMINI_API_KEY),
+      'process.env.OPENAI_API_KEY': JSON.stringify(env.VITE_OPENAI_API_KEY || env.OPENAI_API_KEY),
+      'process.env.DEEPSEEK_API_KEY': JSON.stringify(env.VITE_DEEPSEEK_API_KEY || env.DEEPSEEK_API_KEY),
+      'process.env.ALI_API_KEY': JSON.stringify(env.VITE_ALI_API_KEY || env.ALI_API_KEY),
+      'process.env.OPENAI_ENDPOINT': JSON.stringify(env.VITE_OPENAI_ENDPOINT || `${openaiProxyPath}/v1/chat/completions`),
+      'process.env.OPENAI_MODEL': JSON.stringify(env.VITE_OPENAI_MODEL || env.OPENAI_MODEL || 'gpt-5-ca'),
+      'process.env.DEEPSEEK_ENDPOINT': JSON.stringify(env.VITE_DEEPSEEK_ENDPOINT || `${deepseekProxyPath}/v1/chat/completions`),
+      'process.env.DEEPSEEK_MODEL': JSON.stringify(env.VITE_DEEPSEEK_MODEL || env.DEEPSEEK_MODEL || 'deepseek-chat'),
+      'process.env.ALI_ENDPOINT': JSON.stringify(env.VITE_ALI_ENDPOINT || `${aliProxyPath}/v1/chat/completions`),
+      'process.env.ALI_MODEL': JSON.stringify(env.VITE_ALI_MODEL || env.ALI_MODEL || 'doubao-seed-1-6-thinking-250715'),
     }
   }
 })

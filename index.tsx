@@ -121,7 +121,8 @@ const callGenerativeAi = async (provider: ModelProvider, systemInstruction: stri
       let responseText: string;
 
       if (provider === 'gemini') {
-        const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY! });
+        // FIX: Updated to use process.env.API_KEY for Gemini API key as per SDK guidelines.
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
         const config: any = { systemInstruction };
 
         if (jsonResponse) {
@@ -264,7 +265,8 @@ const callGenerativeAiStream = async (
         }
 
         if (provider === 'gemini') {
-            const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY! });
+            // FIX: Updated to use process.env.API_KEY for Gemini API key as per SDK guidelines.
+            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
             const config: any = { systemInstruction };
             
             if (thinkingBudget !== undefined) {
@@ -2042,7 +2044,7 @@ const App = () => {
         try {
             const savedKeys = localStorage.getItem('apiKeys');
             const parsedKeys = savedKeys ? JSON.parse(savedKeys) : {};
-            // Set keys from process.env if available
+            // Set keys from environment variables if available
             parsedKeys.openai = parsedKeys.openai || process.env.OPENAI_API_KEY;
             parsedKeys.deepseek = parsedKeys.deepseek || process.env.DEEPSEEK_API_KEY;
             parsedKeys.ali = parsedKeys.ali || process.env.ALI_API_KEY;
@@ -2064,7 +2066,8 @@ const App = () => {
     useEffect(() => {
         const fetchKnowledgeBases = async () => {
             // Check if running in production (e.g., on GitHub Pages)
-            if (import.meta.env.PROD) {
+            // Vite sets `process.env.NODE_ENV` to 'production' for production builds.
+            if (process.env.NODE_ENV === 'production') {
                 setKbError("知识库功能在此在线演示版中不可用。此功能需要连接本地后端服务才能运行。");
                 setIsKbLoading(false);
                 setKnowledgeBases([]);
