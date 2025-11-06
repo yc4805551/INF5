@@ -50,9 +50,9 @@ jobs:
           VITE_DEEPSEEK_MODEL: ${{ secrets.VITE_DEEPSEEK_MODEL }}
           
           # 3. 如果你未来还要加 OpenAI, 就取消下面这几行的注释
-          # VITE_OPENAI_API_KEY: ${{ secrets.VITE_OPENAI_API_KEY }}
-          # VITE_OPENAI_ENDPOINT: ${{ secrets.VITE_OPENAI_ENDPOINT }}
-          # VITE_OPENAI_MODEL: ${{ secrets.VITE_OPENAI_MODEL }}
+          VITE_OPENAI_API_KEY: ${{ secrets.VITE_OPENAI_API_KEY }}
+          VITE_OPENAI_ENDPOINT: ${{ secrets.VITE_OPENAI_ENDPOINT }}
+          VITE_OPENAI_MODEL: ${{ secrets.VITE_OPENAI_MODEL }}
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Upload artifact
