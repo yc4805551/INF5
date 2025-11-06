@@ -5,8 +5,8 @@ import { marked } from 'marked';
 import { GoogleGenAI } from '@google/genai';
 
 
-const API_BASE_URL = import.meta.env.PROD
-  ? import.meta.env.VITE_API_BASE_URL
+const API_BASE_URL = import.meta.env?.PROD
+  ? import.meta.env?.VITE_API_BASE_URL
   : 'http://127.0.0.1:5000/api';
 
 // FIX: Modified debounce to return a function with a `clearTimeout` method to cancel pending calls.
@@ -92,6 +92,148 @@ type AuditResults = {
     [key in ModelProvider]?: AuditResult
 };
 
+const frontendApiConfig: Record<string, {
+    apiKey?: string;
+    endpoint?: string;
+    model?: string;
+}> = {
+    gemini: {
+        apiKey: import.meta.env?.VITE_GEMINI_API_KEY,
+        model: 'gemini-2.5-flash',
+    },
+    openai: {
+        apiKey: import.meta.env?.VITE_OPENAI_API_KEY,
+        endpoint: import.meta.env?.VITE_OPENAI_TARGET_URL ? `${import.meta.env.VITE_OPENAI_TARGET_URL}/v1/chat/completions` : undefined,
+        model: import.meta.env?.VITE_OPENAI_MODEL,
+    },
+    deepseek: {
+        apiKey: import.meta.env?.VITE_DEEPSEEK_API_KEY,
+        endpoint: import.meta.env?.VITE_DEEPSEEK_ENDPOINT,
+        model: import.meta.env?.VITE_DEEPSEEK_MODEL,
+    },
+    ali: {
+        apiKey: import.meta.env?.VITE_ALI_API_KEY,
+        endpoint: import.meta.env?.VITE_ALI_ENDPOINT || (import.meta.env?.VITE_ALI_TARGET_URL ? `${import.meta.env.VITE_ALI_TARGET_URL}/v1/chat/completions` : undefined),
+        model: import.meta.env?.VITE_ALI_MODEL,
+    }
+};
+
+async function callOpenAiCompatibleApi(
+    apiKey: string,
+    endpoint: string,
+    model: string,
+    systemInstruction: string,
+    userPrompt: string,
+    history: ChatMessage[],
+    jsonResponse: boolean
+) {
+    const messages = [
+        { role: 'system', content: systemInstruction },
+        ...history.map(h => ({ role: h.role as 'user' | 'assistant', content: h.parts[0].text })),
+        { role: 'user', content: userPrompt }
+    ];
+
+    const body: any = {
+        model,
+        messages,
+        stream: false,
+    };
+
+    if (jsonResponse) {
+        body.response_format = { type: 'json_object' };
+    }
+
+    const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify(body)
+    });
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`API Error: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+
+    const result = await response.json();
+    return result.choices[0].message.content;
+}
+
+async function callOpenAiCompatibleApiStream(
+    apiKey: string,
+    endpoint: string,
+    model: string,
+    systemInstruction: string,
+    userPrompt: string,
+    history: ChatMessage[],
+    onChunk: (textChunk: string) => void,
+    onComplete: () => void,
+    onError: (error: Error) => void,
+) {
+    try {
+        const messages = [
+            { role: 'system', content: systemInstruction },
+            ...history.map(h => ({ role: h.role as 'user' | 'assistant', content: h.parts[0].text })),
+            { role: 'user', content: userPrompt }
+        ];
+
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+                model,
+                messages,
+                stream: true,
+            })
+        });
+
+        if (!response.ok || !response.body) {
+            const errorText = await response.text().catch(() => `Status: ${response.status}`);
+            throw new Error(`Streaming Error: ${errorText}`);
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || ''; // Keep the last, possibly incomplete line
+
+            for (const line of lines) {
+                if (line.trim().startsWith('data: ')) {
+                    const dataStr = line.substring(6).trim();
+                    if (dataStr === '[DONE]') {
+                        onComplete();
+                        return;
+                    }
+                    try {
+                        const data = JSON.parse(dataStr);
+                        const content = data.choices?.[0]?.delta?.content;
+                        if (content) {
+                            onChunk(content);
+                        }
+                    } catch (e) {
+                        console.error("Error parsing stream data chunk:", dataStr, e);
+                    }
+                }
+            }
+        }
+        onComplete();
+    } catch (error: any) {
+        onError(error);
+    }
+}
+
 const callGenerativeAi = async (
     provider: ModelProvider,
     executionMode: ExecutionMode,
@@ -102,25 +244,38 @@ const callGenerativeAi = async (
     history: ChatMessage[] = []
 ) => {
     if (executionMode === 'frontend') {
-        if (provider !== 'gemini') {
-            throw new Error('Frontend Direct mode only supports the Gemini model.');
-        }
-        if (!import.meta.env.VITE_GEMINI_API_KEY) {
-            throw new Error('Gemini API key is not configured for Frontend Direct mode.');
+        const config = frontendApiConfig[provider];
+        if (!config?.apiKey || !config.model) {
+            throw new Error(`Frontend Direct mode for ${provider} is not configured. Please set VITE_${provider.toUpperCase()}_API_KEY and model in your environment.`);
         }
 
-        const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
-        const fullContents = [...history, { role: 'user', parts: [{ text: userPrompt }] }];
+        if (provider === 'gemini') {
+            const ai = new GoogleGenAI({ apiKey: config.apiKey });
+            const fullContents = [...history, { role: 'user', parts: [{ text: userPrompt }] }];
 
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: fullContents as any, // Cast to any to align with SDK expectations
-            config: {
-                systemInstruction: systemInstruction,
-                responseMimeType: jsonResponse ? 'application/json' : undefined
+            const response = await ai.models.generateContent({
+                model: config.model,
+                contents: fullContents as any, // Cast to any to align with SDK expectations
+                config: {
+                    systemInstruction: systemInstruction,
+                    responseMimeType: jsonResponse ? 'application/json' : undefined
+                }
+            });
+            return response.text;
+        } else { // OpenAI-compatible
+            if (!config.endpoint) {
+                throw new Error(`Frontend Direct mode for ${provider} is not configured. Please set the endpoint URL in your environment.`);
             }
-        });
-        return response.text;
+            return callOpenAiCompatibleApi(
+                config.apiKey,
+                config.endpoint,
+                config.model,
+                systemInstruction,
+                userPrompt,
+                history,
+                jsonResponse
+            );
+        }
 
     } else { // Backend mode
         const retries = 2; // 1 initial attempt + 2 retries
@@ -172,25 +327,41 @@ const callGenerativeAiStream = async (
 ) => {
     try {
         if (executionMode === 'frontend') {
-             if (provider !== 'gemini') {
-                throw new Error('Frontend Direct mode only supports the Gemini model.');
+             const config = frontendApiConfig[provider];
+            if (!config?.apiKey || !config.model) {
+                throw new Error(`Frontend Direct mode for ${provider} is not configured. Please set VITE_${provider.toUpperCase()}_API_KEY and model in your environment.`);
             }
-            if (!import.meta.env.VITE_GEMINI_API_KEY) {
-                throw new Error('Gemini API key is not configured for Frontend Direct mode.');
-            }
-            const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
-            const fullContents = [...history, { role: 'user', parts: [{ text: userPrompt }] }];
             
-            const streamResult = await ai.models.generateContentStream({
-                model: 'gemini-2.5-flash',
-                contents: fullContents as any, // Cast to any to align with SDK
-                config: { systemInstruction: systemInstruction }
-            });
+            if (provider === 'gemini') {
+                const ai = new GoogleGenAI({ apiKey: config.apiKey });
+                const fullContents = [...history, { role: 'user', parts: [{ text: userPrompt }] }];
+                
+                const streamResult = await ai.models.generateContentStream({
+                    model: config.model,
+                    contents: fullContents as any, // Cast to any to align with SDK
+                    config: { systemInstruction: systemInstruction }
+                });
 
-            for await (const chunk of streamResult) {
-                onChunk(chunk.text);
+                for await (const chunk of streamResult) {
+                    onChunk(chunk.text);
+                }
+                onComplete();
+            } else { // OpenAI-compatible
+                if (!config.endpoint) {
+                    throw new Error(`Frontend Direct mode for ${provider} is not configured. Please set the endpoint URL in your environment.`);
+                }
+                await callOpenAiCompatibleApiStream(
+                    config.apiKey,
+                    config.endpoint,
+                    config.model,
+                    systemInstruction,
+                    userPrompt,
+                    history,
+                    onChunk,
+                    onComplete,
+                    onError
+                );
             }
-            onComplete();
 
         } else { // Backend mode
             const response = await fetch(`${API_BASE_URL}/generate-stream`, {
@@ -446,7 +617,7 @@ const HomeInputView = ({
                         </button>
                     </div>
                     {executionMode === 'frontend' && (
-                        <p className="instruction-text">前端直连模式仅支持 Gemini 模型，并将直接在浏览器中调用其 API。</p>
+                        <p className="instruction-text">前端直连模式将直接在浏览器中调用 AI 服务。请确保已在环境中配置了相应模型的 API Keys。</p>
                     )}
                 </div>
                 <div className="config-group">
@@ -457,7 +628,7 @@ const HomeInputView = ({
                                 key={model}
                                 className={`model-btn ${selectedModel === model ? 'active' : ''}`}
                                 onClick={() => setSelectedModel(model)}
-                                disabled={isProcessing || (executionMode === 'frontend' && model !== 'gemini')}
+                                disabled={isProcessing}
                             >
                                 {model}
                             </button>
@@ -903,22 +1074,41 @@ const parseJsonResponse = <T,>(responseText: string): { data: T | null, error?: 
 };
 
 
-const parseAuditResponse = (responseText: string): { issues: AuditIssue[], error?: string, rawResponse?: string } => {
-    const { data, error, rawResponse } = parseJsonResponse<AuditIssue[]>(responseText);
+const parseAuditResponse = (responseText: string): { issues: AuditIssue[], error?: string, rawResponse?: string } => { 
+  // 1. 'parseError' 和 'parsedRawResponse' 仅在 parseJsonResponse 本身失败时才会被设置 
+  const { data, error: parseError, rawResponse: parsedRawResponse } = parseJsonResponse<unknown>(responseText); 
 
-    if (!data) {
-        return { issues: [], error, rawResponse };
-    }
+  // 2. 如果 parseJsonResponse 失败，则将其错误和原始响应向上传递 
+  if (!data) { 
+    return { issues: [], error: parseError, rawResponse: parsedRawResponse }; 
+  }
 
-    const validIssues = data.filter(issue => 
-        issue && 
-        typeof issue.problematicText === 'string' &&
-        typeof issue.suggestion === 'string' &&
-        typeof issue.checklistItem === 'string' &&
-        typeof issue.explanation === 'string' &&
-        issue.problematicText.trim()
-    );
-    return { issues: validIssues };
+  let issuesArray: AuditIssue[] = [];
+
+  // 3. 检查 data 是否直接就是一个数组 
+  if (Array.isArray(data)) {
+    issuesArray = data as AuditIssue[];
+  }
+  // 4. 否则，检查 data 是否是一个包含 'issues' 数组的对象 
+  else if (typeof data === 'object' && data !== null && 'issues' in data && Array.isArray((data as { issues: any }).issues)) {
+    issuesArray = (data as { issues: AuditIssue[] }).issues;
+  }
+  // 5. 【关键修复】如果两种都不是，说明格式错误 
+  else { 
+    // 我们现在将原始的 'responseText' 作为 rawResponse 传递回去，以便调试 
+    return { issues: [], error: "模型返回了意外的 JSON 格式 (既不是数组，也不是包含 'issues' 的对象)。", rawResponse: responseText }; 
+  }
+
+  // 6. 现在我们安全地筛选 issuesArray 
+  const validIssues = issuesArray.filter(issue =>
+    issue &&
+    typeof issue.problematicText === 'string' &&
+    typeof issue.suggestion === 'string' &&
+    typeof issue.checklistItem === 'string' &&
+    typeof issue.explanation === 'string' &&
+    issue.problematicText.trim()
+  );
+  return { issues: validIssues };
 };
 
 const AuditView = ({
@@ -1092,11 +1282,11 @@ const AuditView = ({
                     <button className="btn btn-secondary" onClick={addChecklistItem} disabled={isLoading}>+ 添加规则</button>
                 </div>
                 <div className="audit-button-group">
-                     <button className="btn btn-primary audit-start-btn" onClick={handleAudit} disabled={isLoading || !text || (executionMode === 'frontend' && selectedModel !== 'gemini')}>
+                     <button className="btn btn-primary audit-start-btn" onClick={handleAudit} disabled={isLoading || !text}>
                         {isLoading ? <span className="spinner"></span> : null}
                         {isLoading ? '审阅中...' : `审阅 (${selectedModel})`}
                     </button>
-                    <button className="btn btn-primary audit-start-btn" onClick={handleAuditAll} disabled={isLoading || !text || executionMode === 'frontend'}>
+                    <button className="btn btn-primary audit-start-btn" onClick={handleAuditAll} disabled={isLoading || !text}>
                         {isLoading ? <span className="spinner"></span> : null}
                         {isLoading ? '审阅中...' : '全部模型审阅'}
                     </button>
@@ -1856,10 +2046,13 @@ const App = () => {
     const [initialKnowledgeChatQuestion, setInitialKnowledgeChatQuestion] = useState<string | undefined>();
     
     useEffect(() => {
-        if (executionMode === 'frontend') {
-            setSelectedModel('gemini');
+        if (executionMode === 'frontend' && selectedModel !== 'gemini') {
+            // If switching to frontend and a non-Gemini model was selected,
+            // default back to Gemini to avoid issues before this refactor.
+            // With the refactor, this line is less critical but good for safety.
+            // setSelectedModel('gemini'); // This logic is now removed to allow other models
         }
-    }, [executionMode]);
+    }, [executionMode, selectedModel]);
 
     useEffect(() => {
         const fetchKnowledgeBases = async () => {

@@ -4,8 +4,6 @@ import { ServerResponse } from 'http';
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  // Set the base path for deployment to the specific GitHub repository.
-  base: '/INF3/',
   plugins: [react()],
   server: {
     watch: {
@@ -14,12 +12,13 @@ export default defineConfig({
       ignored: ['**/tsconfig.json'],
     },
     proxy: {
-      // 本地后端服务代理（知识库和AI生成请求）
+      // Proxy for the local backend, which handles both knowledge base
+      // and AI generation requests during development.
       '/api': {
-        target: 'http://127.0.0.1:5000', // 本地开发时指向本地Flask后端
+        target: 'http://localhost:5000', // Use localhost for better compatibility.
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ''),
-        // 添加日志以便调试代理问题
+        // Add logging to help debug proxy issues.
         configure: (proxy, options) => {
           proxy.on('proxyReq', (proxyReq, req, res) => {
             console.log(`[vite-proxy] Sending request: ${req.method} ${req.url} -> ${options.target}${proxyReq.path}`);
@@ -36,24 +35,6 @@ export default defineConfig({
             }
           });
         }
-      },
-      // OpenAI API 代理
-      '/proxy/my-openai': {
-        target: 'https://api.chatanywhere.tech',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/proxy\/my-openai/, ''),
-      },
-      // DeepSeek API 代理
-      '/proxy/deepseek': {
-        target: 'https://api.deepseek.com',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/proxy\/deepseek/, ''),
-      },
-      // 阿里云（豆包）API 代理
-      '/proxy/ali': {
-        target: 'https://www.dmxapi.cn',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/proxy\/ali/, ''),
       },
     }
   },
