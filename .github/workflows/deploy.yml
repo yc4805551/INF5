@@ -15,7 +15,8 @@ permissions:
   pages: write
   id-token: write
 
-# Allow only one concurrent deployment
+# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
+# However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
 concurrency:
   group: "pages"
   cancel-in-progress: false
@@ -35,27 +36,29 @@ jobs:
         with:
           node-version: 20
           cache: 'npm'
-          
       - name: Install dependencies
-        # Using npm install after removing lock file as per user's reference file
-        #run: |
-        #rm -f package-lock.json
-        run: npm install
-
+        run: npm ci
       - name: Build
         run: npm run build
         env: 
-          # Inject the production backend API URL from repository secrets.
-          # All AI API Keys should be securely stored as environment variables on your Render backend.
-          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
           # 1. 添加 Gemini Key
-          #VITE_GEMINI_API_KEY: ${{ secrets.VITE_GEMINI_API_KEY }}
+          VITE_GEMINI_API_KEY: ${{ secrets.VITE_GEMINI_API_KEY }}
+
+          # 2. 添加你新创建的 DeepSeek Secrets
+          VITE_DEEPSEEK_API_KEY: ${{ secrets.VITE_DEEPSEEK_API_KEY }}
+          VITE_DEEPSEEK_ENDPOINT: ${{ secrets.VITE_DEEPSEEK_ENDPOINT }}
+          VITE_DEEPSEEK_MODEL: ${{ secrets.VITE_DEEPSEEK_MODEL }}
+          
+          # 3. 如果你未来还要加 OpenAI, 就取消下面这几行的注释
+          VITE_OPENAI_API_KEY: ${{ secrets.VITE_OPENAI_API_KEY }}
+          VITE_OPENAI_ENDPOINT: ${{ secrets.VITE_OPENAI_ENDPOINT }}
+          VITE_OPENAI_MODEL: ${{ secrets.VITE_OPENAI_MODEL }}
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          # Upload the 'dist' directory
+          # Upload the 'dist' directory which contains the built site
           path: './dist'
       - name: Deploy to GitHub Pages
         id: deployment
