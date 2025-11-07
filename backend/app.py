@@ -542,7 +542,7 @@ def _stream_gemini(user_prompt, system_instruction, history):
         
         # 4. 构建API请求 
         # --- 关键修复：使用 gemini-1.0-pro (根据 404 日志) ---
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.0-pro:streamGenerateContent?key={GEMINI_API_KEY}" 
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:streamGenerateContent?key={GEMINI_API_KEY}" 
         headers = {'Content-Type': 'application/json'} 
         payload = { 
             "contents": contents, 
