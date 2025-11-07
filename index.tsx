@@ -6,7 +6,7 @@ import { GoogleGenAI } from '@google/genai';
 
 
 const API_BASE_URL = import.meta.env?.PROD
-  ? import.meta.env?.VITE_API_BASE_URL
+  ? `${import.meta.env.VITE_API_BASE_URL || ''}/api`
   : 'http://127.0.0.1:5000/api';
 
 // FIX: Modified debounce to return a function with a `clearTimeout` method to cancel pending calls.
@@ -98,7 +98,8 @@ const frontendApiConfig: Record<string, {
     model?: string;
 }> = {
     gemini: {
-        apiKey: import.meta.env?.VITE_GEMINI_API_KEY,
+        // NOTE: The API key for frontend mode is handled directly in the `callGenerativeAi` function
+        // using `import.meta.env.VITE_GEMINI_API_KEY` to comply with browser environment standards.
         model: 'gemini-2.5-flash',
     },
     openai: {
@@ -245,12 +246,18 @@ const callGenerativeAi = async (
 ) => {
     if (executionMode === 'frontend') {
         const config = frontendApiConfig[provider];
-        if (!config?.apiKey || !config.model) {
-            throw new Error(`Frontend Direct mode for ${provider} is not configured. Please set VITE_${provider.toUpperCase()}_API_KEY and model in your environment.`);
+        if (!config.model) {
+            throw new Error(`Frontend Direct mode for ${provider} is not configured: model is missing.`);
         }
 
         if (provider === 'gemini') {
-            const ai = new GoogleGenAI({ apiKey: config.apiKey });
+            // NOTE: The @google/genai guideline specifies using process.env.API_KEY, which is for Node.js environments.
+            // For frontend execution in Vite, we must use import.meta.env to access environment variables.
+            const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+            if (!apiKey) {
+                throw new Error(`Frontend direct mode for Gemini is not configured. Please set VITE_GEMINI_API_KEY in your environment.`);
+            }
+            const ai = new GoogleGenAI({ apiKey });
             const fullContents = [...history, { role: 'user', parts: [{ text: userPrompt }] }];
 
             const response = await ai.models.generateContent({
@@ -263,6 +270,9 @@ const callGenerativeAi = async (
             });
             return response.text;
         } else { // OpenAI-compatible
+            if (!config.apiKey) {
+                throw new Error(`Frontend Direct mode for ${provider} is not configured. Please set VITE_${provider.toUpperCase()}_API_KEY in your environment.`);
+            }
             if (!config.endpoint) {
                 throw new Error(`Frontend Direct mode for ${provider} is not configured. Please set the endpoint URL in your environment.`);
             }
@@ -327,13 +337,19 @@ const callGenerativeAiStream = async (
 ) => {
     try {
         if (executionMode === 'frontend') {
-             const config = frontendApiConfig[provider];
-            if (!config?.apiKey || !config.model) {
-                throw new Error(`Frontend Direct mode for ${provider} is not configured. Please set VITE_${provider.toUpperCase()}_API_KEY and model in your environment.`);
+            const config = frontendApiConfig[provider];
+            if (!config.model) {
+                throw new Error(`Frontend Direct mode for ${provider} is not configured. Model is missing.`);
             }
             
             if (provider === 'gemini') {
-                const ai = new GoogleGenAI({ apiKey: config.apiKey });
+                // NOTE: The @google/genai guideline specifies using process.env.API_KEY, which is for Node.js environments.
+                // For frontend execution in Vite, we must use import.meta.env to access environment variables.
+                const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+                if (!apiKey) {
+                    throw new Error(`Frontend direct mode for Gemini is not configured. Please set VITE_GEMINI_API_KEY in your environment.`);
+                }
+                const ai = new GoogleGenAI({ apiKey });
                 const fullContents = [...history, { role: 'user', parts: [{ text: userPrompt }] }];
                 
                 const streamResult = await ai.models.generateContentStream({
@@ -347,6 +363,9 @@ const callGenerativeAiStream = async (
                 }
                 onComplete();
             } else { // OpenAI-compatible
+                if (!config.apiKey) {
+                    throw new Error(`Frontend Direct mode for ${provider} is not configured. Please set VITE_${provider.toUpperCase()}_API_KEY in your environment.`);
+                }
                 if (!config.endpoint) {
                     throw new Error(`Frontend Direct mode for ${provider} is not configured. Please set the endpoint URL in your environment.`);
                 }
@@ -657,10 +676,6 @@ const HomeInputView = ({
                             <p className="instruction-text">未找到可用的知识库。请检查后端服务和 Milvus 连接。</p>
                         )
                     )}
-                </div>
-                <div className="config-group">
-                    <h4>API Keys</h4>
-                    <p className="instruction-text">API Keys 现已在后端服务中统一管理，无需在前端配置。</p>
                 </div>
             </div>
         </div>

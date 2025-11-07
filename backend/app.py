@@ -359,26 +359,34 @@ def _format_history(history):
 
 @app.route('/api/generate', methods=['POST'])
 def handle_generate():
-    """处理非流式 AI 生成请求"""
+    # 简化了响应收集方式，直接使用字符串拼接
+    full_response = ""
+    
+    if provider == 'gemini':
+        # 优化了错误检测逻辑
+        for chunk in _stream_gemini(...):
+            if "[后端" in chunk:  # 检查流中是否有错误
+                raise Exception(chunk)
+            full_response += chunk
     try:
         data = request.get_json()
         provider = data.get('provider')
         
         logging.info(f"收到非流式生成请求，Provider: {provider}")
         
-        # 统一调用流式函数，但等待完整响应
+        # 统一调用流式函数，并收集响应
+        full_response = ""
+        
         if provider == 'gemini':
             if not GEMINI_API_KEY:
                 return jsonify({"error": "GEMINI_API_KEY 未设置"}), 500
             # Gemini 仍然使用官方API
-            import io
-            from contextlib import redirect_stdout
-            f = io.StringIO()
-            with redirect_stdout(f):
-                for chunk in _stream_gemini(data.get('userPrompt'), data.get('systemInstruction'), data.get('history', [])):
-                    print(chunk, end='')
-            full_response = f.getvalue()
+            for chunk in _stream_gemini(data.get('userPrompt'), data.get('systemInstruction'), data.get('history', [])):
+                if "[后端" in chunk: # 检查流中是否有错误
+                    raise Exception(chunk)
+                full_response += chunk
             return jsonify({"text": full_response})
+            
         elif provider == 'openai':
             # 使用代理的OpenAI
             return _call_openai_proxy(data)
@@ -393,6 +401,7 @@ def handle_generate():
 
     except Exception as e:
         logging.error(f"API /api/generate 错误: {e}")
+        # 将异常信息作为JSON错误返回
         return jsonify({"error": "服务器内部错误", "details": str(e)}), 500
 
 
@@ -433,39 +442,81 @@ def handle_generate_stream():
         return jsonify({"error": "服务器内部错误", "details": str(e)}), 500
 
 def _stream_gemini(user_prompt, system_instruction, history):
-    """流式调用 Google Gemini"""
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:streamGenerateContent?key={GEMINI_API_KEY}"
-    
-    headers = {'Content-Type': 'application/json'}
-    
-    # 构建 Gemini 的 contents 格式
-    contents = []
-    if system_instruction:
-        # Gemini 没有 system, 放在第一个 user message
-        contents.append({"role": "user", "parts": [{"text": system_instruction}]})
-        contents.append({"role": "model", "parts": [{"text": "好的，我将遵循这个指示。"}]}) # 模拟 assistant 回答
-
-    for item in history:
-        # 确保 "user" 和 "model" 角色
-        if item['role'] == 'user':
-             contents.append({"role": "user", "parts": [{"text": item['parts'][0]['text']}]})
-        elif item['role'] == 'model':
-             contents.append({"role": "model", "parts": [{"text": item['parts'][0]['text']}]})
-
-    contents.append({"role": "user", "parts": [{"text": user_prompt}]})
-
-    payload = {"contents": contents}
-
+    """处理Gemini模型的流式响应"""
     try:
-        with requests.post(url, headers=headers, json=payload, stream=True, timeout=180) as r:
-            r.raise_for_status()
-            for line in r.iter_lines():
-                if line:
-                    line_str = line.decode('utf-8').strip()
-                    if line_str.startswith('"text":'):
-                        text_chunk = line_str.replace('"text": "', '').replace('"', '').replace(',', '').strip()
-                        yield text_chunk
-    except requests.exceptions.RequestException as e:
+        # 初始化变量
+        contents = []
+        last_role = "model" if system_instruction else None
+        
+        # 处理历史消息
+        for item in history:
+            current_role = item.get('role')
+            if not current_role:
+                logging.warning(f"跳过缺少角色的历史记录: {item}")
+                continue
+            
+            # 验证parts格式
+            parts = item.get('parts')
+            if not parts or not isinstance(parts, list) or len(parts) == 0 or not parts[0].get('text'):
+                logging.warning(f"跳过格式无效的历史记录: {item}")
+                continue
+            
+            # 确保第一个消息必须是user
+            if not contents and current_role == 'model':
+                logging.warning("跳过历史记录中开头的 'model' 消息。")
+                continue
+                
+            # 避免重复角色
+            if current_role == last_role:
+                logging.warning(f"跳过重复的角色: {current_role}")
+                continue
+            
+            # 添加有效的历史消息
+            contents.append(item)
+            last_role = current_role
+        
+        # 修复用户消息前必须是模型回复的问题
+        if last_role == 'user':
+            # 如果历史的最后一条是'user'，添加一个假的'model'回复
+            contents.append({"role": "model", "parts": [{"text": "..."}]})
+        
+        # 添加当前用户的消息
+        contents.append({"role": "user", "parts": [{"text": user_prompt}]})
+        
+        # 构建API请求
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:streamGenerateContent?key={GEMINI_API_KEY}"
+        headers = {'Content-Type': 'application/json'}
+        payload = {
+            "contents": contents,
+            "generationConfig": {
+                "temperature": 0.7,
+                "maxOutputTokens": 2048
+            },
+            "stream": True
+        }
+        
+        # 如果有系统指令，添加到payload
+        if system_instruction:
+            payload["systemInstruction"] = {"parts": [{"text": system_instruction}]}
+        
+        # 发送API请求
+        r = requests.post(url, headers=headers, json=payload, stream=True)
+        
+        # 检查请求是否成功
+        if not r.ok:
+            error_details = r.text
+            logging.error(f"Gemini API 请求失败 (状态码: {r.status_code}): {error_details}")
+            yield f"[后端代理错误: Gemini API 返回 {r.status_code}. 详情: {error_details}]"
+            return
+
+        # 处理流式响应
+        for line in r.iter_lines():
+            if line:
+                line_str = line.decode('utf-8').strip()
+                if line_str.startswith('"text":'):
+                    text_chunk = line_str.replace('"text": "', '').replace('"', '').replace(',', '').strip()
+                    yield text_chunk
+    
         logging.error(f"调用 Gemini API 失败: {e}")
         yield f"[后端代理错误: {str(e)}]"
     except Exception as e:

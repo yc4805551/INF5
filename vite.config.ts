@@ -18,7 +18,6 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:5000', // Use localhost for better compatibility.
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, ''),
         // Add logging to help debug proxy issues.
         configure: (proxy, options) => {
           proxy.on('proxyReq', (proxyReq, req, res) => {

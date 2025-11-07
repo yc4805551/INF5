@@ -1,9 +1,12 @@
-// FIX: Removed the reference to "vite/client" which was causing a "Cannot find type definition file" error.
-// The custom ImportMeta and ImportMetaEnv interfaces below provide the necessary types for the project.
+// This file is now an ambient declaration file (a script file), not a module.
+// This allows `declare module 'mammoth'` to be a primary declaration, fixing the `export =` error,
+// and global interfaces are declared directly without `declare global`.
 
+// These interfaces will be merged into the global scope automatically by TypeScript,
+// augmenting Vite's built-in types without conflict.
 interface ImportMetaEnv {
-  // FIX: Added the PROD property to match Vite's built-in environment variables and fix the error in index.tsx.
   readonly PROD: boolean;
+  readonly DEV: boolean;
   readonly VITE_API_BASE_URL?: string;
   readonly VITE_GEMINI_API_KEY?: string;
   readonly VITE_OPENAI_API_KEY?: string;
@@ -22,6 +25,14 @@ interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
 
+// Augment the existing NodeJS.ProcessEnv interface for environment variables.
+namespace NodeJS {
+  interface ProcessEnv {
+    readonly API_KEY?: string;
+  }
+}
+
+// Declare the 'mammoth' module for CommonJS interoperability.
 declare module 'mammoth' {
   interface MammothResult {
     value: string;
@@ -32,5 +43,7 @@ declare module 'mammoth' {
     extractRawText(options: { arrayBuffer: ArrayBuffer }): Promise<MammothResult>;
   };
 
-  export default mammoth;
+  // FIX: `export =` is now valid because this `declare module` block is in a global
+  // script file, making it a primary module declaration, not an augmentation.
+  export = mammoth;
 }
