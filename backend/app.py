@@ -252,6 +252,7 @@ class KnowledgeBaseEventHandler(FileSystemEventHandler):
         self.watch_path = os.path.normpath(os.path.join(self.base_dir, self.collection_to_watch))
         logging.info(f"监控器已初始化，目标路径: {self.watch_path}")
     def process_if_relevant(self, event):
+        print(f"DEBUG: 收到事件: {event.event_type}, 路径: {event.src_path}")
         logging.info(f"收到事件: {event.event_type}, 路径: {event.src_path}")
         if event.is_directory:
             logging.info("忽略目录事件")
