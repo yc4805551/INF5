@@ -394,10 +394,15 @@ def find_related():
         if not query_text or not collection_name:
             return jsonify({"error": "缺少 text 或 collection_name"}), 400
         
-        if not utility.has_collection(collection_name):
+        # Ensure connection exists before checking collection
+        try:
             connections.connect("default", host=MILVUS_HOST, port=MILVUS_PORT)
-            if not utility.has_collection(collection_name):
-                return jsonify({"error": f"集合 '{collection_name}' 不存在"}), 404
+        except Exception as e:
+            logging.error(f"Milvus 连接失败: {e}")
+            return jsonify({"error": f"无法连接到向量数据库: {str(e)}"}), 500
+
+        if not utility.has_collection(collection_name):
+            return jsonify({"error": f"集合 '{collection_name}' 不存在"}), 404
 
         model_to_use = get_model_for_collection(collection_name)
         query_embedding = get_ollama_embedding(query_text, model_to_use)
