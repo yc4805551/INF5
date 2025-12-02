@@ -167,6 +167,7 @@ def get_file_hash(file_path):
 
 def upsert_file_to_milvus(file_path: str, collection_name: str, model_name: str):
     filename = os.path.basename(file_path)
+    print(f"DEBUG: 进入 upsert_file_to_milvus, 文件: {filename}")
     try:
         current_hash = get_file_hash(file_path)
         if not os.path.exists(file_path):
@@ -200,6 +201,7 @@ def upsert_file_to_milvus(file_path: str, collection_name: str, model_name: str)
         if not chunks: return
         
         entities_to_insert = []
+        print(f"DEBUG: 正在为 '{filename}' 处理 {len(chunks)} 个文本块...")
         logging.info(f"为 '{filename}' 处理 {len(chunks)} 个文本块...")
         with ThreadPoolExecutor(max_workers=INGEST_WORKERS) as executor:
             future_to_chunk = {executor.submit(get_ollama_embedding, chunk, model_name): (i, chunk) for i, chunk in enumerate(chunks)}
@@ -270,6 +272,7 @@ class KnowledgeBaseEventHandler(FileSystemEventHandler):
             logging.info(f"路径不匹配: 事件目录 '{event_dir}' != 监控目录 '{self.watch_path}'")
             return
             
+        print(f"DEBUG: 开始处理文件: {event.src_path}")
         logging.info(f"处理文件: {event.src_path}")
         if event.event_type in ('created', 'modified'):
             upsert_file_to_milvus(event.src_path, self.collection_to_watch, self.model_name)
