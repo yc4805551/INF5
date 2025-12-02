@@ -255,15 +255,18 @@ class KnowledgeBaseEventHandler(FileSystemEventHandler):
         print(f"DEBUG: 收到事件: {event.event_type}, 路径: {event.src_path}")
         logging.info(f"收到事件: {event.event_type}, 路径: {event.src_path}")
         if event.is_directory:
+            print("DEBUG: 忽略目录事件")
             logging.info("忽略目录事件")
             return
         if not (event.src_path.endswith(".txt") or event.src_path.endswith(".md")):
+            print(f"DEBUG: 忽略非 txt/md 文件: {event.src_path}")
             logging.info("忽略非 txt/md 文件")
             return
             
         event_dir = os.path.normpath(os.path.dirname(event.src_path))
         # Case-insensitive comparison for Windows
         if event_dir.lower() != self.watch_path.lower():
+            print(f"DEBUG: 路径不匹配: 事件目录 '{event_dir}' != 监控目录 '{self.watch_path}'")
             logging.info(f"路径不匹配: 事件目录 '{event_dir}' != 监控目录 '{self.watch_path}'")
             return
             
