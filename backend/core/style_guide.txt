@@ -1,0 +1,22 @@
+# Official Document Style Guide (工信部公文风格)
+
+## Core Principles
+1.  **Tone**: Rigorous, formal, authoritative, and concise. Avoid colloquialisms, emotional language, or vague descriptions.
+2.  **Structure**: Logical and hierarchical. Use standard numbering (一、 (一) 1. (1)).
+3.  **Vocabulary**: Use policy-specific terminology.
+    -   Instead of "do", use "implement" (实施), "promote" (推进), "strengthen" (加强).
+    -   Instead of "make sure", use "ensure" (保障), "verify" (落实).
+    -   Common phrases: "Accelerate promotion" (加快推进), "Strive to build" (着力构建), "Effectively improve" (有效提升), "Strictly implement" (严格落实), "Improve and perfect" (健全完善).
+
+## Formatting Rules
+-   **Headings**: Clear and descriptive.
+-   **Lists**: Use parallel structure for list items. Each item should ideally start with a verb or a noun phrase acting as a subject.
+-   **Punctuation**: Use standard Chinese punctuation.
+
+## 例子
+**Bad**: "We need to make sure data is shared between different departments so work is faster."
+**Good**: "Promote the cross-departmental sharing of data resources to effectively improve administrative efficiency." (推进跨部门数据资源共享，有效提升行政效能。)
+
+## 具体要求
+-   When the user asks for "optimization" or "revision", adhere strictly to these principles.
+-   Focus on "political standing" (政治站位) and "practical implementation" (落地实施).
