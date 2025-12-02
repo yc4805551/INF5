@@ -119,9 +119,11 @@ def get_ollama_embedding(text: str, model_name: str):
             raise ValueError(f"Ollama API 响应 (模型: {model_name}) 中缺少 'embedding' 字段。")
         return response_data["embedding"]
     except requests.exceptions.RequestException as e:
+        print(f"DEBUG: 调用 Ollama API (模型: {model_name}) 失败: {e}")
         logging.error(f"调用 Ollama API (模型: {model_name}) 失败: {e}")
         raise RuntimeError(f"无法连接到 Ollama 服务: {e}")
     except Exception as e:
+        print(f"DEBUG: 从 Ollama (模型: {model_name}) 获取嵌入时出错: {e}")
         logging.error(f"从 Ollama (模型: {model_name}) 获取嵌入时出错: {e}")
         raise
 
@@ -209,6 +211,7 @@ def upsert_file_to_milvus(file_path: str, collection_name: str, model_name: str)
                 try:
                     embedding = future.result()
                     i, chunk = future_to_chunk[future]
+                    print(f"DEBUG: 成功获取 chunk {i} 的嵌入")
                     entity = {
                         "id": str(uuid.uuid4()),
                         "text": chunk,
@@ -219,12 +222,15 @@ def upsert_file_to_milvus(file_path: str, collection_name: str, model_name: str)
                     }
                     entities_to_insert.append(entity)
                 except Exception as e:
+                    print(f"DEBUG: 生成嵌入失败: {e}")
                     logging.error(f"生成嵌入失败: {e}")
         if entities_to_insert:
             collection.insert(entities_to_insert)
             collection.flush()
+            print(f"DEBUG: 已更新文件: {filename}")
             logging.info(f"已更新文件: {filename}")
     except Exception as e:
+        print(f"DEBUG: 处理文件 '{filename}' 失败: {e}")
         logging.error(f"处理文件 '{filename}' 失败: {e}")
     finally:
         if 'collection' in locals():
