@@ -1555,7 +1555,7 @@ const KnowledgeChatView = ({
             const backendResponse = await fetch(`${API_BASE_URL}/find-related`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ text: messageToSend, collection_name: knowledgeBaseId, top_k: 5 })
+                body: JSON.stringify({ text: messageToSend, collection_name: knowledgeBaseId, top_k: 30 })
             });
             if (!backendResponse.ok) {
                 const errorText = await backendResponse.text().catch(() => backendResponse.statusText);
