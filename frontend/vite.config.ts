@@ -19,6 +19,7 @@ export default defineConfig(({ mode }) => {
       host: true, // Listen on all addresses (0.0.0.0)
       port: 5178,
       strictPort: true,
+      allowedHosts: ['www.yc01.top'], // Allow external domain access
       cors: true, // Explicitly enable CORS
       // hmr: {
       //   clientPort: 5178, 
