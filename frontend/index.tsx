@@ -4,6 +4,7 @@ import mammoth from 'mammoth';
 import { marked } from 'marked';
 import { GoogleGenAI } from '@google/genai';
 import { CanvasView } from './src/components/Canvas/CanvasView';
+import { CoCreationView } from './src/components/CoCreation/CoCreationView';
 
 // Helper to clean environment variables (remove accidentally added quotes/smart-quotes)
 const cleanEnv = (value: string | undefined): string | undefined => {
@@ -518,6 +519,7 @@ const HomeInputView = ({
     onWriting,
     onTextRecognition,
     onCanvas,
+    onCoCreation,
     executionMode,
     setExecutionMode,
 }: {
@@ -537,6 +539,7 @@ const HomeInputView = ({
     onWriting: () => void;
     onTextRecognition: () => void;
     onCanvas: () => void;
+    onCoCreation: () => void;
     executionMode: ExecutionMode;
     setExecutionMode: (mode: ExecutionMode) => void;
 }) => {
@@ -745,7 +748,10 @@ const HomeInputView = ({
                     5. 文本识别
                 </button>
                 <button className="action-btn" onClick={onCanvas} disabled={isProcessing}>
-                    6. 智能画布
+                    6. 格式画布
+                </button>
+                <button className="action-btn" onClick={onCoCreation} disabled={isProcessing}>
+                    7. 共创画布
                 </button>
             </div>
         </>
@@ -2688,8 +2694,11 @@ const TextRecognitionView = ({ provider, executionMode }: { provider: ModelProvi
     );
 };
 
+// Inline Debug Component
+
+
 const App = () => {
-    type View = 'home' | 'notes' | 'audit' | 'chat' | 'writing' | 'ocr' | 'canvas';
+    type View = 'home' | 'notes' | 'audit' | 'chat' | 'writing' | 'ocr' | 'canvas' | 'cocreation';
     const [view, setView] = useState<View>('home');
     const [inputText, setInputText] = useState('');
     const [noteAnalysisResult, setNoteAnalysisResult] = useState<NoteAnalysis | null>(null);
@@ -2791,6 +2800,10 @@ const App = () => {
         setView('canvas');
     };
 
+    const handleCoCreation = () => {
+        setView('cocreation');
+    };
+
     const handleTriggerAudit = () => {
         setView('audit');
     };
@@ -2867,6 +2880,27 @@ const App = () => {
                 />;
             case 'canvas':
                 return <CanvasView onBack={handleBackToHome} />;
+            case 'cocreation':
+                return <CoCreationView
+                    onBack={handleBackToHome}
+                    callAiStream={async (sys, user, hist, onChunk, onComp, onErr) => {
+                        const adaptedHistory = hist.map(h => ({
+                            role: h.role,
+                            parts: [{ text: h.text }]
+                        })) as ChatMessage[];
+
+                        await callGenerativeAiStream(
+                            selectedModel,
+                            executionMode,
+                            sys,
+                            user,
+                            adaptedHistory,
+                            onChunk,
+                            onComp,
+                            onErr
+                        );
+                    }}
+                />;
             case 'home':
             default:
                 return (
@@ -2887,6 +2921,7 @@ const App = () => {
                         onWriting={handleTriggerWriting}
                         onTextRecognition={handleTextRecognition}
                         onCanvas={handleCanvas}
+                        onCoCreation={handleCoCreation}
                         executionMode={executionMode}
                         setExecutionMode={setExecutionMode}
                     />
@@ -2904,7 +2939,7 @@ const App = () => {
 
     return (
         <div className="main-layout">
-            {view !== 'canvas' && (
+            {(view !== 'canvas' && view !== 'cocreation') && (
                 <div className="app-header">
                     <h1>写作笔记助手</h1>
                     <div className="button-group">

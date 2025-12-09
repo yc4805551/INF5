@@ -1,0 +1,517 @@
+.cc-container {
+    display: flex;
+    height: 100vh;
+    width: 100vw;
+    background-color: #f9fafb;
+    overflow: hidden;
+}
+
+/* Chat Panel */
+.cc-chat-panel {
+    width: 380px;
+    /* Slightly wider for better reading */
+    min-width: 320px;
+    max-width: 480px;
+    display: flex;
+    flex-direction: column;
+    background: white;
+    border-right: 1px solid #e5e7eb;
+    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.05);
+    z-index: 10;
+}
+
+.cc-header {
+    height: 60px;
+    border-bottom: 1px solid #f3f4f6;
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 12px;
+}
+
+.cc-title {
+    font-weight: 600;
+    color: #111827;
+}
+
+.cc-icon-btn {
+    padding: 10px;
+    border-radius: 8px;
+    color: #4b5563;
+    transition: background 0.2s;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.cc-icon-btn:hover {
+    background-color: #f3f4f6;
+    color: #111827;
+}
+
+.cc-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    background: #ffffff;
+}
+
+.cc-bubble {
+    padding: 12px 16px;
+    border-radius: 12px;
+    max-width: 95%;
+    font-size: 14px;
+    line-height: 1.6;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.cc-message.user {
+    align-self: flex-end;
+}
+
+.cc-message.user .cc-bubble {
+    background-color: #3b82f6;
+    color: white;
+    border-bottom-right-radius: 2px;
+}
+
+.cc-message.model {
+    align-self: flex-start;
+}
+
+.cc-message.model .cc-bubble {
+    background-color: #f9fafb;
+    color: #1f2937;
+    border-bottom-left-radius: 2px;
+    border: 1px solid #e5e7eb;
+}
+
+.cc-message.model .cc-bubble p {
+    margin: 8px 0;
+}
+
+.cc-message.model .cc-bubble p:first-child {
+    margin-top: 0;
+}
+
+.cc-input-area-wrapper {
+    background: white;
+    border-top: 1px solid #e5e7eb;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.02);
+}
+
+.cc-context-chips {
+    display: flex;
+    gap: 8px;
+    padding: 8px 16px 0 16px;
+    flex-wrap: wrap;
+}
+
+.cc-chip {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    background: #f3f4f6;
+    border-radius: 4px;
+    font-size: 12px;
+    color: #4b5563;
+    border: 1px solid #e5e7eb;
+}
+
+.cc-chip.requirement {
+    background: #fef2f2;
+    color: #b91c1c;
+    border-color: #fecaca;
+}
+
+.cc-chip.reference {
+    background: #eff6ff;
+    color: #1d4ed8;
+    border-color: #bfdbfe;
+}
+
+.cc-chip-remove {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    color: inherit;
+    opacity: 0.6;
+}
+
+.cc-chip-remove:hover {
+    opacity: 1;
+}
+
+.cc-input-area {
+    padding: 16px;
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+}
+
+.cc-input {
+    flex: 1;
+    min-height: 44px;
+    max-height: 150px;
+    padding: 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 12px;
+    resize: none;
+    outline: none;
+    font-family: inherit;
+    font-size: 14px;
+    background: #f9fafb;
+    transition: all 0.2s;
+}
+
+.cc-input:focus {
+    border-color: #3b82f6;
+    background: white;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.cc-send-btn {
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #3b82f6;
+    color: white;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2);
+}
+
+.cc-send-btn:hover {
+    background-color: #2563eb;
+}
+
+.cc-send-btn:disabled {
+    background-color: #9ca3af;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+/* Canvas Panel */
+.cc-canvas-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background-color: #f3f4f6;
+    /* Slightly darker bg to make paper pop */
+    position: relative;
+}
+
+/* Tiptap Toolbar */
+.cc-top-controls {
+    height: 40px;
+    display: flex;
+    align-items: center;
+    padding: 0 24px;
+    background: white;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.cc-toolbar {
+    height: 46px;
+    display: flex;
+    align-items: center;
+    padding: 0 24px;
+    background: white;
+    border-bottom: 1px solid #e5e7eb;
+    gap: 6px;
+    justify-content: flex-start;
+}
+
+.cc-tab {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 4px;
+    color: #4b5563;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+}
+
+.cc-tab:hover {
+    background: #f3f4f6;
+    color: #111827;
+}
+
+.cc-tab.active {
+    background: #e5e7eb;
+    color: #000;
+}
+
+.cc-divider {
+    width: 1px;
+    height: 20px;
+    background: #e5e7eb;
+    margin: 0 6px;
+}
+
+/* Editor Container (A4 Style) */
+.tiptap-wrapper {
+    background: #ffffff;
+    cursor: text;
+    padding: 60px 80px !important;
+    margin: 30px auto;
+    width: 100%;
+    max-width: 850px;
+    /* A4 width ish */
+    height: calc(100vh - 120px);
+    box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    border-radius: 4px;
+    overflow-y: auto;
+    border: 1px solid #e5e7eb;
+}
+
+/* ProseMirror Styles */
+.ProseMirror {
+    outline: none;
+    min-height: 100%;
+    font-size: 16px;
+    line-height: 1.75;
+    color: #1f2937;
+}
+
+.ProseMirror p {
+    margin-bottom: 1em;
+}
+
+.ProseMirror h1 {
+    font-size: 2.25em;
+    font-weight: 700;
+    margin-top: 1.5em;
+    margin-bottom: 0.5em;
+    line-height: 1.2;
+}
+
+.ProseMirror h2 {
+    font-size: 1.75em;
+    font-weight: 600;
+    margin-top: 1.2em;
+    margin-bottom: 0.5em;
+}
+
+.ProseMirror ul,
+.ProseMirror ol {
+    padding-left: 1.5em;
+    margin-bottom: 1em;
+}
+
+.ProseMirror blockquote {
+    border-left: 3px solid #e5e7eb;
+    padding-left: 1em;
+    color: #6b7280;
+    font-style: italic;
+}
+
+.ProseMirror pre {
+    background: #f3f4f6;
+    padding: 0.75em 1em;
+    border-radius: 0.375em;
+    color: #1f2937;
+    font-family: 'Consolas', monospace;
+    overflow-x: auto;
+}
+
+.ProseMirror code {
+    background-color: #f3f4f6;
+    padding: 0.2em 0.4em;
+    border-radius: 0.25em;
+    font-family: 'Consolas', monospace;
+    font-size: 0.875em;
+}
+
+/* Code Block in Chat */
+.cc-code-block {
+    position: relative;
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 6px;
+    margin: 8px 0;
+    overflow: hidden;
+}
+
+.cc-code-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 12px;
+    background: #e9ecef;
+    border-bottom: 1px solid #dee2e6;
+    font-size: 12px;
+    color: #6c757d;
+}
+
+.cc-code-content {
+    padding: 12px;
+    overflow-x: auto;
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    margin: 0;
+    white-space: pre-wrap;
+}
+
+.cc-apply-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    font-size: 12px;
+    font-weight: 500;
+    color: white;
+    background-color: #10b981;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.cc-apply-btn:hover {
+    background-color: #059669;
+}
+
+/* Table Styles for Tiptap */
+.ProseMirror table {
+    border-collapse: collapse;
+    table-layout: fixed;
+    width: 100%;
+    margin: 0;
+    overflow: hidden;
+}
+
+.ProseMirror td,
+.ProseMirror th {
+    min-width: 1em;
+    border: 2px solid #ced4da;
+    padding: 3px 5px;
+    vertical-align: top;
+    box-sizing: border-box;
+    position: relative;
+}
+
+.ProseMirror th {
+    font-weight: bold;
+    text-align: left;
+    background-color: #f1f3f5;
+}
+
+.ProseMirror .selectedCell:after {
+    z-index: 2;
+    position: absolute;
+    content: "";
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    background: rgba(200, 200, 255, 0.4);
+    pointer-events: none;
+}
+
+.ProseMirror .column-resize-handle {
+    position: absolute;
+    right: -2px;
+    top: 0;
+    bottom: -2px;
+    width: 4px;
+    background-color: #adf;
+    pointer-events: none;
+}
+
+.tableWrapper {
+    overflow-x: auto;
+}
+
+/* Bubble Menu */
+.cc-bubble-menu,
+.cc-bubble-menu-custom {
+    background-color: #2563eb;
+    color: white;
+    padding: 6px 12px;
+    border-radius: 8px;
+    display: flex;
+    gap: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    animation: fadeIn 0.2s ease-in-out;
+}
+
+.cc-refine-badge {
+    position: absolute;
+    top: -24px;
+    left: 4px;
+    background: #8b5cf6;
+    color: white;
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 12px 12px 0 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    z-index: 5;
+}
+
+.cc-refine-badge button {
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+    padding: 0;
+    display: flex;
+}
+
+.cc-bubble-btn {
+    background: transparent;
+    border: none;
+    color: white;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px;
+    border-radius: 4px;
+}
+
+.cc-bubble-btn:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Refinement Input State */
+.cc-input.refining {
+    border-color: #8b5cf6;
+    background-color: #f5f3ff;
+    box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(5px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
