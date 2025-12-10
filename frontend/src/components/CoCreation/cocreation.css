@@ -34,6 +34,26 @@
     color: #111827;
 }
 
+.cc-model-selector {
+    margin-left: auto;
+}
+
+.cc-model-select {
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: 1px solid #e5e7eb;
+    background: #fff;
+    font-size: 13px;
+    color: #374151;
+    cursor: pointer;
+    outline: none;
+    transition: all 0.2s;
+}
+
+.cc-model-select:hover {
+    border-color: #d1d5db;
+}
+
 .cc-icon-btn {
     padding: 10px;
     border-radius: 8px;

@@ -17,6 +17,8 @@ import TableRow from '@tiptap/extension-table-row';
 
 interface CoCreationViewProps {
     onBack: () => void;
+    selectedModel: string;
+    onModelChange: (model: string) => void;
     callAiStream: (
         systemPrompt: string,
         userPrompt: string,
@@ -58,7 +60,7 @@ const MenuBar = ({ editor }: { editor: any }) => {
     );
 };
 
-export const CoCreationView: React.FC<CoCreationViewProps> = ({ onBack, callAiStream }) => {
+export const CoCreationView: React.FC<CoCreationViewProps> = ({ onBack, callAiStream, selectedModel, onModelChange }) => {
     const { state, setContent, addMessage, setProcessing } = useCoCreation();
     const [input, setInput] = useState('');
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -385,6 +387,19 @@ export const CoCreationView: React.FC<CoCreationViewProps> = ({ onBack, callAiSt
                 <div className="cc-header">
                     <button onClick={onBack} className="cc-icon-btn"><ArrowLeft size={18} /></button>
                     <span className="cc-title">共创画布</span>
+                    <div className="cc-model-selector">
+                        <select
+                            value={selectedModel}
+                            onChange={(e) => onModelChange(e.target.value)}
+                            className="cc-model-select"
+                        >
+                            <option value="gemini">Gemini Pro</option>
+                            <option value="deepseek">DeepSeek</option>
+                            <option value="openai">GPT-4o</option>
+                            <option value="ali">通义千问</option>
+                            <option value="doubao">豆包</option>
+                        </select>
+                    </div>
                 </div>
                 <div className="cc-messages">
                     {state.messages.map((msg, idx) => (

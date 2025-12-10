@@ -2883,6 +2883,8 @@ const App = () => {
             case 'cocreation':
                 return <CoCreationView
                     onBack={handleBackToHome}
+                    selectedModel={selectedModel}
+                    onModelChange={(m) => setSelectedModel(m as any)}
                     callAiStream={async (sys, user, hist, onChunk, onComp, onErr) => {
                         const adaptedHistory = hist.map(h => ({
                             role: h.role,
