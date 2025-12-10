@@ -3,6 +3,7 @@ import { ArrowLeft, Send, Plus, Upload, Bold, Italic, Heading1, Heading2, List, 
 import { marked } from 'marked';
 import mammoth from 'mammoth';
 import './cocreation.css';
+import { SYSTEM_BASE, buildSystemPrompt } from '../../prompts';
 import { useCoCreation } from './useCoCreation';
 
 // Tiptap
@@ -254,25 +255,15 @@ export const CoCreationView: React.FC<CoCreationViewProps> = ({ onBack, callAiSt
         const requirements = contextFiles.filter(f => f.type === 'requirement').map(f => f.content).join('\n\n');
         const references = contextFiles.filter(f => f.type === 'reference').map(f => f.content).join('\n\n');
 
-        let systemPrompt = `You are a professional co-creation writing assistant.`;
-        if (requirements.trim()) systemPrompt += `\n\n=== [REQUIREMENTS] ===\n${requirements}\n==================`;
-        if (references.trim()) systemPrompt += `\n\n=== [REFERENCE] ===\n${references}\n===============`;
+        const systemPrompt = buildSystemPrompt({
+            requirements,
+            references,
+            documentContent: contextContent,
+            refinement: pendingRefinement ? { text: pendingRefinement.text } : null
+        });
 
-        systemPrompt += `\n\n=== DOCUMENT ===\n\`\`\`markdown\n${contextContent}\n\`\`\`\n`;
-
-        // Refinement Prompting
-        let isRefineMode = false;
-        if (pendingRefinement) {
-            systemPrompt += `\nTASK: REWRITE ONLY the selected text below based on user instruction.\nSELECTED TEXT: "${pendingRefinement.text}"\n`;
-            isRefineMode = true;
-        }
-
-        systemPrompt += `\nINSTRUCTIONS:
-        1. ONLY if the user EXPLICITLY asks for a "First Draft", "Full Article", "Rewrite Document", or "Fill Canvas", start response with ":::CANVAS:::".
-        2. For normal questions (e.g., "Give me 3 titles", "Make this paragraph better"), DO NOT use ":::CANVAS:::". Instead, output Markdown code blocks in the chat.
-        3. If Refinement Mode is active, start response with ":::CANVAS:::" to stream the replacement directly into the document.
-        4. Support Tables.
-        `;
+        // Determine if refine mode (logic moved to prompt builder, but we still need the boolean for streaming logic)
+        const isRefineMode = !!pendingRefinement;
 
         let currentResponse = '';
         let isCanvasStream = false;
