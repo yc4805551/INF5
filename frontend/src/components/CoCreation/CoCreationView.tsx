@@ -298,8 +298,14 @@ export const CoCreationView: React.FC<CoCreationViewProps> = ({ onBack, callAiSt
                     const partial = lines.pop();
 
                     if (lines.length > 0) {
-                        const contentToInsert = lines.join('\n') + '\n';
-                        if (editor) editor.chain().insertContent(contentToInsert).run();
+                        const rawContent = lines.join('\n') + '\n';
+                        // Parse Markdown to HTML before inserting
+                        // marked.parse returns string | Promise. Check sync usage.
+                        // Assuming marked is sync or we await. 
+                        // In CoCreationView.tsx imports, marked is imported. 
+                        // marked.parse(string) is sync by default.
+                        const htmlContent = marked.parse(rawContent) as string;
+                        if (editor) editor.chain().insertContent(htmlContent).run();
                     }
                     lineBuffer = partial || '';
                 } else {
@@ -310,7 +316,8 @@ export const CoCreationView: React.FC<CoCreationViewProps> = ({ onBack, callAiSt
                 setProcessing(false);
                 if (isCanvasStream) {
                     if (lineBuffer && editor) {
-                        editor.chain().insertContent(lineBuffer).run();
+                        const htmlBuffer = marked.parse(lineBuffer) as string;
+                        editor.chain().insertContent(htmlBuffer).run();
                     }
                     if (isRefineMode) {
                         setPendingRefinement(null);
