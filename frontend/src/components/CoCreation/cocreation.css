@@ -7,16 +7,16 @@
 }
 
 /* Chat Panel */
+/* Chat Panel */
 .cc-chat-panel {
-    width: 380px;
-    /* Slightly wider for better reading */
-    min-width: 320px;
-    max-width: 480px;
+    width: 480px;
+    min-width: 400px;
+    max-width: 600px;
     display: flex;
     flex-direction: column;
-    background: white;
+    background: #fdfdfd;
     border-right: 1px solid #e5e7eb;
-    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.05);
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.04);
     z-index: 10;
 }
 
@@ -153,11 +153,28 @@
     opacity: 1;
 }
 
+/* Clean Gemini-style Input Area */
+.cc-input-area-wrapper {
+    background: #fdfdfd;
+    padding: 16px 24px 24px;
+    /* Bottom padding for breathing room */
+}
+
 .cc-input-area {
-    padding: 16px;
     display: flex;
-    gap: 8px;
     align-items: flex-end;
+    gap: 12px;
+    background: #f1f3f4;
+    /* Google-like light gray */
+    padding: 8px 16px;
+    border-radius: 24px;
+    transition: background 0.2s, box-shadow 0.2s;
+    min-height: 56px;
+}
+
+.cc-input-area:focus-within {
+    background: white;
+    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.15);
 }
 
 .cc-input {
@@ -166,53 +183,48 @@
     outline: none;
     background: transparent;
     resize: none;
-    /* Auto-resize handled by JS */
-    min-height: 48px;
-    max-height: 200px;
-    padding: 12px 14px;
-    font-size: 15px;
+    min-height: 24px;
+    max-height: 300px;
+    padding: 14px 0;
+    font-size: 16px;
     line-height: 1.5;
     color: #1f2937;
     overflow-y: hidden;
-    /* Hidden scrollbar until max height */
+}
+
+.cc-input::placeholder {
+    color: #6b7280;
 }
 
 .cc-input.refining {
-    border: 2px solid #8b5cf6;
-    border-radius: 8px;
-    background-color: #f5f3ff;
-}
-
-.cc-input-area {
-    display: flex;
-    align-items: flex-end;
-    /* Align bottom so it grows up */
-    gap: 10px;
-    padding: 12px;
-    border-top: 1px solid #e5e7eb;
-    background: white;
-    min-height: 72px;
-}
-
-.cc-input:focus {
-    border-color: #3b82f6;
-    background: white;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    color: #7c3aed;
 }
 
 .cc-send-btn {
-    width: 44px;
-    height: 44px;
+    width: 36px;
+    height: 36px;
     display: flex;
     align-items: center;
     justify-content: center;
-    background-color: #3b82f6;
-    color: white;
+    background-color: transparent;
+    color: #1f2937;
     border: none;
-    border-radius: 12px;
+    border-radius: 50%;
     cursor: pointer;
     transition: all 0.2s;
-    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2);
+    margin-bottom: 6px;
+    /* Align with text bottom */
+}
+
+.cc-send-btn:hover {
+    background-color: #e5e7eb;
+    color: #000;
+}
+
+.cc-send-btn:disabled {
+    color: #9ca3af;
+    cursor: not-allowed;
+    background-color: transparent;
 }
 
 .cc-send-btn:hover {
