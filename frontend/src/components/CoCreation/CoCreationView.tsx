@@ -73,6 +73,7 @@ export const CoCreationView: React.FC<CoCreationViewProps> = ({ onBack, callAiSt
     // Custom Bubble Menu State
     const [bubbleParams, setBubbleParams] = useState<{ x: number, y: number, visible: boolean } | null>(null);
     const [pendingRefinement, setPendingRefinement] = useState<{ from: number, to: number, text: string } | null>(null);
+    const inputRef = useRef<HTMLTextAreaElement>(null);
 
     const editor = useEditor({
         extensions: [
@@ -419,7 +420,27 @@ export const CoCreationView: React.FC<CoCreationViewProps> = ({ onBack, callAiSt
                                     <button onClick={cancelRefine}><X size={10} /></button>
                                 </div>
                             )}
-                            <textarea value={input} onChange={e => setInput(e.target.value)} placeholder={pendingRefinement ? "输入修改指令..." : "输入指令..."} className={`cc-input ${pendingRefinement ? 'refining' : ''}`} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }} />
+                            <textarea
+                                ref={inputRef}
+                                value={input}
+                                onChange={e => {
+                                    setInput(e.target.value);
+                                    // Auto-resize logic
+                                    e.target.style.height = 'auto';
+                                    e.target.style.height = `${e.target.scrollHeight}px`;
+                                }}
+                                placeholder={pendingRefinement ? "输入修改指令..." : "输入指令..."}
+                                className={`cc-input ${pendingRefinement ? 'refining' : ''}`}
+                                onKeyDown={e => {
+                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                        e.preventDefault();
+                                        handleSend();
+                                        // Reset height
+                                        if (inputRef.current) inputRef.current.style.height = 'auto';
+                                    }
+                                }}
+                                rows={1}
+                            />
                         </div>
 
                         <button onClick={handleSend} disabled={!input.trim() || state.isProcessing} className="cc-send-btn"><Send size={18} /></button>

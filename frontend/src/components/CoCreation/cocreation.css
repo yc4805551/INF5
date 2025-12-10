@@ -162,17 +162,36 @@
 
 .cc-input {
     flex: 1;
-    min-height: 44px;
-    max-height: 150px;
-    padding: 12px;
-    border: 1px solid #d1d5db;
-    border-radius: 12px;
-    resize: none;
+    border: none;
     outline: none;
-    font-family: inherit;
-    font-size: 14px;
-    background: #f9fafb;
-    transition: all 0.2s;
+    background: transparent;
+    resize: none;
+    /* Auto-resize handled by JS */
+    min-height: 48px;
+    max-height: 200px;
+    padding: 12px 14px;
+    font-size: 15px;
+    line-height: 1.5;
+    color: #1f2937;
+    overflow-y: hidden;
+    /* Hidden scrollbar until max height */
+}
+
+.cc-input.refining {
+    border: 2px solid #8b5cf6;
+    border-radius: 8px;
+    background-color: #f5f3ff;
+}
+
+.cc-input-area {
+    display: flex;
+    align-items: flex-end;
+    /* Align bottom so it grows up */
+    gap: 10px;
+    padding: 12px;
+    border-top: 1px solid #e5e7eb;
+    background: white;
+    min-height: 72px;
 }
 
 .cc-input:focus {
