@@ -193,7 +193,7 @@ export const CoCreationView: React.FC<CoCreationViewProps> = ({ onBack, callAiSt
         const markdown = (editor.storage as any).markdown.getMarkdown();
 
         try {
-            const response = await fetch('/api/canvas/export_docx', {
+            const response = await fetch('/proxy-api/canvas/export_docx', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ markdown })
