@@ -187,24 +187,66 @@ export const CoCreationView: React.FC<CoCreationViewProps> = ({ onBack, callAiSt
         URL.revokeObjectURL(url);
     };
 
+    const handleExportDocx = async () => {
+        if (!editor) return;
+        const markdown = (editor.storage as any).markdown.getMarkdown();
+
+        try {
+            const response = await fetch('/api/canvas/export_docx', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ markdown })
+            });
+
+            if (!response.ok) throw new Error('Export failed');
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'export.docx';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        } catch (e) {
+            console.error(e);
+            alert('导出 Word 失败');
+        }
+    };
+
     const removeFile = (index: number) => {
         setContextFiles(prev => prev.filter((_, i) => i !== index));
     };
 
     // Refinement Logic
+    // ... (rest of logic)
+
+    // ...
+
+    <div className="cc-canvas-panel">
+        <div className="cc-top-controls">
+            <button className="cc-tab" style={{ width: 'auto', padding: '0 12px' }} onClick={() => importInputRef.current?.click()}><Upload size={14} style={{ marginRight: 6 }} /> 导入文件</button>
+            <input type="file" ref={importInputRef} style={{ display: 'none' }} accept=".txt,.md,.docx" onChange={handleImportToCanvas} />
+            <div className="cc-divider"></div>
+            <button className="cc-tab" style={{ width: 'auto', padding: '0 12px' }} onClick={handleExport}><Download size={14} style={{ marginRight: 6 }} /> MD</button>
+            <button className="cc-tab" style={{ width: 'auto', padding: '0 12px', marginLeft: 8 }} onClick={handleExportDocx}><Download size={14} style={{ marginRight: 6 }} /> Word</button>
+        </div>
+
+    // Refinement Logic
     const handleRefineRequest = () => {
         if (!editor || !bubbleParams) return;
-        const { from, to } = editor.state.selection;
+        const {from, to} = editor.state.selection;
         const selectedText = editor.state.doc.textBetween(from, to, '\n');
 
-        setPendingRefinement({ from, to, text: selectedText });
+        setPendingRefinement({from, to, text: selectedText });
         setInput(`Refine this text: "${selectedText}"`); // Pre-fill input
         setBubbleParams(null); // Hide menu
     };
 
     // Cancel refinement
     const cancelRefine = () => {
-        setPendingRefinement(null);
+            setPendingRefinement(null);
         setInput('');
     };
 
@@ -231,106 +273,106 @@ export const CoCreationView: React.FC<CoCreationViewProps> = ({ onBack, callAiSt
         let isRefineMode = false;
         if (pendingRefinement) {
             systemPrompt += `\nTASK: REWRITE ONLY the selected text below based on user instruction.\nSELECTED TEXT: "${pendingRefinement.text}"\n`;
-            isRefineMode = true;
+        isRefineMode = true;
         }
 
         systemPrompt += `\nINSTRUCTIONS:
-1. ONLY if the user EXPLICITLY asks for a "First Draft", "Full Article", "Rewrite Document", or "Fill Canvas", start response with ":::CANVAS:::".
-2. For normal questions (e.g., "Give me 3 titles", "Make this paragraph better"), DO NOT use ":::CANVAS:::". Instead, output Markdown code blocks in the chat.
-3. If Refinement Mode is active, start response with ":::CANVAS:::" to stream the replacement directly into the document.
-4. Support Tables.
-`;
+        1. ONLY if the user EXPLICITLY asks for a "First Draft", "Full Article", "Rewrite Document", or "Fill Canvas", start response with ":::CANVAS:::".
+        2. For normal questions (e.g., "Give me 3 titles", "Make this paragraph better"), DO NOT use ":::CANVAS:::". Instead, output Markdown code blocks in the chat.
+        3. If Refinement Mode is active, start response with ":::CANVAS:::" to stream the replacement directly into the document.
+        4. Support Tables.
+        `;
 
         let currentResponse = '';
         let isCanvasStream = false;
         let lineBuffer = '';
 
         await callAiStream(
-            systemPrompt,
-            userText,
-            state.messages,
+        systemPrompt,
+        userText,
+        state.messages,
             (chunk: string) => {
                 // Check markers
                 if (!isCanvasStream && (currentResponse + chunk).includes(':::CANVAS:::')) {
-                    isCanvasStream = true;
-                    // Remove marker
-                    const parts = (currentResponse + chunk).split(':::CANVAS:::');
-                    const cleanChunk = parts[1] || '';
-                    lineBuffer += cleanChunk;
-                    currentResponse = '';
+            isCanvasStream = true;
+        // Remove marker
+        const parts = (currentResponse + chunk).split(':::CANVAS:::');
+        const cleanChunk = parts[1] || '';
+        lineBuffer += cleanChunk;
+        currentResponse = '';
 
-                    // If refinement, delete old text first
-                    if (isRefineMode && pendingRefinement && editor) {
-                        editor.chain().deleteRange({ from: pendingRefinement.from, to: pendingRefinement.to }).run();
+        // If refinement, delete old text first
+        if (isRefineMode && pendingRefinement && editor) {
+            editor.chain().deleteRange({ from: pendingRefinement.from, to: pendingRefinement.to }).run();
                         // Reset so we don't delete again
                         // pendingRefinement = null; // Can't mute state inside callback easily without ref
                     }
-                    return;
+        return;
                 }
 
-                if (isCanvasStream) {
+        if (isCanvasStream) {
                     const combined = lineBuffer + chunk;
-                    const lines = combined.split('\n');
-                    const partial = lines.pop();
+        const lines = combined.split('\n');
+        const partial = lines.pop();
 
                     if (lines.length > 0) {
                         const contentToInsert = lines.join('\n') + '\n';
-                        if (editor) editor.chain().insertContent(contentToInsert).run();
+        if (editor) editor.chain().insertContent(contentToInsert).run();
                     }
-                    lineBuffer = partial || '';
+        lineBuffer = partial || '';
                 } else {
-                    currentResponse += chunk;
+            currentResponse += chunk;
                 }
             },
             () => {
-                setProcessing(false);
-                if (isCanvasStream) {
+            setProcessing(false);
+        if (isCanvasStream) {
                     if (lineBuffer && editor) {
-                        editor.chain().insertContent(lineBuffer).run();
+            editor.chain().insertContent(lineBuffer).run();
                     }
-                    if (isRefineMode) {
-                        setPendingRefinement(null);
-                        addMessage('model', '✅ 已完成选中内容的修改。');
+        if (isRefineMode) {
+            setPendingRefinement(null);
+        addMessage('model', '✅ 已完成选中内容的修改。');
                     } else {
-                        addMessage('model', '✅ 内容已生成到画布。');
+            addMessage('model', '✅ 内容已生成到画布。');
                     }
                 } else {
-                    // Normal Chat Response
-                    addMessage('model', currentResponse);
+            // Normal Chat Response
+            addMessage('model', currentResponse);
                 }
             },
             (err) => {
-                setProcessing(false);
-                addMessage('model', `Error: ${err.message}`);
+            setProcessing(false);
+        addMessage('model', `Error: ${err.message}`);
             }
         );
     };
 
-    const renderMessageContent = (msg: { role: string, text: string }) => {
+        const renderMessageContent = (msg: {role: string, text: string }) => {
         if (msg.role === 'user') return <div className="markdown-body" dangerouslySetInnerHTML={renderMarkdown(msg.text)} />;
         const parts = msg.text.split(/(```markdown[\s\S]*?```)/g);
         return (
-            <div>
-                {parts.map((part, index) => {
-                    const match = part.match(/^```markdown\s*([\s\S]*?)```$/);
-                    if (match) {
-                        const codeContent = match[1];
-                        return (
-                            <div key={index} className="cc-code-block">
-                                <div className="cc-code-header">
-                                    <span>Markdown Output</span>
-                                    <button className="cc-apply-btn" onClick={() => handleApply(codeContent)}><Plus size={14} /> 插入到画布</button>
-                                </div>
-                                <div className="cc-code-content">{codeContent}</div>
+        <div>
+            {parts.map((part, index) => {
+                const match = part.match(/^```markdown\s*([\s\S]*?)```$/);
+                if (match) {
+                    const codeContent = match[1];
+                    return (
+                        <div key={index} className="cc-code-block">
+                            <div className="cc-code-header">
+                                <span>Markdown Output</span>
+                                <button className="cc-apply-btn" onClick={() => handleApply(codeContent)}><Plus size={14} /> 插入到画布</button>
                             </div>
-                        );
-                    } else { return !part.trim() ? null : <div key={index} className="markdown-body" dangerouslySetInnerHTML={renderMarkdown(part)} />; }
-                })}
-            </div>
+                            <div className="cc-code-content">{codeContent}</div>
+                        </div>
+                    );
+                } else { return !part.trim() ? null : <div key={index} className="markdown-body" dangerouslySetInnerHTML={renderMarkdown(part)} />; }
+            })}
+        </div>
         );
     };
 
-    return (
+        return (
         <div className="cc-container">
             {/* Custom Bubble Menu (Fixed Position) */}
             {bubbleParams && bubbleParams.visible && (
@@ -409,5 +451,5 @@ export const CoCreationView: React.FC<CoCreationViewProps> = ({ onBack, callAiSt
                 </div>
             </div>
         </div>
-    );
+        );
 };
