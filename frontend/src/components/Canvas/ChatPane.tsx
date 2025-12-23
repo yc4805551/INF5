@@ -224,19 +224,39 @@ export const ChatPane: React.FC<ChatPaneProps> = ({
                             </div>
                         )}
 
-                        <form onSubmit={handleSubmit} className="input-wrapper">
-                            <input
-                                type="text"
+                        <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '8px', alignItems: 'flex-end', width: '100%' }}>
+                            <textarea
                                 value={input}
-                                onChange={(e) => setInput(e.target.value)}
-                                placeholder="Describe your changes..."
+                                onChange={(e) => {
+                                    setInput(e.target.value);
+                                    // Auto-height
+                                    e.target.style.height = 'auto';
+                                    e.target.style.height = Math.min(e.target.scrollHeight, 150) + 'px';
+                                }}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                        e.preventDefault();
+                                        handleSubmit(e);
+                                    }
+                                }}
+                                placeholder="输入您的修改建议... (Shift+Enter 换行)"
                                 className="chat-text-input"
                                 disabled={isProcessing}
+                                style={{
+                                    resize: 'none',
+                                    minHeight: '40px',
+                                    maxHeight: '150px',
+                                    overflowY: 'auto',
+                                    flex: 1,
+                                    padding: '8px 12px',
+                                    lineHeight: '1.5'
+                                }}
                             />
                             <button
-                                type="submit"
+                                onClick={handleSubmit}
                                 disabled={isProcessing || !input.trim()}
                                 className="send-button"
+                                style={{ height: '40px', position: 'static', transform: 'none' }}
                             >
                                 <Send size={18} />
                             </button>

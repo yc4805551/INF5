@@ -26,11 +26,19 @@ llm_engine = LLMEngine() # Initialize with API key if available
 async def upload_file(file: UploadFile = File(...)):
     content = await file.read()
     current_engine.load_document(io.BytesIO(content))
-    return {"message": "File uploaded successfully", "preview": current_engine.get_preview_data()}
+    return {
+        "message": "File uploaded successfully", 
+        "preview": current_engine.get_preview_data(),
+        "html_preview": current_engine.get_html_preview()
+    }
 
 @app.get("/preview")
 async def get_preview():
     return current_engine.get_preview_data()
+
+@app.get("/preview_html")
+async def get_preview_html():
+    return {"html": current_engine.get_html_preview()}
 
 @app.post("/chat")
 async def chat_with_doc(message: Dict[str, Any] = Body(...)):
@@ -87,6 +95,7 @@ async def chat_with_doc(message: Dict[str, Any] = Body(...)):
         "reply": reply,
         "intent": intent,
         "preview": current_engine.get_preview_data(),
+        "html_preview": current_engine.get_html_preview(),
         "is_staging": is_staging
     }
 
@@ -101,7 +110,8 @@ async def confirm_changes():
     
     return {
         "message": "Changes confirmed",
-        "preview": current_engine.get_preview_data()
+        "preview": current_engine.get_preview_data(),
+        "html_preview": current_engine.get_html_preview()
     }
 
 @app.post("/discard")
@@ -112,7 +122,8 @@ async def discard_changes():
     current_engine.discard_staging()
     return {
         "message": "Changes discarded",
-        "preview": current_engine.get_preview_data()
+        "preview": current_engine.get_preview_data(),
+        "html_preview": current_engine.get_html_preview()
     }
 
 @app.post("/patch")
@@ -155,6 +166,7 @@ async def format_official_doc(data: Dict[str, Any] = Body(...)):
         "message": "Formatting applied", 
         "code_executed": code,
         "preview": current_engine.get_preview_data(),
+        "html_preview": current_engine.get_html_preview(),
         "is_staging": True
     }
 

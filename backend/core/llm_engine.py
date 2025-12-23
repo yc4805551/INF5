@@ -67,9 +67,13 @@ INSTRUCTIONS:
    - Use the `id` from the SELECTION CONTEXT to find the correct paragraph index in the `doc.paragraphs` list.
    - Example: If selected paragraph has id 5, you should target `doc.paragraphs[5]`.
    - Do NOT guess the paragraph based on text content if an ID is provided.
+5. **CITATION RULE**: When referencing or extracting information from the 【参考资料】 section (Reference Materials), you **MUST** explicit cite the page number at the end of the relevant sentence or paragraph.
+   - Format: `(第 N 页)` or `(第 N-M 页)`.
+   - Source: Derive the page number `N` from the `[第 N 页]` or `[第 N 页 (估算)]` markers that appear strictly above the referenced text in the Context.
+   - Example: "该项目旨在提高效率 (第 5 页)。"
 
 OUTPUT FORMAT:
-You must return a JSON object with the following structure:
+You must return a JSON object with the following structure (Make sure all strings are valid JSON, escape newlines as \\n):
 {{
     "intent": "CHAT" or "MODIFY",
     "reply": "Your conversational response to the user. If suggesting changes, show the draft here.",
@@ -80,6 +84,8 @@ FOR MODIFY INTENT:
 - The `code` field must contain valid Python code using `python-docx`.
 - AVAILABLE TOOLS:
     - `doc`: The Document object.
+    - `insert_image(paragraph, image_path, width=None)`: Insert an image after a paragraph. Supports `/static/images/` URLs.
+    - `paragraph.insert_paragraph_after(text=None, style=None)`: Insert a new paragraph after the current one.
     - `smart_replace(doc, find_text, replace_text)`
     - `search_replace(doc, find_text, replace_text)`
     - `apply_markdown(doc, paragraph_index, markdown_text)`: Use this to apply the FINAL AGREED TEXT.
@@ -94,6 +100,10 @@ FOR CHAT INTENT:
 You are an expert Python developer working with the python-docx library.
 Your task is to write a Python script to modify a Word document based on the user's instruction.
 
+CAPABILITIES:
+- You CAN insert images using `insert_image(paragraph, url)` or `run.add_picture(url)`.
+- You CAN insert paragraphs using `paragraph.insert_paragraph_after()`.
+
 CONTEXT:
 The document content is roughly:
 {doc_context}
@@ -103,14 +113,35 @@ INSTRUCTION:
 
 AVAILABLE TOOLS:
 - `doc`: The Document object is available as `doc`.
+- `insert_image(paragraph, image_path, width=None)`: Insert an image after a paragraph. Supports `/static/images/` URLs.
+- `paragraph.insert_paragraph_after(text=None, style=None)`: Insert a new paragraph after the current one.
+- `paragraph.id`: The index of the paragraph.
 - `smart_replace(doc, find_text, replace_text)`: Use this for simple text replacements.
-- `search_replace(doc, find_text, replace_text)`: Use this for robust replacements (multiple occurrences, split runs).
-- `apply_markdown(doc, paragraph_index, markdown_text)`: Use this if you are generating NEW content or rewriting a paragraph. It supports **bold** and *italic*.
+- `search_replace(doc, find_text, replace_text)`: Use this for robust replacements.
+- `apply_markdown(doc, paragraph_index, markdown_text)`: Use this if you are generating NEW content.
+"""
 
-REQUIREMENTS:
-1. Write ONLY the Python code. No markdown fences (```python), no explanations.
-2. Do not assume any other variables exist.
-3. Use the provided tools where appropriate.
+    TOC_ANALYSIS_PROMPT_TEMPLATE = """
+你是一位协助从大型文档中检索信息的AI研究助手。
+你的任务是分析文档的大纲（Table of Contents, TOC），并识别哪些章节可能包含用户问题的答案。
+
+用户问题:
+{query}
+
+文档目录 (TOC):
+{toc}
+
+指令:
+1. 返回一个包含最相关章节ID（开始索引 start, 结束索引 end）的JSON列表。
+2. 最多选择 3-5 个章节。不要选择整篇文档。
+3. 如果目录中的章节标题与用户意图明显匹配，请选择该章节。
+4. 输出格式:
+[
+    {{"start": 100, "end": 200, "title": "章节标题", "doc_idx": 0}},
+    ...
+]
+5. 如果目录行中包含 "idx:" 信息，请务必在JSON输出中包含对应的 "doc_idx"。
+6. 如果没有相关章节，请返回空列表 []。
 """
 
     def __init__(self, api_key: str = None):
@@ -125,7 +156,90 @@ REQUIREMENTS:
         
         return self._mock_code_generation(user_instruction, doc_context)
 
-    def chat_with_doc(self, user_message: str, doc_context: List[Dict[str, Any]], model_config: Dict[str, Any] = None, history: List[Dict[str, str]] = [], selection_context: List[int] = []) -> Dict[str, Any]:
+    def analyze_toc_relevance(self, user_query: str, toc: List[Dict[str, Any]], model_config: Dict[str, Any] = None) -> List[Dict[str, Any]]:
+        """
+        Analyzes the TOC to find relevant sections for the user's query.
+        """
+        # Prepare TOC text
+        toc_text = ""
+        for item in toc:
+            indent = "  " * (item['level'] - 1)
+            # Include filename or doc_idx in output so LLM acts on it?
+            # Or just provide a unique ID?
+            # We can prompt the LLM to return the object it sees.
+            extra_info = ""
+            if 'filename' in item:
+                extra_info = f" [Doc: {item['filename']} | idx: {item.get('doc_idx', 0)}]"
+            
+            toc_text += f"{indent}- {item['title']} (ID: {item['id']}-{item['end_id']}){extra_info}\n"
+
+        prompt = self.TOC_ANALYSIS_PROMPT_TEMPLATE.format(
+            query=user_query,
+            toc=toc_text
+        )
+
+        if model_config and model_config.get("apiKey"):
+             provider = model_config.get("provider")
+             api_key = model_config.get("apiKey")
+             endpoint = model_config.get("endpoint")
+             model = model_config.get("model")
+             model = model_config.get("model")
+             # Use a faster model if possible for this routing step
+             
+             try:
+                 result = ""
+                 if provider == "openai" or provider == "deepseek":
+                     result = self._call_openai_compatible(api_key, endpoint, model, prompt)
+                 elif provider == "gemini":
+                     if endpoint and ("/chat/completions" in endpoint or "/v1" in endpoint) and "googleapis.com" not in endpoint:
+                          result = self._call_openai_compatible(api_key, endpoint, model, prompt)
+                     else:
+                          result = self._call_google_gemini(api_key, prompt, endpoint, model)
+
+                 # Parse JSON
+                 json_match = re.search(r"\[.*\]", result, re.DOTALL)
+                 if json_match:
+                     json_str = json_match.group(0)
+                     try:
+                         parsed = json.loads(json_str)
+                     except json.JSONDecodeError:
+                         # Repair Chinese quotes/punctuation
+                         json_str = json_str.replace('”', '"').replace('“', '"')
+                         json_str = json_str.replace('，', ',')
+                         try:
+                             parsed = json.loads(json_str)
+                         except:
+                             logger.error(f"Failed to parse TOC JSON: {json_str}")
+                             # Fallback to mock
+                             parsed = None
+                             
+                     if isinstance(parsed, list):
+                         # validate items are dicts
+                         valid_items = []
+                         for item in parsed:
+                             if isinstance(item, dict) and 'start' in item:
+                                 valid_items.append(item)
+                         if valid_items:
+                             return valid_items
+
+             except Exception as e:
+                 logger.error(f"Error in analyze_toc_relevance: {e}")
+        
+        # Mock/Fallback logic
+        return self._mock_toc_analysis(user_query, toc)
+
+    def _mock_toc_analysis(self, user_query: str, toc: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        # Simple keyword match as mock fallback
+        relevant = []
+        keywords = user_query.split()
+        for item in toc:
+            for kw in keywords:
+                if len(kw) > 1 and kw.lower() in item['title'].lower():
+                    relevant.append({"start": item['id'], "end": item['end_id'], "title": item['title']})
+                    break
+        return relevant
+
+    def chat_with_doc(self, user_message: str, doc_context: List[Dict[str, Any]], ref_context: str = None, model_config: Dict[str, Any] = None, history: List[Dict[str, str]] = [], selection_context: List[int] = []) -> Dict[str, Any]:
         """
         Interacts with the document based on user message.
         Returns a dict with 'intent', 'reply', and 'code'.
@@ -139,10 +253,18 @@ REQUIREMENTS:
         except FileNotFoundError:
             style_guide = "Tone: Professional and helpful."
 
-        # 2. Prepare Selection Context
-        selection_text = ""
+        # 2. Prepare Contexts
+        # Selection Context
         if selection_context:
-            selected_paras = [p for p in doc_context if p["id"] in selection_context]
+            selected_paras = []
+            for idx in selection_context:
+                # Find para in doc_context or fetch from doc?
+                # doc_context is ALREADY a list of dicts from preview data
+                # We need to filter it. Or assume `selection_context` passed here is just IDs.
+                # Actually LLM prompt expects text.
+                # Simplified: Just say "Paragraphs X, Y"
+                selected_paras.append(f"Paragraph {idx}")
+            
             selection_text = json.dumps(selected_paras, ensure_ascii=False, indent=2)
         else:
             selection_text = "No specific text selected."
@@ -151,10 +273,16 @@ REQUIREMENTS:
         history_text = ""
         for msg in history[-5:]: # Keep last 5 turns
             history_text += f"{msg['role'].upper()}: {msg['content']}\n"
-
+            
         # 4. Construct Prompt
+        # Append Reference Context to prompt if exists (this is cleaner than appending to user message)
+        final_doc_context = "【当前编辑文档 (可修改)】:\n" + json.dumps(doc_context, ensure_ascii=False, indent=2)
+        
+        if ref_context:
+            final_doc_context += f"\n\n【参考资料 (只读/不可修改)】:\n{ref_context}"
+
         prompt = self.CHAT_PROMPT_TEMPLATE.format(
-            doc_context=json.dumps(doc_context, ensure_ascii=False, indent=2),
+            doc_context=final_doc_context, 
             user_message=user_message,
             style_guide=style_guide,
             selection_context=selection_text,
@@ -186,20 +314,36 @@ REQUIREMENTS:
                  # Find JSON object
                  json_match = re.search(r"\{.*\}", clean_result, re.DOTALL)
                  if json_match:
+                     json_str = json_match.group(0)
                      try:
-                        parsed = json.loads(json_match.group(0))
-                        # Validate parsed JSON
-                        if not isinstance(parsed, dict):
-                             return {"intent": "CHAT", "reply": f"Invalid JSON from LLM: {clean_result}", "code": None}
-                        
-                        # Ensure reply is a string
-                        if "reply" not in parsed or parsed["reply"] is None:
-                             parsed["reply"] = "I processed your request."
-                        
-                        return parsed
+                        parsed = json.loads(json_str)
                      except json.JSONDecodeError:
-                        logger.error(f"Failed to parse JSON from LLM: {clean_result}")
-                        return {"intent": "CHAT", "reply": f"I had trouble processing that. Raw response: {clean_result}", "code": None}
+                        # Attempt to repair common LLM JSON errors
+                        # 1. Fix Chinese quotes used as delimiters
+                        # Replace ”} with "}
+                        json_str = json_str.replace('”}', '"}')
+                        json_str = json_str.replace('”]', '"]')
+                        # Replace ”, with ",
+                        json_str = json_str.replace('”,', '",')
+                        # Replace : “ with : "
+                        json_str = json_str.replace(': “', ': "')
+                        
+                        try:
+                            parsed = json.loads(json_str)
+                            logger.info("Successfully repaired JSON with Chinese quotes.")
+                        except json.JSONDecodeError:
+                            logger.error(f"Failed to parse JSON from LLM: {clean_result}")
+                            return {"intent": "CHAT", "reply": f"I had trouble processing that. Raw response: {clean_result}", "code": None}
+
+                     # Validate parsed JSON
+                     if not isinstance(parsed, dict):
+                          return {"intent": "CHAT", "reply": f"Invalid JSON from LLM: {clean_result}", "code": None}
+                    
+                     # Ensure reply is a string
+                     if "reply" not in parsed or parsed["reply"] is None:
+                          parsed["reply"] = "I processed your request."
+                    
+                     return parsed
                  else:
                      # Fallback if no JSON found (treat as chat)
                      return {"intent": "CHAT", "reply": result, "code": None}
@@ -448,7 +592,11 @@ for i, p in enumerate(doc.paragraphs):
     def _clean_code(self, content: str) -> str:
         # Remove markdown fences
         content = re.sub(r"```python", "", content, flags=re.IGNORECASE)
+        content = re.sub(r"```json", "", content, flags=re.IGNORECASE)
         content = re.sub(r"```", "", content)
+        # Remove literal "json" prefix if it appears at start
+        if content.strip().lower().startswith("json"):
+            content = content.strip()[4:]
         return content.strip()
 
     def _mock_code_generation(self, instruction: str, doc_context: List[Dict[str, Any]]) -> str:

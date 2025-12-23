@@ -19,7 +19,8 @@ export const CanvasView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         handleBodyFormatConfirm,
         handleBodyFormatCancel,
         handleSelectionEdit,
-        handleClearSelection
+        handleClearSelection,
+        handleReferenceUpload
     } = useDocxEditor();
 
     const { previewData, isUploading, isProcessing, hasFile, isPendingConfirmation } = state;
@@ -40,6 +41,20 @@ export const CanvasView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                     </div>
                     {hasFile && (
                         <div className="header-actions">
+                            <label className="icon-btn secondary" title="上传参考资料">
+                                <input
+                                    type="file"
+                                    accept=".docx"
+                                    style={{ display: 'none' }}
+                                    onChange={(e) => {
+                                        if (e.target.files?.[0]) {
+                                            handleReferenceUpload(e.target.files[0]);
+                                            e.target.value = ''; // Reset
+                                        }
+                                    }}
+                                />
+                                <span style={{ fontSize: '12px', fontWeight: 'bold' }}>+参考</span>
+                            </label>
                             <button
                                 onClick={reset}
                                 className="icon-btn danger"

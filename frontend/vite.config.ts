@@ -54,7 +54,20 @@ export default defineConfig(({ mode }) => {
             });
           }
         },
+        '/api': {
+          target: apiTarget,
+          changeOrigin: true,
+          configure: (proxy, options) => {
+            proxy.on('proxyReq', (proxyReq, req, res) => {
+              console.log(`[vite-proxy] Sending request: ${req.method} ${req.url} -> ${options.target}${proxyReq.path}`);
+            });
+          }
+        },
+        '/static': {
+          target: apiTarget,
+          changeOrigin: true,
+        }
       }
-    },
+    }
   }
 })

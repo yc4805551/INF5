@@ -174,9 +174,44 @@ export const useDocxEditor = () => {
         updateState({ selectionContext: null });
     };
 
+    const handleReferenceUpload = async (file: File) => {
+        updateState({ isUploading: true });
+        const formData = new FormData();
+        formData.append('file', file);
+        try {
+            // Use smart_canvas/upload for backend processing (images, etc)
+            // Note: backend endpoint is /api/smart_canvas/upload
+            // If proxy is working, we can hit it relatively.
+            // But API_URL currently points to /api/canvas. 
+            // Let's deduce base API url.
+            const baseUrl = API_URL.replace(/\/canvas$/, '');
+            const res = await axios.post(`${baseUrl}/smart_canvas/upload`, formData);
+
+            // Add reference to chat context or just display it?
+            // For now, let's treat it as a system message or user context injection.
+            const refMsg = {
+                role: 'user',
+                content: `[参考资料: ${file.name}]\n\n${res.data.markdown}`
+            } as const;
+
+            setState(prev => ({
+                ...prev,
+                messages: [...prev.messages, refMsg]
+            }));
+
+        } catch (error: any) {
+            console.error("Reference upload failed", error);
+            const errMsg = error.response?.data?.error || error.message;
+            alert(`Reference upload error: ${errMsg}`);
+        } finally {
+            updateState({ isUploading: false });
+        }
+    };
+
     return {
         state,
         handleFileUpload,
+        handleReferenceUpload,
         handleSendMessage,
         handleConfirm,
         handleDiscard,
