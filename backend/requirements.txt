@@ -13,3 +13,4 @@ uvicorn
 python-multipart
 httpx
 pydantic
+mammoth
