@@ -73,6 +73,9 @@ class DocxEngine:
             
             # Extract content with images using mammoth
             image_output_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static', 'images')
+            if not os.path.exists(image_output_dir):
+                os.makedirs(image_output_dir, exist_ok=True)
+            
             markdown_content = self._convert_to_markdown_with_images(tmp_path, image_output_dir)
             
             # Cleanup temp file
