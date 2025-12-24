@@ -250,14 +250,11 @@ export const HomeInputView: React.FC<HomeInputViewProps> = ({
                 <button className="action-btn" onClick={onTextRecognition} disabled={isProcessing}>
                     5. 文本识别
                 </button>
-                <button className="action-btn" onClick={onCanvas} disabled={isProcessing}>
-                    6. 智能画布
-                </button>
                 <button className="action-btn" onClick={onCoCreation} disabled={isProcessing}>
-                    7. 共创画布
+                    6. 共创画布
                 </button>
                 <button className="action-btn" onClick={onWordCanvas} disabled={isProcessing}>
-                    8. 我的画布
+                    7. 我的画布
                 </button>
             </div>
         </>
