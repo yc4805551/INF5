@@ -6,7 +6,7 @@ import { ArrowLeft, FileText, RotateCcw, FilePlus, Download, Target, Trash2 } fr
 import './canvas.css'; // Reuse styles
 
 export const WordCanvas: React.FC<{ onBack: () => void }> = ({ onBack }) => {
-    const { state, handleFileUpload, handleReferenceUpload, handleSendMessage, handleSelection, clearSelection, reset, handleDownload, loadPage, toggleScope, handleRemoveReference } = useWordCanvas();
+    const { state, handleFileUpload, handleReferenceUpload, handleSendMessage, handleSelection, clearSelection, reset, handleDownload, loadPage, toggleScope, handleRemoveReference, handleConfirm, handleDiscard } = useWordCanvas();
     const previewRef = useRef<HTMLDivElement>(null);
     const refFileInput = useRef<HTMLInputElement>(null);
     const [popupStyle, setPopupStyle] = useState<{ left: number, top: number } | null>(null);
@@ -138,6 +138,10 @@ export const WordCanvas: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                         isProcessing={state.isChatLoading || false}
                         selectionContext={state.selectionContext ? { text: state.selectionContext.text, ids: [state.selectionContext.id] } : null}
                         onClearSelection={() => { setPopupStyle(null); clearSelection(); }}
+                        /* Confirmation Props */
+                        isPendingConfirmation={state.isPendingConfirmation}
+                        onConfirm={handleConfirm}
+                        onDiscard={handleDiscard}
                     />
                 )}
             </div>

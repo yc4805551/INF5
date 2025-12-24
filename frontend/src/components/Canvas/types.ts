@@ -60,4 +60,5 @@ export interface CanvasState {
     activeScope: { start: number; end: number; title: string } | null;
     referenceFiles: string[];
     isChatLoading?: boolean; // Separate chat loading state
+    isPendingConfirmation?: boolean; // For manual confirmation
 }

@@ -130,7 +130,9 @@ export const useWordCanvas = () => {
             const aiReply = response.data.reply;
             updateState({
                 messages: [...updatedMessages, { role: 'ai', content: aiReply }],
-                isChatLoading: false
+                isChatLoading: false,
+                isPendingConfirmation: response.data.is_staging,
+                htmlPreview: response.data.html_preview || state.htmlPreview
             });
 
             // Reload page or jump to scope?
@@ -192,6 +194,40 @@ export const useWordCanvas = () => {
         }
     };
 
+    const handleConfirm = async () => {
+        if (state.isProcessing) return;
+        updateState({ isProcessing: true });
+        try {
+            const res = await axios.post(`${API_URL}/confirm`);
+            updateState({
+                htmlPreview: res.data.html_preview, // Real-time update
+                isPendingConfirmation: false
+            });
+        } catch (error) {
+            console.error("Confirm failed", error);
+            alert("确认修改失败");
+        } finally {
+            updateState({ isProcessing: false });
+        }
+    };
+
+    const handleDiscard = async () => {
+        if (state.isProcessing) return;
+        updateState({ isProcessing: true });
+        try {
+            const res = await axios.post(`${API_URL}/discard`);
+            updateState({
+                htmlPreview: res.data.html_preview, // Real-time revert
+                isPendingConfirmation: false
+            });
+        } catch (error) {
+            console.error("Discard failed", error);
+            alert("取消修改失败");
+        } finally {
+            updateState({ isProcessing: false });
+        }
+    };
+
     const reset = async () => {
         if (!confirm("确定要重置画布吗？所有未保存的更改和参考文件将被清除。")) return;
 
@@ -248,6 +284,8 @@ export const useWordCanvas = () => {
 
     return {
         state,
+        handleConfirm,
+        handleDiscard,
         handleFileUpload,
         handleReferenceUpload,
         handleSendMessage,
