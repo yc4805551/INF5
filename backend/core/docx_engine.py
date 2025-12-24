@@ -1273,6 +1273,26 @@ class DocxEngine:
             "insert_image": insert_image 
         }
         
+        # FIX: The LLM sometimes hallucinates 'import utils' or 'utils.smart_replace'.
+        # We handle this by stripping the import and providing a mock object.
+        if "import utils" in code or "from utils" in code:
+             # Remove the import line to avoid ModuleNotFoundError
+             code = re.sub(r'^\s*import utils.*$', '', code, flags=re.MULTILINE)
+             code = re.sub(r'^\s*from utils import.*$', '', code, flags=re.MULTILINE)
+             
+             class MockUtils:
+                 pass
+             mock_utils = MockUtils()
+             # Map common methods to the mock object
+             mock_utils.smart_replace = self.smart_replace
+             mock_utils.flexible_replace = self.flexible_replace
+             mock_utils.search_replace = self.search_replace
+             mock_utils.apply_markdown = self.replace_with_markdown
+             mock_utils.insert_image = insert_image
+             mock_utils.set_east_asian_font = self.set_east_asian_font
+             
+             local_scope["utils"] = mock_utils
+
         try:
             exec(code, local_scope)
             return True, ""
