@@ -177,9 +177,10 @@ export const useWordCanvas = () => {
             if (res.data.references) {
                 updateState({ referenceFiles: res.data.references });
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error("Reference upload failed", error);
-            alert("上传参考文件失败");
+            const msg = error.response?.data?.error || error.message || "未知错误";
+            alert(`上传参考文件失败: ${msg}`);
         }
     };
 

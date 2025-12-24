@@ -31,6 +31,8 @@ class DocxEngine:
     def load_document(self, file_stream):
         self.doc = Document(file_stream)
         self.staging_doc = None
+        # Clear references on new document load to sync with frontend
+        self.reference_docs = []
         return self.doc
 
     def load_from_path(self, path: str):
@@ -94,10 +96,10 @@ class DocxEngine:
                 "doc": ref_doc,
                 "markdown": markdown_content
             })
-            return True
+            return True, "Success"
         except Exception as e:
             logging.error(f"Failed to load reference doc {filename}: {e}")
-            return False
+            return False, str(e)
 
     def reset(self):
         """

@@ -92,13 +92,13 @@ def canvas_upload_reference():
             return jsonify({"error": "No selected file"}), 400
         
         content = file.read()
-        success = current_engine.add_reference_doc(io.BytesIO(content), file.filename)
+        success, message = current_engine.add_reference_doc(io.BytesIO(content), file.filename)
         
         if success:
             refs = current_engine.get_reference_list()
             return jsonify({"message": f"Reference {file.filename} added", "references": refs})
         else:
-            return jsonify({"error": "Failed to load reference doc"}), 500
+            return jsonify({"error": f"Failed to load reference: {message}"}), 500
     except Exception as e:
         logging.error(f"Canvas Upload Reference Error: {e}")
         return jsonify({"error": str(e)}), 500
