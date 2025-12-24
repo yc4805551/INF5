@@ -96,8 +96,9 @@ export const WordCanvas: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                         <button
                             className="action-btn"
                             onClick={() => refFileInput.current?.click()}
-                            title="添加参考文件"
-                            style={{ padding: '4px 8px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                            title={!state.hasFile ? "请先上传主文档" : "添加参考文件"}
+                            disabled={!state.hasFile}
+                            style={{ padding: '4px 8px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px', opacity: !state.hasFile ? 0.5 : 1 }}
                         >
                             <FilePlus size={14} /> 添加参考
                         </button>
