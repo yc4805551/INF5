@@ -44,3 +44,5 @@ pip-delete-this-directory.txt
 knowledge_base/
 knowledge_base_nomic/
 deployment_debug.log
+
+backend/static/images/
