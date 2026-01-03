@@ -122,27 +122,27 @@ AVAILABLE TOOLS:
 """
 
     TOC_ANALYSIS_PROMPT_TEMPLATE = """
-你是一位协助从大型文档中检索信息的AI研究助手。
-你的任务是分析文档的大纲（Table of Contents, TOC），并识别哪些章节可能包含用户问题的答案。
-
-用户问题:
-{query}
-
-文档目录 (TOC):
-{toc}
-
-指令:
-1. 返回一个包含最相关章节ID（开始索引 start, 结束索引 end）的JSON列表。
-2. 最多选择 3-5 个章节。不要选择整篇文档。
-3. 如果目录中的章节标题与用户意图明显匹配，请选择该章节。
-4. 输出格式:
-[
-    {{"start": 100, "end": 200, "title": "章节标题", "doc_idx": 0}},
-    ...
-]
-5. 如果目录行中包含 "idx:" 信息，请务必在JSON输出中包含对应的 "doc_idx"。
-6. 如果没有相关章节，请返回空列表 []。
-"""
+    你是一位协助从大型文档中检索信息的AI研究助手。
+    你的任务是分析文档的大纲（Table of Contents, TOC）及其摘要片段（Snippet），并识别哪些章节可能包含用户问题的答案。
+    
+    用户问题:
+    {query}
+    
+    文档大纲 (Smart Outline):
+    {toc}
+    
+    指令:
+    1. 返回一个包含最相关章节ID（开始索引 start, 结束索引 end）的JSON列表。
+    2. 结合【标题】和【摘要片段】进行判断。如果标题不明确但摘要片段包含相关信息，请务必选中该章节。
+    3. 最多选择 3-5 个章节。不用选太多。
+    4. 输出格式:
+    [
+        {{"start": 100, "end": 200, "title": "章节标题", "doc_idx": 0, "reason": "摘要提及相关内容"}},
+        ...
+    ]
+    5. 如果目录行中包含 "idx:" 信息，请务必在JSON输出中包含对应的 "doc_idx"。
+    6. 如果没有相关章节，请返回空列表 []。
+    """
 
     def __init__(self, api_key: str = None):
         self.api_key = api_key
@@ -165,13 +165,16 @@ AVAILABLE TOOLS:
         for item in toc:
             indent = "  " * (item['level'] - 1)
             # Include filename or doc_idx in output so LLM acts on it?
-            # Or just provide a unique ID?
-            # We can prompt the LLM to return the object it sees.
             extra_info = ""
             if 'filename' in item:
                 extra_info = f" [Doc: {item['filename']} | idx: {item.get('doc_idx', 0)}]"
             
-            toc_text += f"{indent}- {item['title']} (ID: {item['id']}-{item['end_id']}){extra_info}\n"
+            # Format: Title (ID: X-Y) [Snippet: ...]
+            snippet_text = ""
+            if "snippet" in item and item["snippet"]:
+                snippet_text = f" | Snippet: {item['snippet']}..."
+
+            toc_text += f"{indent}- {item['title']} (ID: {item['id']}-{item['end_id']}){extra_info}{snippet_text}\n"
 
         prompt = self.TOC_ANALYSIS_PROMPT_TEMPLATE.format(
             query=user_query,

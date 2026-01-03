@@ -1,10 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
+
 import { ArrowLeft, Send, Plus, Upload, Bold, Italic, Heading1, Heading2, List, ListOrdered, Quote, Code, Undo, Redo, ClipboardList, BookOpen, X, Download, Wand2 } from 'lucide-react';
 import { marked } from 'marked';
 import mammoth from 'mammoth';
 import './cocreation.css';
 import { SYSTEM_BASE, buildSystemPrompt } from '../../prompts';
 import { useCoCreation } from './useCoCreation';
+import { getAvailableModels, MODEL_DISPLAY_NAMES } from '../../services/ai';
 
 // Tiptap
 import { useEditor, EditorContent } from '@tiptap/react';
@@ -27,6 +29,7 @@ interface CoCreationViewProps {
         onComplete: () => void,
         onError: (err: Error) => void
     ) => Promise<void>;
+    onNavigateToCanvas: () => void;
 }
 
 interface ContextFile {
@@ -60,7 +63,9 @@ const MenuBar = ({ editor }: { editor: any }) => {
     );
 };
 
-export const CoCreationView: React.FC<CoCreationViewProps> = ({ onBack, callAiStream, selectedModel, onModelChange }) => {
+export const CoCreationView: React.FC<CoCreationViewProps> = ({ onBack, callAiStream, selectedModel, onModelChange, onNavigateToCanvas }) => {
+    // const navigate = useNavigate(); // Removed
+    const availableModels = getAvailableModels();
     const { state, setContent, addMessage, setProcessing } = useCoCreation();
     const [input, setInput] = useState('');
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -76,6 +81,34 @@ export const CoCreationView: React.FC<CoCreationViewProps> = ({ onBack, callAiSt
     const [bubbleParams, setBubbleParams] = useState<{ x: number, y: number, visible: boolean } | null>(null);
     const [pendingRefinement, setPendingRefinement] = useState<{ from: number, to: number, text: string } | null>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
+
+    // Resizing Logic
+    const [chatWidth, setChatWidth] = useState(480);
+    const [isResizing, setIsResizing] = useState(false);
+
+    const startResizing = React.useCallback(() => setIsResizing(true), []);
+    const stopResizing = React.useCallback(() => setIsResizing(false), []);
+
+    const resize = React.useCallback(
+        (mouseMoveEvent: MouseEvent) => {
+            if (isResizing) {
+                const newWidth = mouseMoveEvent.clientX;
+                if (newWidth > 300 && newWidth < 800) {
+                    setChatWidth(newWidth);
+                }
+            }
+        },
+        [isResizing]
+    );
+
+    useEffect(() => {
+        window.addEventListener("mousemove", resize);
+        window.addEventListener("mouseup", stopResizing);
+        return () => {
+            window.removeEventListener("mousemove", resize);
+            window.removeEventListener("mouseup", stopResizing);
+        };
+    }, [resize, stopResizing]);
 
     const editor = useEditor({
         extensions: [
@@ -118,6 +151,73 @@ export const CoCreationView: React.FC<CoCreationViewProps> = ({ onBack, callAiSt
             }, 50);
         }
     });
+
+    const API_BASE = import.meta.env.PROD
+        ? `${(import.meta.env.VITE_API_BASE_URL || '').trim().replace(/\/+$/, '')}/api/smart_canvas`
+        : '/proxy-api/smart_canvas';
+
+    const handleExport = () => {
+        const content = editor ? (editor.storage as any).markdown.getMarkdown() : state.content;
+        const blob = new Blob([content], { type: 'text/markdown' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'co_creation_export.md';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };
+
+    const handleExportDocx = async () => {
+        const content = editor ? (editor.storage as any).markdown.getMarkdown() : state.content;
+        try {
+            const response = await fetch(`${API_BASE}/export`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ markdown: content })
+            });
+
+            if (!response.ok) {
+                const errText = await response.text();
+                throw new Error(errText || "Export failed");
+            }
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'co_creation_export.docx';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        } catch (e: any) {
+            console.error("Export failed", e);
+            alert(`导出失败: ${e.message}`);
+        }
+    };
+
+    const handleTransferToCanvas = async () => {
+        const content = editor ? (editor.storage as any).markdown.getMarkdown() : state.content;
+        try {
+            // 1. Call backend to convert and load into engine
+            const response = await fetch(`${API_BASE}/transfer_to_canvas`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ markdown: content })
+            });
+
+            if (!response.ok) throw new Error("Transfer failed");
+
+            // 2. Navigate
+            onNavigateToCanvas();
+
+        } catch (e: any) {
+            console.error("Transfer failed", e);
+            alert("转入画布失败");
+        }
+    };
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -177,47 +277,7 @@ export const CoCreationView: React.FC<CoCreationViewProps> = ({ onBack, callAiSt
         else reader.readAsText(file);
     };
 
-    const handleExport = () => {
-        if (!editor) return;
-        const markdown = (editor.storage as any).markdown.getMarkdown();
-        const blob = new Blob([markdown], { type: 'text/markdown' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'co-creation-canvas.md';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-    };
 
-    const handleExportDocx = async () => {
-        if (!editor) return;
-        const markdown = (editor.storage as any).markdown.getMarkdown();
-
-        try {
-            const response = await fetch('/proxy-api/canvas/export_docx', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ markdown })
-            });
-
-            if (!response.ok) throw new Error('Export failed');
-
-            const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'export.docx';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            window.URL.revokeObjectURL(url);
-        } catch (e) {
-            console.error(e);
-            alert('导出 Word 失败');
-        }
-    };
 
     const removeFile = (index: number) => {
         setContextFiles(prev => prev.filter((_, i) => i !== index));
@@ -256,7 +316,7 @@ export const CoCreationView: React.FC<CoCreationViewProps> = ({ onBack, callAiSt
         const contextContent = fullContent.length > 6000 ? "...(truncated)\n" + fullContent.slice(-6000) : fullContent;
 
         const requirements = contextFiles.filter(f => f.type === 'requirement').map(f => f.content).join('\n\n');
-        const references = contextFiles.filter(f => f.type === 'reference').map(f => f.content).join('\n\n');
+        const references = contextFiles.filter(f => f.type === 'reference').map((f, i) => `[Ref ${i + 1}] (File: ${f.name}):\n${f.content}`).join('\n\n');
 
         const systemPrompt = buildSystemPrompt({
             requirements,
@@ -383,21 +443,38 @@ export const CoCreationView: React.FC<CoCreationViewProps> = ({ onBack, callAiSt
                 </div>
             )}
 
-            <div className="cc-chat-panel">
+            <div className="cc-chat-panel" style={{ width: chatWidth }}>
+                {/* Resizer Handle */}
+                <div
+                    className="cc-resizer"
+                    onMouseDown={startResizing}
+                />
                 <div className="cc-header">
                     <button onClick={onBack} className="cc-icon-btn"><ArrowLeft size={18} /></button>
                     <span className="cc-title">共创画布</span>
-                    <div className="cc-model-selector">
+                    <div className="cc-model-selector" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <button className="action-btn" title="添加需求" onClick={() => reqInputRef.current?.click()}>
+                            <ClipboardList size={14} /> <span style={{ fontSize: 13 }}>需求</span>
+                        </button>
+                        <input type="file" ref={reqInputRef} multiple style={{ display: 'none' }} accept=".txt,.md,.docx" onChange={(e) => readContextFile(e.target.files, 'requirement')} />
+
+                        <button className="action-btn" title="添加参考资料" onClick={() => refInputRef.current?.click()}>
+                            <BookOpen size={14} /> <span style={{ fontSize: 13 }}>参考</span>
+                        </button>
+                        <input type="file" ref={refInputRef} multiple style={{ display: 'none' }} accept=".txt,.md,.docx" onChange={(e) => readContextFile(e.target.files, 'reference')} />
+
+                        <div className="cc-divider" style={{ height: 16, margin: '0 4px' }}></div>
+
                         <select
                             value={selectedModel}
                             onChange={(e) => onModelChange(e.target.value)}
                             className="cc-model-select"
                         >
-                            <option value="gemini">Gemini Pro</option>
-                            <option value="deepseek">DeepSeek</option>
-                            <option value="openai">GPT-4o</option>
-                            <option value="ali">通义千问</option>
-                            <option value="doubao">豆包</option>
+                            {availableModels.map(modelKey => (
+                                <option key={modelKey} value={modelKey}>
+                                    {MODEL_DISPLAY_NAMES[modelKey] || modelKey}
+                                </option>
+                            ))}
                         </select>
                     </div>
                 </div>
@@ -423,10 +500,6 @@ export const CoCreationView: React.FC<CoCreationViewProps> = ({ onBack, callAiSt
                         </div>
                     )}
                     <div className="cc-input-area">
-                        <button className="cc-icon-btn" title="Requirements" onClick={() => reqInputRef.current?.click()}><ClipboardList size={18} color="#ef4444" /></button>
-                        <input type="file" ref={reqInputRef} multiple style={{ display: 'none' }} accept=".txt,.md,.docx" onChange={(e) => readContextFile(e.target.files, 'requirement')} />
-                        <button className="cc-icon-btn" title="Reference" onClick={() => refInputRef.current?.click()}><BookOpen size={18} color="#3b82f6" /></button>
-                        <input type="file" ref={refInputRef} multiple style={{ display: 'none' }} accept=".txt,.md,.docx" onChange={(e) => readContextFile(e.target.files, 'reference')} />
 
                         <div style={{ flex: 1, position: 'relative' }}>
                             {pendingRefinement && (
@@ -470,6 +543,10 @@ export const CoCreationView: React.FC<CoCreationViewProps> = ({ onBack, callAiSt
                     <div className="cc-divider"></div>
                     <button className="cc-tab" style={{ width: 'auto', padding: '0 12px' }} onClick={handleExport}><Download size={14} style={{ marginRight: 6 }} /> MD</button>
                     <button className="cc-tab" style={{ width: 'auto', padding: '0 12px', marginLeft: 8 }} onClick={handleExportDocx}><Download size={14} style={{ marginRight: 6 }} /> Word</button>
+                    <div className="cc-divider"></div>
+                    <button className="cc-tab active-action" style={{ width: 'auto', padding: '0 12px', background: '#e0f2fe', color: '#0284c7', border: '1px solid #bae6fd' }} onClick={handleTransferToCanvas}>
+                        <Wand2 size={14} style={{ marginRight: 6 }} /> 去画布精修
+                    </button>
                 </div>
                 <MenuBar editor={editor} />
                 <div className="cc-editor-container tiptap-wrapper" onClick={() => editor?.commands.focus()}>

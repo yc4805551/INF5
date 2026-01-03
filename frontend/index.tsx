@@ -8,7 +8,7 @@ import {
 } from './src/types';
 import { GoogleGenAI } from '@google/genai';
 import { callGenerativeAi, callGenerativeAiStream, API_BASE_URL } from './src/services/ai';
-import { CanvasView } from './src/components/Canvas/CanvasView';
+
 import { WordCanvas } from './src/components/Canvas/WordCanvas';
 import { CoCreationView } from './src/components/CoCreation/CoCreationView';
 
@@ -2025,7 +2025,7 @@ const TextRecognitionView = ({ provider, executionMode }: { provider: ModelProvi
 
 
 const App = () => {
-    type View = 'home' | 'notes' | 'audit' | 'chat' | 'writing' | 'ocr' | 'canvas' | 'word-canvas' | 'cocreation';
+    type View = 'home' | 'notes' | 'audit' | 'chat' | 'writing' | 'ocr' | 'word-canvas' | 'cocreation';
     const [view, setView] = useState<View>('home');
     const [inputText, setInputText] = useState('');
     const [noteAnalysisResult, setNoteAnalysisResult] = useState<NoteAnalysis | null>(null);
@@ -2123,9 +2123,7 @@ const App = () => {
         setView('ocr');
     };
 
-    const handleCanvas = () => {
-        setView('canvas');
-    };
+
 
     const handleCoCreation = () => {
         setView('cocreation');
@@ -2209,13 +2207,13 @@ const App = () => {
                     provider={selectedModel}
                     executionMode={executionMode}
                 />;
-            case 'canvas':
-                return <CanvasView onBack={handleBackToHome} />;
+
             case 'word-canvas':
-                return <WordCanvas onBack={handleBackToHome} />;
+                return <WordCanvas onBack={handleBackToHome} initialContent={inputText} />;
             case 'cocreation':
                 return <CoCreationView
                     onBack={handleBackToHome}
+                    onNavigateToCanvas={handleWordCanvas}
                     selectedModel={selectedModel}
                     onModelChange={(m) => setSelectedModel(m as any)}
                     callAiStream={async (sys, user, hist, onChunk, onComp, onErr) => {
@@ -2255,7 +2253,7 @@ const App = () => {
                         onKnowledgeChat={handleKnowledgeChat}
                         onWriting={handleTriggerWriting}
                         onTextRecognition={handleTextRecognition}
-                        onCanvas={handleCanvas}
+
                         onCoCreation={handleCoCreation}
                         onWordCanvas={handleWordCanvas}
                         executionMode={executionMode}
@@ -2275,7 +2273,7 @@ const App = () => {
 
     return (
         <div className="main-layout">
-            {(view !== 'canvas' && view !== 'cocreation') && (
+            {(view !== 'cocreation') && (
                 <div className="app-header">
                     <h1>写作笔记助手</h1>
                     <div className="button-group">

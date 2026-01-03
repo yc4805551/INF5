@@ -19,7 +19,7 @@
 
 /* Sidebar */
 .canvas-sidebar {
-    width: 400px;
+    /* Width handled by inline style */
     display: flex;
     flex-direction: column;
     background-color: var(--surface-color);
@@ -27,6 +27,26 @@
     box-shadow: 4px 0 24px rgba(0, 0, 0, 0.05);
     /* Lighter shadow */
     border-right: 1px solid var(--border-color);
+    position: relative;
+    /* For resizer */
+}
+
+.sidebar-resizer {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 6px;
+    /* Hit area */
+    height: 100%;
+    cursor: col-resize;
+    z-index: 30;
+    transition: background-color 0.2s;
+    background-color: transparent;
+}
+
+.sidebar-resizer:hover,
+.sidebar-resizer:active {
+    background-color: var(--accent-color);
 }
 
 .canvas-header {
@@ -60,6 +80,8 @@
     font-weight: 700;
     color: var(--text-color);
     margin: 0;
+    white-space: nowrap;
+    /* Prevent wrapping */
 }
 
 .header-actions {
@@ -228,6 +250,18 @@
     background-color: var(--accent-hover-color);
 }
 
+/* Header Actions Spacing */
+.header-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: nowrap;
+    align-items: center;
+}
+
+.action-btn {
+    white-space: nowrap;
+}
+
 .send-button:disabled {
     opacity: 0.5;
     cursor: not-allowed;
@@ -237,12 +271,15 @@
 /* Preview Area */
 .canvas-preview-area {
     flex: 1;
-    background-color: #f0f2f5;
-    /* Light gray background for contrast with white page */
+    background-color: #f3f4f6;
+    /* Slightly darker gray for better contrast */
     overflow: hidden;
     position: relative;
     display: flex;
     justify-content: center;
+    align-items: flex-start;
+    /* Align top, allow scrolling */
+    padding-top: 20px;
 }
 
 .preview-scroll-container {
@@ -254,16 +291,26 @@
     justify-content: center;
 }
 
-.document-page {
+.docx-content {
     width: 100%;
-    max-width: 850px;
+    max-width: 820px;
+    /* A4 width approx */
     background-color: white;
     color: #000;
-    min-height: 1100px;
-    padding: 96px;
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
-    /* Softer shadow */
+    min-height: 1123px;
+    /* A4 height approx */
+    padding: 80px 90px;
+    /* Standard margins */
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.1);
+    margin: 0 auto 40px auto;
     transition: all 0.3s ease;
+    line-height: 1.6;
+    font-size: 16px;
+}
+
+/* Ensure paragraph spacing in preview */
+.docx-content p {
+    margin-bottom: 1em;
 }
 
 .document-empty {
@@ -448,4 +495,46 @@
 
 .format-menu-item:hover {
     background-color: #f0f2f5;
+}
+
+/* Action Button Styling */
+.action-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border: 1px solid var(--border-color);
+    background: #ffffff;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-color);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    white-space: nowrap;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.action-btn:hover {
+    background-color: #f8f9fa;
+    border-color: var(--accent-color);
+    color: var(--accent-color);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.action-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.action-btn.active {
+    background-color: rgba(0, 120, 212, 0.1);
+    color: var(--accent-color);
+    border-color: var(--accent-color);
+}
+
+.action-btn svg {
+    width: 16px;
+    height: 16px;
 }

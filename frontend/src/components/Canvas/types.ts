@@ -1,23 +1,13 @@
+import { ModelProvider } from '../../types';
+
 export interface ModelConfig {
-    provider: 'gemini' | 'openai' | 'deepseek' | 'aliyun';
+    provider: ModelProvider;
     apiKey?: string;
     endpoint?: string;
     model?: string;
 }
 
-export interface PreviewItem {
-    id: number;
-    text: string;
-    style: string;
-    runs: Array<{
-        text: string;
-        bold: boolean;
-        italic: boolean;
-        underline: boolean;
-        color: string | null;
-        fontSize: number | null;
-    }>;
-}
+
 
 export interface Message {
     role: 'user' | 'assistant' | 'ai' | 'model';
@@ -25,7 +15,7 @@ export interface Message {
 }
 
 export interface DocxEditorState {
-    previewData: PreviewItem[];
+
     isUploading: boolean;
     isProcessing: boolean;
     hasFile: boolean;

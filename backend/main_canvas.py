@@ -32,6 +32,16 @@ async def upload_file(file: UploadFile = File(...)):
         "html_preview": current_engine.get_html_preview()
     }
 
+@app.post("/create_with_text")
+async def create_from_text(data: Dict[str, str] = Body(...)):
+    text = data.get("text", "")
+    current_engine.load_from_text(text)
+    return {
+        "message": "Document created from text",
+        "preview": current_engine.get_preview_data(),
+        "html_preview": current_engine.get_html_preview()
+    }
+
 @app.get("/preview")
 async def get_preview():
     return current_engine.get_preview_data()

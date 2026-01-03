@@ -45,6 +45,26 @@ class DocxEngine:
         self.staging_doc = None
         return self.doc
 
+    def load_from_text(self, text: str):
+        """
+        Creates a new document from the provided text.
+        """
+        self.doc = Document()
+        # Set default style to something reasonable for Chinese if possible,
+        # but python-docx defaults are usually okay-ish. 
+        # Ideally we'd set a style, but for now simple paragraphs.
+        
+        lines = text.split('\n')
+        for line in lines:
+            line = line.strip()
+            if line:
+                self.doc.add_paragraph(line)
+        
+        self.staging_doc = None
+        self.original_path = None
+        self.reference_docs = [] # Clear refs
+        return self.doc
+
     def save_to_path(self, path: str):
         """
         Saves the current document to a local file path.
@@ -104,11 +124,29 @@ class DocxEngine:
     def reset(self):
         """
         Resets the engine to initial state.
+        Also cleans up temporary images in static/images.
         """
         self.doc = None
         self.staging_doc = None
         self.original_path = None
         self.reference_docs = []
+        
+        # Cleanup Logic
+        try:
+            base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            static_img_dir = os.path.join(base_dir, 'static', 'images')
+            if os.path.exists(static_img_dir):
+                logging.info(f"Cleaning up image directory: {static_img_dir}")
+                for filename in os.listdir(static_img_dir):
+                    file_path = os.path.join(static_img_dir, filename)
+                    try:
+                        if os.path.isfile(file_path) or os.path.islink(file_path):
+                            os.unlink(file_path)
+                    except Exception as e:
+                        logging.error(f"Failed to delete {file_path}. Reason: {e}")
+        except Exception as e:
+            logging.error(f"Error during reset cleanup: {e}")
+            
         return True
         
     def get_reference_list(self) -> list:
@@ -340,6 +378,7 @@ class DocxEngine:
             p = doc.paragraphs[i]
             
             # Check for page num update
+            old_page = current_page
             current_page = self._update_page_num(p, current_page, char_count_since_last_page)
             
             page_changed = False
@@ -490,17 +529,29 @@ class DocxEngine:
                 
                 # 2. Restart/Implicit Break
                 if char_count_since_last_page > 50:
-                     # If detected <= current, it means a restart. 
-                     # If we have lots of chars, we missed a break.
-                     logging.info(f"[Page Debug] Implicit Break: Footer '{p_text}' says {detected_num} (<= {current_page}), but char buffer {char_count_since_last_page} > 50. Incrementing to {current_page + 1}.")
-                     return current_page + 1
-                
+                    # If detected <= current, it means a restart. 
+                    # If we have lots of chars, we missed a break.
+                    logging.info(f"[Page Debug] Implicit Break: Footer '{p_text}' says {detected_num} (<= {current_page}), but char buffer {char_count_since_last_page} > 50. Incrementing to {current_page + 1}.")
+                    return current_page + 1
+
         return current_page
+
+    def get_all_content(self, limit=None) -> str:
+        """
+        Retrieves the full content of the current main document with page numbers.
+        """
+        target_doc = self.staging_doc if self.staging_doc else self.doc
+        if not target_doc: return ""
+        
+        # Reuse extract logic but for the whole range
+        total_paras = len(target_doc.paragraphs)
+        return self._extract_range_with_pages(target_doc, 0, total_paras, limit=limit or 100000)
 
     def get_relevant_reference_context(self, user_query: str) -> str:
         """
-        Smart Context Retrieval (Coarse-to-Fine).
-        Based on user_query, finds relevant sections and returns content with PAGE NUMBERS.
+        Smart Context Retrieval (Universal Adaptive Strategy).
+        1. Short Docs (< 300 paras): Return FULL content.
+        2. Long Docs: Coarse-to-Fine Search.
         """
         if not self.reference_docs:
             return ""
@@ -516,6 +567,16 @@ class DocxEngine:
         for ref in self.reference_docs:
             doc = ref['doc']
             filename = ref['filename']
+            para_count = len(doc.paragraphs)
+            
+            # --- ADAPTIVE STRATEGY: Small Doc Optimization ---
+            if para_count < 300:
+                # Direct Injection for small docs
+                full_text = self._extract_range_with_pages(doc, 0, para_count, limit=50000)
+                relevant_parts.append(f"--- 参考文档：{filename} (全文) ---\n{full_text}\n")
+                matches_found = True
+                continue
+            # -------------------------------------------------
             
             # 1. Build Outline
             outline = []
@@ -904,11 +965,35 @@ class DocxEngine:
                      if level == 0: level = 3 # Default to level 3 for unspecified bold headers
             
             if level > 0:
+                # snippet Extraction (Smart Outline)
+                snippet = ""
+                # Peek ahead for snippet
+                # We want the first non-empty text that is NOT a title/heading
+                start_peek_id = i + 1
+                search_limit = 5 # Look at next 5 paragraphs max
+                found_snippet = False
+                
+                for peek_i in range(start_peek_id, min(start_peek_id + search_limit, len(doc.paragraphs))):
+                    peek_p = doc.paragraphs[peek_i]
+                    peek_text = peek_p.text.strip()
+                    if not peek_text:
+                        continue
+                        
+                    # Check if this next para is also a header?
+                    # Simple heuristic: if it's very short and bold, or matches our regex, might be subheader
+                    # But for snippet, we'll take it unless it's obviously a strong header
+                    # If snippet is too short, we might append more? For now, just take the first chunk.
+                    snippet = peek_text[:200]
+                    if len(snippet) < 200 and len(peek_text) > 200:
+                         snippet += "..."
+                    break
+
                 toc.append({
                     "id": i,
                     "title": text,
                     "level": level,
-                    "page": current_page # Use the synced robust page number
+                    "page": current_page, # Use the synced robust page number
+                    "snippet": snippet # Smart Outline Feature
                 })
         
         # Calculate End Indices
@@ -1580,7 +1665,10 @@ class DocxEngine:
 
 
     def save_to_stream(self):
+        target_doc = self.staging_doc if self.staging_doc else self.doc
+        if not target_doc:
+            return None
         stream = io.BytesIO()
-        self.doc.save(stream)
+        target_doc.save(stream)
         stream.seek(0)
         return stream

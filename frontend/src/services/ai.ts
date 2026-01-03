@@ -11,7 +11,7 @@ export const API_BASE_URL = import.meta.env?.PROD
     ? `${cleanEnv(import.meta.env.VITE_API_BASE_URL) || ''}/api`
     : '/proxy-api';
 
-const frontendApiConfig: Record<string, {
+export const frontendApiConfig: Record<string, {
     apiKey?: string;
     endpoint?: string;
     model?: string;
@@ -45,6 +45,26 @@ const frontendApiConfig: Record<string, {
         endpoint: cleanEnv(import.meta.env?.VITE_DOUBAO_ENDPOINT),
         model: cleanEnv(import.meta.env?.VITE_DOUBAO_MODEL),
     },
+};
+
+export const MODEL_DISPLAY_NAMES: Record<string, string> = {
+    gemini: 'Gemini',
+    openai: 'OpenAI',
+    deepseek: 'DeepSeek',
+    ali: '3PRO',
+    depOCR: 'DepOCR',
+    doubao: 'Doubao'
+};
+
+export const getAvailableModels = (): ModelProvider[] => {
+    // Returns models that have at least a model name configured
+    // For OpenAI-compatibles, usually Model Name comes from env.
+    // For Gemini, model is hardcoded, so check API Key.
+    return Object.keys(frontendApiConfig).filter(key => {
+        const config = frontendApiConfig[key];
+        if (key === 'gemini') return !!config.apiKey;
+        return !!config.model; // For others, model name is dynamic and required
+    }) as ModelProvider[];
 };
 
 async function callOpenAiCompatibleApi(

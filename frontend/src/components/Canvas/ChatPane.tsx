@@ -1,8 +1,9 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { Send, Sparkles, Check, X, User, Bot, ChevronDown } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { ModelConfig, Message } from './types';
+import { getAvailableModels, MODEL_DISPLAY_NAMES, frontendApiConfig } from '../../services/ai';
 
 interface ChatPaneProps {
     onSendMessage: (message: string, modelConfig: ModelConfig) => void;
@@ -19,7 +20,12 @@ interface ChatPaneProps {
     onClearSelection?: () => void;
 }
 
-export const ChatPane: React.FC<ChatPaneProps> = ({
+export interface ChatPaneHandle {
+    setInput: (text: string) => void;
+    focus: () => void;
+}
+
+export const ChatPane = forwardRef<ChatPaneHandle, ChatPaneProps>(({
     onSendMessage,
     isProcessing,
     isPendingConfirmation = false,
@@ -32,11 +38,18 @@ export const ChatPane: React.FC<ChatPaneProps> = ({
     messages = [],
     selectionContext,
     onClearSelection
-}) => {
+}, ref) => {
     const [input, setInput] = useState('');
-    const [selectedModel, setSelectedModel] = useState<'gemini' | 'openai' | 'deepseek' | 'aliyun'>('gemini');
+    const availableModels = getAvailableModels();
+    const [selectedModel, setSelectedModel] = useState<string>(availableModels[0] || 'gemini');
     const [showFormatMenu, setShowFormatMenu] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<HTMLTextAreaElement>(null);
+
+    useImperativeHandle(ref, () => ({
+        setInput: (text: string) => setInput(text),
+        focus: () => inputRef.current?.focus()
+    }));
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -47,39 +60,15 @@ export const ChatPane: React.FC<ChatPaneProps> = ({
     }, [messages, isPendingConfirmation]);
 
     const getModelConfig = (model: string): ModelConfig => {
-        const env = import.meta.env;
-        switch (model) {
-            case 'gemini':
-                return {
-                    provider: 'gemini',
-                    apiKey: env.VITE_GEMINI_API_KEY,
-                    endpoint: env.VITE_GEMINI_ENDPOINT,
-                    model: env.VITE_GEMINI_MODEL || 'gemini-2.5-flash'
-                };
-            case 'openai':
-                return {
-                    provider: 'openai',
-                    apiKey: env.VITE_OPENAI_API_KEY,
-                    endpoint: env.VITE_OPENAI_ENDPOINT,
-                    model: env.VITE_OPENAI_MODEL
-                };
-            case 'deepseek':
-                return {
-                    provider: 'deepseek', // Treated as openai-compatible in backend
-                    apiKey: env.VITE_DEEPSEEK_API_KEY,
-                    endpoint: env.VITE_DEEPSEEK_ENDPOINT,
-                    model: env.VITE_DEEPSEEK_MODEL
-                };
-            case 'aliyun':
-                return {
-                    provider: 'aliyun',
-                    apiKey: env.VITE_ALI_API_KEY,
-                    endpoint: env.VITE_ALI_ENDPOINT,
-                    model: env.VITE_ALI_MODEL
-                };
-            default:
-                return { provider: 'gemini' };
-        }
+        const config = frontendApiConfig[model];
+        if (!config) return { provider: 'gemini' };
+
+        return {
+            provider: model as any,
+            apiKey: config.apiKey,
+            endpoint: config.endpoint,
+            model: config.model
+        };
     };
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -92,7 +81,7 @@ export const ChatPane: React.FC<ChatPaneProps> = ({
 
     return (
         <div className="chat-container">
-            {/* Body Format Confirmation Dialog - Simplified for now, can be modalized properly later */}
+            {/* Body Format Confirmation Dialog */}
             {showBodyFormatDialog && (
                 <div className="modal-overlay">
                     <div className="modal-content">
@@ -170,13 +159,14 @@ export const ChatPane: React.FC<ChatPaneProps> = ({
                         <div style={{ marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <select
                                 value={selectedModel}
-                                onChange={(e) => setSelectedModel(e.target.value as any)}
+                                onChange={(e) => setSelectedModel(e.target.value)}
                                 className="model-selector"
                             >
-                                <option value="gemini">Google Gemini</option>
-                                <option value="openai">OpenAI (GPT-5.1)</option>
-                                <option value="deepseek">DeepSeek</option>
-                                <option value="aliyun">Aliyun Qwen3</option>
+                                {availableModels.map(modelKey => (
+                                    <option key={modelKey} value={modelKey}>
+                                        {MODEL_DISPLAY_NAMES[modelKey] || modelKey}
+                                    </option>
+                                ))}
                             </select>
                             <div style={{ position: 'relative' }}>
                                 <button
@@ -226,6 +216,7 @@ export const ChatPane: React.FC<ChatPaneProps> = ({
 
                         <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '8px', alignItems: 'flex-end', width: '100%' }}>
                             <textarea
+                                ref={inputRef}
                                 value={input}
                                 onChange={(e) => {
                                     setInput(e.target.value);
@@ -269,4 +260,4 @@ export const ChatPane: React.FC<ChatPaneProps> = ({
             </div>
         </div>
     );
-};
+});

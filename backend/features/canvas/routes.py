@@ -9,6 +9,7 @@ from docx.shared import Pt, Cm
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml.ns import qn
 from core.services import current_engine, llm_engine
+from core.win32_engine import WordAppEngine
 
 canvas_bp = Blueprint('canvas', __name__)
 
@@ -76,7 +77,8 @@ def canvas_preview_html():
             "html": current_engine.get_html_preview(start=start, limit=page_size),
             "total_paragraphs": current_engine.get_paragraph_count(),
             "page": page,
-            "page_size": page_size
+            "page_size": page_size,
+            "structure": current_engine.get_document_structure()
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -172,58 +174,99 @@ def canvas_chat():
             start = (page - 1) * page_size
             context = current_engine.get_preview_data(start=start, limit=page_size)
         
-        # Get reference context (Smart Coarse-to-Fine)
-        # 1. Get Reference Structure
-        ref_structure = current_engine.get_reference_structure()
+        # --- UNIVERSAL ADAPTIVE STRATEGY (MAIN DOC) ---
+        total_paras = current_engine.get_paragraph_count()
+        main_doc_context = ""
+        is_short_doc = total_paras < 300
         
-        # Prepare Reference TOC Summary (Always visible to AI so it knows what's available)
+        if is_short_doc:
+            # STRATEGY A: Small Doc -> Full Context Injection
+            logging.info(f"Adaptive Strategy: Small Doc ({total_paras} paras). Injecting FULL text.")
+            full_text = current_engine.get_all_content()
+            main_doc_context = f"【当前编辑文档（全文）】:\n{full_text}\n"
+        else:
+            # STRATEGY B: Large Doc -> Coarse-to-Fine Retrieval
+            logging.info(f"Adaptive Strategy: Large Doc ({total_paras} paras). Using Retrieval.")
+            
+            # 1. Get Main Doc Structure
+            main_structure = current_engine.get_document_structure()
+            
+            # 2. Analyze Relevance via LLM (Reuse logic)
+            if main_structure:
+                relevant_indices = llm_engine.analyze_toc_relevance(user_text, main_structure, model_config)
+                if relevant_indices:
+                    retrieved_content = current_engine.get_content_by_indices(relevant_indices)
+                    if retrieved_content:
+                        main_doc_context = f"【文档相关章节（智能检索）】:\n{retrieved_content}\n"
+
+        # Ref Context (Already Adaptive via docx_engine.get_relevant_reference_context upgrades)
+        # We still need to call it.
+        # But notice: current_engine.get_relevant_reference_context was updated to be adaptive.
+        # However, the code below used llm_engine.analyze_toc_relevance FIRST.
+        # We need to respect the internal adaptive logic of get_relevant_reference_context if we fallback?
+        # Actually, let's simplify Reference Logic to rely on the Engine's new smarts?
+        # Or keep the TOC analysis?
+        # The prompt said: "modify routes.py ... to apply threshold logic check".
+        # Since we updated get_relevant_reference_context to handle small docs, we can rely on it
+        # BUT analyze_toc_relevance is powerful.
+        # Let's keep analyze_toc_relevance but maybe we assume the Engine handles the choice?
+        # For now, let's keep the existing flow but if it returns nothing, we trust the engine.
+        
+        # Get reference context
+        ref_structure = current_engine.get_reference_structure()
+        ref_context_str = ""
+        
+        # Prepare TOC Summary
         ref_toc_summary = ""
         if ref_structure:
+            # Re-implement inline for safety
             ref_toc_summary = "\n【参考文档目录结构】:\n"
             current_doc_idx = -1
             for item in ref_structure:
                 if item.get('doc_idx') != current_doc_idx:
                     current_doc_idx = item.get('doc_idx')
                     ref_toc_summary += f"[文档: {item.get('filename')}]\n"
-                
                 indent = "  " * (item.get('level', 1) - 1)
                 ref_toc_summary += f"{indent}- {item.get('title')}\n"
-        
-        # 2. Analyze Relevance via LLM
+
+        # Execute Ref Retrieval
         if ref_structure:
-            relevant_indices = llm_engine.analyze_toc_relevance(user_text, ref_structure, model_config)
-            
-            # 3. Fetch Content
-            if relevant_indices:
-                ref_context = current_engine.get_content_by_indices(relevant_indices)
+            valid_indices = llm_engine.analyze_toc_relevance(user_text, ref_structure, model_config)
+            if valid_indices:
+                ref_context_str = current_engine.get_content_by_indices(valid_indices)
             else:
-                # Fallback to keyword match if LLM returns nothing
-                ref_context = current_engine.get_relevant_reference_context(user_text)
+                ref_context_str = current_engine.get_relevant_reference_context(user_text)
         else:
-            ref_context = current_engine.get_relevant_reference_context(user_text)
+            ref_context_str = current_engine.get_relevant_reference_context(user_text)
 
-        # Combine Content + TOC Summary
-        if ref_context:
-            ref_context = ref_toc_summary + "\n" + ref_context
-        else:
-            # Even if no content matched, show the TOC so AI knows the docs exist
-            ref_context = ref_toc_summary
 
-        if ref_context and len(ref_context) > 25000:
-            ref_context = ref_context[:25000] + "\n...[智能精选内容过长已截断]..."
-            
-        # Get Global Context (Meta-Summary)
-        global_context = current_engine.get_global_context()
+        # Combine Contexts
+        final_ref_context = (ref_toc_summary + "\n" + ref_context_str) if ref_context_str else ref_toc_summary
+        if len(final_ref_context) > 25000:
+             final_ref_context = final_ref_context[:25000] + "\n...[参考资料截断]..."
+
+        # Get Global Context (Meta-Summary) if not full doc
+        global_context = ""
+        if not is_short_doc:
+             global_context = current_engine.get_global_context()
+
+        # Construct Final User Message
+        # Priority: Main Doc Context -> Global Context -> Original User Text
+        
+        augmented_user_text = ""
         if global_context:
-            # Inject Global Context
-            user_text = f"【全书脉络背景】:\n{global_context}\n\n【当前章节内容】:\n{user_text}"
+            augmented_user_text += f"【全书脉络】:\n{global_context}\n\n"
+        
+        if main_doc_context:
+            augmented_user_text += main_doc_context + "\n\n"
             
+        augmented_user_text += f"【当前可视区域】:\n(见 doc_context)\n\n【用户指令】:\n{user_text}"
+
         # Call LLM
-        # We pass the scoped/paginated context + ref_context + modified user_text
         response = llm_engine.chat_with_doc(
-            user_message=user_text, 
-            doc_context=context, 
-            ref_context=ref_context, # Pass reference context
+            user_message=augmented_user_text, 
+            doc_context=context, # Visual Page context
+            ref_context=final_ref_context, 
             model_config=model_config,
             history=history,
             selection_context=selection_context
@@ -296,6 +339,83 @@ def canvas_download():
             download_name="modified.docx"
         )
     except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@canvas_bp.route('/export_pdf', methods=['GET'])
+def canvas_export_pdf():
+    try:
+        engine = WordAppEngine()
+        # Pre-check connection
+        if not engine.connect():
+             return jsonify({"error": "Failed to connect to Word. Please ensure Word is installed on the server."}), 500
+        
+        # 1. Save current doc to a temporary file
+        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) # backend/
+        temp_dir = os.path.join(base_dir, 'static', 'temp')
+        if not os.path.exists(temp_dir): os.makedirs(temp_dir, exist_ok=True)
+        
+        import uuid
+        unique_id = uuid.uuid4()
+        docx_path = os.path.join(temp_dir, f"temp_{unique_id}.docx")
+        pdf_path = os.path.join(temp_dir, f"export_{unique_id}.pdf")
+        
+        current_engine.save_to_path(docx_path)
+        
+        # 2. Convert to PDF
+        success = engine.export_to_pdf(docx_path, pdf_path)
+        engine.quit() # Always cleanup
+        
+        if success and os.path.exists(pdf_path):
+             return send_file(
+                pdf_path, 
+                mimetype="application/pdf",
+                as_attachment=True, 
+                download_name="document.pdf"
+             )
+        else:
+             return jsonify({"error": "PDF conversion failed in Word engine."}), 500
+             
+    except Exception as e:
+        logging.error(f"PDF Export Error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@canvas_bp.route('/update_toc', methods=['POST'])
+def canvas_update_toc():
+    try:
+        engine = WordAppEngine()
+        if not engine.connect():
+             return jsonify({"error": "Failed to connect to Word."}), 500
+             
+        # 1. Save current state
+        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        temp_dir = os.path.join(base_dir, 'static', 'temp')
+        if not os.path.exists(temp_dir): os.makedirs(temp_dir, exist_ok=True)
+        
+        import uuid
+        unique_id = uuid.uuid4()
+        docx_path = os.path.join(temp_dir, f"temp_toc_{unique_id}.docx")
+        
+        current_engine.save_to_path(docx_path)
+        
+        # 2. Update TOC
+        success = engine.update_toc(docx_path)
+        engine.quit()
+        
+        if success:
+             # Reload the updated doc back into current_engine
+             with open(docx_path, "rb") as f:
+                 current_engine.load_document(io.BytesIO(f.read()))
+                 
+             return jsonify({
+                "message": "TOC and Page Numbers updated successfully.",
+                "preview": current_engine.get_preview_data(),
+                "html_preview": current_engine.get_html_preview()
+             })
+        else:
+             return jsonify({"error": "Word engine failed to verify TOC updates."}), 500
+
+    except Exception as e:
+        logging.error(f"TOC Update Error: {e}")
         return jsonify({"error": str(e)}), 500
 
 @canvas_bp.route('/format_official', methods=['POST'])

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import mammoth from 'mammoth';
 import { ModelProvider, ExecutionMode } from '../../types';
+import { getAvailableModels, MODEL_DISPLAY_NAMES } from '../../services/ai';
 
 interface HomeInputViewProps {
     inputText: string;
@@ -18,7 +19,6 @@ interface HomeInputViewProps {
     onKnowledgeChat: () => void;
     onWriting: () => void;
     onTextRecognition: () => void;
-    onCanvas: () => void;
     onCoCreation: () => void;
     onWordCanvas: () => void;
     executionMode: ExecutionMode;
@@ -41,12 +41,12 @@ export const HomeInputView: React.FC<HomeInputViewProps> = ({
     onKnowledgeChat,
     onWriting,
     onTextRecognition,
-    onCanvas,
     onCoCreation,
     onWordCanvas,
     executionMode,
     setExecutionMode,
 }) => {
+    const availableModels = getAvailableModels();
     const lastPastedText = useRef('');
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -136,7 +136,7 @@ export const HomeInputView: React.FC<HomeInputViewProps> = ({
         }
     };
 
-    const modelProviders: ModelProvider[] = ['gemini', 'openai', 'deepseek', 'ali', 'depOCR', 'doubao'];
+
 
     return (
         <>
@@ -196,18 +196,18 @@ export const HomeInputView: React.FC<HomeInputViewProps> = ({
                     </div>
                     <div className="config-group">
                         <h4>选择模型</h4>
-                        <div className="model-selector-group">
-                            {modelProviders.map(model => (
-                                <button
-                                    key={model}
-                                    className={`model-btn ${selectedModel === model ? 'active' : ''}`}
-                                    onClick={() => setSelectedModel(model)}
-                                    disabled={isProcessing}
-                                >
-                                    {model}
-                                </button>
+                        <select
+                            className="home-select"
+                            value={selectedModel}
+                            onChange={(e) => setSelectedModel(e.target.value as ModelProvider)}
+                            disabled={isProcessing}
+                        >
+                            {availableModels.map(modelKey => (
+                                <option key={modelKey} value={modelKey}>
+                                    {MODEL_DISPLAY_NAMES[modelKey] || modelKey}
+                                </option>
                             ))}
-                        </div>
+                        </select>
                     </div>
                     <div className="config-group">
                         <h4>选择知识库</h4>
@@ -215,18 +215,19 @@ export const HomeInputView: React.FC<HomeInputViewProps> = ({
                         {kbError && <div className="error-message" style={{ textAlign: 'left' }}>{kbError}</div>}
                         {!isKbLoading && !kbError && (
                             knowledgeBases.length > 0 ? (
-                                <div className="kb-selector-group">
+                                <select
+                                    className="home-select"
+                                    value={selectedKnowledgeBase || ''}
+                                    onChange={(e) => setSelectedKnowledgeBase(e.target.value)}
+                                    disabled={isProcessing}
+                                >
+                                    <option value="" disabled>-- 请选择知识库 --</option>
                                     {knowledgeBases.map(kb => (
-                                        <button
-                                            key={kb.id}
-                                            className={`kb-selector-btn ${selectedKnowledgeBase === kb.id ? 'active' : ''}`}
-                                            onClick={() => setSelectedKnowledgeBase(kb.id)}
-                                            disabled={isProcessing}
-                                        >
+                                        <option key={kb.id} value={kb.id}>
                                             {kb.name}
-                                        </button>
+                                        </option>
                                     ))}
-                                </div>
+                                </select>
                             ) : (
                                 <p className="instruction-text">未找到可用的知识库。请检查后端服务和 Milvus 连接。</p>
                             )

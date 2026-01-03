@@ -11,6 +11,7 @@ INSTRUCTIONS:
 2. For normal questions (e.g., "Give me 3 titles", "Make this paragraph better"), DO NOT use ":::CANVAS:::". Instead, output Markdown code blocks in the chat.
 3. If Refinement Mode is active, start response with ":::CANVAS:::" to stream the replacement directly into the document.
 4. Support Tables.
+5. **SMART CITATIONS**: When using information from the provided [REFERENCE] context, you MUST cite the source using the format \`[Ref ID]\`. Example: "According to the requirements [Ref 1], the project..." or "The budget is 500k [Ref 2]".
 `;
 
 export interface PromptContext {
@@ -29,14 +30,14 @@ export const buildSystemPrompt = (context: PromptContext): string => {
     let prompt = SYSTEM_BASE;
 
     if (context.requirements.trim()) {
-        prompt += `\n\n=== [REQUIREMENTS] ===\n${context.requirements}\n==================`;
+        prompt += `\n\n === [REQUIREMENTS] ===\n${context.requirements} \n ================== `;
     }
 
     if (context.references.trim()) {
-        prompt += `\n\n=== [REFERENCE] ===\n${context.references}\n===============`;
+        prompt += `\n\n === [REFERENCE] ===\n${context.references} \n =============== `;
     }
 
-    prompt += `\n\n=== DOCUMENT ===\n\`\`\`markdown\n${context.documentContent}\n\`\`\`\n`;
+    prompt += `\n\n === DOCUMENT ===\n\`\`\`markdown\n${context.documentContent}\n\`\`\`\n`;
 
     if (context.refinement) {
         prompt += `\nTASK: REWRITE ONLY the selected text below based on user instruction.\nSELECTED TEXT: "${context.refinement.text}"\n`;

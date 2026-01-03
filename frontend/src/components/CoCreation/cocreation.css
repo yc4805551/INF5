@@ -9,15 +9,35 @@
 /* Chat Panel */
 /* Chat Panel */
 .cc-chat-panel {
-    width: 480px;
-    min-width: 400px;
-    max-width: 600px;
+    /* width: 480px;  Removed fixed width for dynamic resizing */
+    min-width: 300px;
+    max-width: 800px;
     display: flex;
     flex-direction: column;
     background: #fdfdfd;
     border-right: 1px solid #e5e7eb;
     box-shadow: 4px 0 24px rgba(0, 0, 0, 0.04);
     z-index: 10;
+    position: relative;
+    /* Ensure resizer is positioned relative to panel */
+}
+
+.cc-chat-panel .cc-resizer {
+    position: absolute;
+    right: -3px;
+    /* Center over border */
+    top: 0;
+    width: 6px;
+    height: 100%;
+    cursor: col-resize;
+    z-index: 20;
+    transition: background 0.2s;
+}
+
+.cc-chat-panel .cc-resizer:hover,
+.cc-chat-panel:hover .cc-resizer {
+    background: rgba(59, 130, 246, 0.3);
+    /* Slight blue tint on hover */
 }
 
 .cc-header {
@@ -199,6 +219,7 @@
 
 .cc-input {
     flex: 1;
+    width: 100%;
     border: none;
     outline: none;
     background: transparent;
@@ -565,4 +586,40 @@
         opacity: 1;
         transform: translateY(0);
     }
+}
+
+/* Action Button Styling - Copied from canvas.css for unification */
+.action-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border: 1px solid #e5e7eb;
+    background: #ffffff;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    color: #374151;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    white-space: nowrap;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.action-btn:hover {
+    background-color: #f9fafb;
+    border-color: #3b82f6;
+    color: #2563eb;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+}
+
+.action-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.action-btn svg {
+    width: 14px;
+    height: 14px;
 }

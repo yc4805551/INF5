@@ -70,6 +70,7 @@ export const useWordCanvas = () => {
                     updateState({
                         htmlPreview: res.data.html,
                         hasFile: isRealDoc,
+                        structure: res.data.structure || [] // Capture structure on reload
                     });
                 }
                 // Also fetch references
@@ -94,7 +95,8 @@ export const useWordCanvas = () => {
                 messages: [],
                 page: 1,
                 totalParagraphs: res.data.total_paragraphs || 0,
-                pageSize: res.data.page_size || 100
+                pageSize: res.data.page_size || 100,
+                structure: res.data.structure || [] // Capture structure
             });
             // Fetch refs too in case they persist? Or clear?
             // Usually new upload clears engine?
@@ -107,6 +109,27 @@ export const useWordCanvas = () => {
             alert("Upload failed");
         } finally {
             updateState({ isUploading: false });
+        }
+    };
+
+    const loadFromText = async (text: string) => {
+        try {
+            updateState({ isProcessing: true });
+            const res = await axios.post(`${API_URL}/create_with_text`, { text });
+            updateState({
+                htmlPreview: res.data.html_preview,
+                hasFile: true,
+                messages: [],
+                page: 1,
+                totalParagraphs: res.data.total_paragraphs || 0,
+                pageSize: res.data.page_size || 100,
+                structure: res.data.structure || []
+            });
+            updateState({ referenceFiles: [] });
+        } catch (error) {
+            console.error("Load from text failed", error);
+        } finally {
+            updateState({ isProcessing: false });
         }
     };
 
@@ -246,11 +269,34 @@ export const useWordCanvas = () => {
                 pageSize: 100,
                 structure: [],
                 activeScope: null,
-                referenceFiles: []
+                referenceFiles: [],
+                isChatLoading: false
             });
         } catch (error) {
             console.error("Reset failed", error);
             alert("重置失败");
+        }
+    };
+
+    const handleFormat = async (modelConfig: ModelConfig, scope: 'all' | 'layout' | 'body' = 'all', processor: 'local' | 'ai' = 'local') => {
+        updateState({ isProcessing: true });
+        try {
+            const res = await axios.post(`${API_URL}/format_official`, {
+                model_config: modelConfig,
+                scope,
+                processor
+            });
+
+            updateState({
+                htmlPreview: res.data.html_preview,
+                isPendingConfirmation: true,
+            });
+
+        } catch (error) {
+            console.error("Format failed", error);
+            alert("格式处理失败");
+        } finally {
+            updateState({ isProcessing: false });
         }
     };
 
@@ -265,14 +311,13 @@ export const useWordCanvas = () => {
     const handleDownload = async () => {
         try {
             const response = await axios.get(`${API_URL}/download`, {
-                responseType: 'blob', // Important for file download
+                responseType: 'blob',
             });
 
-            // Create a blob link to download
             const url = window.URL.createObjectURL(new Blob([response.data]));
             const link = document.createElement('a');
             link.href = url;
-            link.setAttribute('download', 'modified_document.docx'); // or extract filename from header
+            link.setAttribute('download', 'modified_document.docx');
             document.body.appendChild(link);
             link.click();
             link.parentNode?.removeChild(link);
@@ -285,6 +330,7 @@ export const useWordCanvas = () => {
 
     return {
         state,
+        updateState,
         handleConfirm,
         handleDiscard,
         handleFileUpload,
@@ -296,6 +342,11 @@ export const useWordCanvas = () => {
         handleDownload,
         loadPage,
         toggleScope,
-        handleRemoveReference
+        handleRemoveReference,
+        handleFormat,
+        loadFromText
     };
 };
+
+
+
