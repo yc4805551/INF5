@@ -16,6 +16,11 @@ export const frontendApiConfig: Record<string, {
     endpoint?: string;
     model?: string;
 }> = {
+    anything: {
+        // Anything Agent is backend-only via /api/agent-anything usually, 
+        // but if we support frontend direct, we'd need config.
+        // For now, it's backend-managed.
+    },
     gemini: {
         apiKey: cleanEnv(import.meta.env?.VITE_GEMINI_API_KEY),
         model: 'gemini-2.5-flash',
@@ -27,7 +32,7 @@ export const frontendApiConfig: Record<string, {
     },
     deepseek: {
         apiKey: cleanEnv(import.meta.env?.VITE_DEEPSEEK_API_KEY),
-        endpoint: cleanEnv(import.meta.env?.VITE_DEEPSEEK_ENDPOINT),
+        endpoint: cleanEnv(import.meta.env?.VITE_DEEPSEEK_ENDPOINT) || 'https://api.deepseek.com',
         model: cleanEnv(import.meta.env?.VITE_DEEPSEEK_MODEL),
     },
     ali: {
@@ -334,7 +339,11 @@ export const callGenerativeAiStream = async (
                 });
 
                 for await (const chunk of streamResult) {
-                    onChunk(chunk.text);
+                    if (typeof chunk.text === 'function') {
+                        onChunk(chunk.text());
+                    } else if (typeof chunk.text === 'string') {
+                        onChunk(chunk.text);
+                    }
                 }
                 onComplete();
             } else { // OpenAI-compatible

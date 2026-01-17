@@ -1,0 +1,90 @@
+.content-block {
+  margin: 0.8em 0;
+  padding: 0.5em;
+  line-height: 1.6;
+  outline: none;
+  transition: background 0.2s;
+  border-radius: 4px;
+}
+
+.content-block:hover {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.content-block:focus {
+  background: rgba(59, 130, 246, 0.05);
+  outline: 2px solid rgba(59, 130, 246, 0.2);
+}
+
+/* Block Types */
+.block-heading1 {
+  font-size: 2em;
+  font-weight: bold;
+  margin: 1em 0 0.5em 0;
+  border-bottom: 2px solid #e5e7eb;
+  padding-bottom: 0.3em;
+}
+
+.block-heading2 {
+  font-size: 1.5em;
+  font-weight: bold;
+  margin: 0.8em 0 0.4em 0;
+}
+
+.block-heading3 {
+  font-size: 1.2em;
+  font-weight: bold;
+  margin: 0.6em 0 0.3em 0;
+  color: #374151;
+}
+
+.block-paragraph {
+  font-size: 1em;
+  color: #1f2937;
+}
+
+.block-quote {
+  border-left: 4px solid #3b82f6;
+  padding-left: 1em;
+  color: #6b7280;
+  font-style: italic;
+  background: #f9fafb;
+}
+
+.block-list {
+  margin-left: 1.5em;
+  list-style: disc;
+}
+
+/* Text Styles */
+.bold {
+  font-weight: bold;
+}
+
+.italic {
+  font-style: italic;
+}
+
+.underline {
+  text-decoration: underline;
+}
+
+/* Alignment */
+.align-left {
+  text-align: left;
+}
+
+.align-center {
+  text-align: center;
+}
+
+.align-right {
+  text-align: right;
+}
+
+/* Empty block placeholder */
+.content-block:empty::before {
+  content: attr(data-placeholder);
+  color: #9ca3af;
+  pointer-events: none;
+}

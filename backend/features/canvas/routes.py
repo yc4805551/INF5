@@ -13,6 +13,41 @@ from core.win32_engine import WordAppEngine
 
 canvas_bp = Blueprint('canvas', __name__)
 
+@canvas_bp.route('/logs', methods=['GET'])
+def get_canvas_logs():
+    try:
+        # Try finding the log file in a few common places
+        # 1. Env Var
+        log_path = os.getenv("LOG_PATH", "docx_engine_debug.log")
+        
+        # 2. Absolute check
+        if not os.path.isabs(log_path):
+            # Try current working directory
+            if not os.path.exists(log_path):
+                # Try backend root
+                backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+                possible_path = os.path.join(backend_dir, log_path)
+                if os.path.exists(possible_path):
+                    log_path = possible_path
+                else:
+                    # Try project root
+                    project_root = os.path.dirname(backend_dir)
+                    possible_path_2 = os.path.join(project_root, log_path)
+                    if os.path.exists(possible_path_2):
+                        log_path = possible_path_2
+
+        if not os.path.exists(log_path):
+            return jsonify({"logs": f"Log file not found at: {log_path}"})
+
+        # Read last 200 lines to avoid huge payload
+        with open(log_path, "r", encoding="utf-8", errors="ignore") as f:
+            lines = f.readlines()
+            tail = lines[-200:]
+            return jsonify({"logs": "".join(tail)})
+
+    except Exception as e:
+        return jsonify({"logs": f"Error reading logs: {str(e)}"}), 500
+
 @canvas_bp.route('/upload', methods=['POST'])
 def canvas_upload():
     try:
@@ -29,7 +64,21 @@ def canvas_upload():
         content = file.read()
         logging.info(f"Canvas Upload: file size {len(content)} bytes")
         
+        # PERSISTENCE: Save to cache
+        try:
+            base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            cache_dir = os.path.join(base_dir, ".cache")
+            if not os.path.exists(cache_dir): os.makedirs(cache_dir, exist_ok=True)
+            
+            cache_path = os.path.join(cache_dir, "last_canvas.docx")
+            with open(cache_path, "wb") as f:
+                f.write(content)
+            logging.info(f"Canvas Upload: Persisted to {cache_path}")
+        except Exception as e:
+            logging.warning(f"Failed to persist canvas: {e}")
+        
         current_engine.load_document(io.BytesIO(content))
+        current_engine.original_path = cache_path # Ensure persistence path is set
         logging.info("Canvas Upload: load_document successful")
         
         # Pagination defaults
@@ -52,9 +101,36 @@ def canvas_upload():
             "structure": structure
         }), 200
     except Exception as e:
-        import traceback
-        logging.error(f"Canvas Upload Error: {e}")
-        logging.error(traceback.format_exc())
+        logging.error(f"Canvas Upload Failed: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@canvas_bp.route('/create_with_text', methods=['POST'])
+def create_with_text():
+    try:
+        data = request.json
+        text = data.get("text", "")
+        preserve_refs = data.get("preserve_references", False)  # 新参数，默认False保持向后兼容
+        
+        # Use current_engine to create doc from text
+        current_engine.load_from_text(text, preserve_references=preserve_refs)
+        
+        # Pagination defaults
+        page_size = 100
+        total_paras = current_engine.get_paragraph_count()
+        
+        html_preview = current_engine.get_html_preview(limit=page_size)
+        total_paragraphs = current_engine.get_paragraph_count()
+        structure = current_engine.get_document_structure()
+        
+        return jsonify({
+            "message": "Document created from text",
+            "html_preview": html_preview,
+            "total_paragraphs": total_paragraphs,
+            "page_size": page_size,
+            "structure": structure
+        })
+    except Exception as e:
+        logging.error(f"Create with text failed: {e}")
         return jsonify({"error": str(e)}), 500
 
 @canvas_bp.route('/preview', methods=['GET'])
@@ -567,4 +643,28 @@ def export_docs():
         )
     except Exception as e:
         logging.error(f"Smart Canvas Export Error: {e}")
+
+@canvas_bp.route('/debug/state', methods=['GET'])
+def debug_state():
+    try:
+        data = {
+            "has_doc": bool(current_engine.doc),
+            "has_staging": bool(current_engine.staging_doc),
+            "original_path": current_engine.original_path,
+            "engine_id": id(current_engine),
+            "staging_preview": None,
+            "doc_preview": None
+        }
+        
+        if current_engine.doc:
+            data["doc_preview"] = [p.text[:50] for p in current_engine.doc.paragraphs[:5]]
+            data["doc_placeholders"] = [p.text for p in current_engine.doc.paragraphs if "Xxx" in p.text]
+            
+        if current_engine.staging_doc:
+            data["staging_preview"] = [p.text[:50] for p in current_engine.staging_doc.paragraphs[:5]]
+            data["staging_placeholders"] = [p.text for p in current_engine.staging_doc.paragraphs if "Xxx" in p.text]
+            
+        return jsonify(data)
+    except Exception as e:
         return jsonify({"error": str(e)}), 500
+

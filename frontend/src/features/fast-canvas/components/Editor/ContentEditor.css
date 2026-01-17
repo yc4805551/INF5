@@ -1,0 +1,42 @@
+.content-editor-wrapper {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: #ffffff;
+}
+
+.content-editor {
+    flex: 1;
+    padding: 40px;
+    max-width: 900px;
+    margin: 0 auto;
+    width: 100%;
+    overflow-y: auto;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+        'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+        sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+.content-editor:focus-within {
+    outline: none;
+}
+
+.editor-placeholder {
+    color: #9ca3af;
+    font-size: 1.1em;
+    padding: 2em;
+    text-align: center;
+    user-select: none;
+}
+
+/* Smooth scrolling */
+.content-editor {
+    scroll-behavior: smooth;
+}
+
+/* Selection styling */
+.content-editor ::selection {
+    background: rgba(59, 130, 246, 0.3);
+}

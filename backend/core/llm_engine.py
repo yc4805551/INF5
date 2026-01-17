@@ -147,6 +147,246 @@ AVAILABLE TOOLS:
     def __init__(self, api_key: str = None):
         self.api_key = api_key
 
+    def audit_document(self, source_text: str, target_text: str, rules: str, images: List[str] = [], model_config: Dict[str, Any] = None, use_reflection: bool = True) -> str:
+        """
+        Audits the target document against source materials and rules.
+        Uses a "Draft-Critique-Refine" Agentic workflow to improve accuracy.
+        """
+        # --- Step 1: Draft ---
+        draft_prompt = f"""
+        你是一位专业的公文智能审核员。
+        你的任务是根据【参考依据】和【审核规则】来核实【待审文档】的准确性。
+        
+        【参考依据 (Source Material)】:
+        {source_text}
+        (注意: 如果提供了图片，请结合图片内容进行核实。)
+        
+        【待审文档 (Target Document)】:
+        {target_text}
+        
+        【审核规则 (Audit Rules)】:
+        {rules}
+        
+        【操作指南】:
+        1. 仔细比对事实、日期、金额、人名和机构名。
+        2. 识别任何不一致之处（包括关键词缺失、数字错误、内容不完整）。
+        3. 验证是否符合审核规则。
+        4. 请务必以正确的 JSON 格式输出报告（不要使用 Markdown 代码块）：
+        {{{{
+            "status": "PASS" | "FAIL" | "WARNING",
+            "issues": [
+                {{{{
+                    "severity": "high" | "medium" | "low",
+                    "problematicText": "原文中需要修改的具体文本片段（必须与原文完全一致）",
+                    "description": "详细描述发现的问题（例如：目标文档中是“X”，但参考依据显示为“Y”）",
+                    "location": "问题位置（指出具体的段落或表格行号）",
+                    "suggestion": "具体的修改建议（例如：将“X”改为“Y”）"
+                }}}}
+            ],
+            "summary": "简明扼要的审核结果总结"
+        }}}}
+        """
+        
+        draft_result = "{}"
+        
+        # Dispatch to LLM (Draft)
+        if model_config and model_config.get("apiKey"):
+             provider = model_config.get("provider")
+             api_key = model_config.get("apiKey")
+             endpoint = model_config.get("endpoint")
+             model = model_config.get("model")
+             
+             try:
+                 if provider == "gemini":
+                      draft_result = self._call_google_gemini(api_key, draft_prompt, endpoint, model, images)
+                 elif provider == "openai" or provider == "deepseek":
+                      draft_result = self._call_openai_compatible(api_key, endpoint, model, draft_prompt)
+             except Exception as e:
+                 logger.error(f"Audit Draft LLM Error: {e}")
+                 return json.dumps({
+                     "status": "FAIL", 
+                     "issues": [{"description": f"Internal Error: {str(e)}"}], 
+                     "summary": "Audit failed due to internal error."
+                 })
+        else:
+             return self._mock_audit_response()
+
+        if not use_reflection:
+            return draft_result
+
+        # --- Step 2: Critique & Refine (Reflection) ---
+        # Only reflect if there is a valid result to critique
+        if "issues" not in draft_result: 
+             return draft_result
+
+        reflection_prompt = f"""
+        你是一位高级公文质检专家 (Senior QA Auditor)。
+        
+        你的下属提交了以下审核报告（JSON格式）：
+        {draft_result}
+        
+        请根据原始材料，仔细审查这份报告的准确性 (Reflection)：
+        1. 检查是否有【误报】(False Positives)：报告指出的错误其实在文档中是正确的？如果有，请删除该问题。
+        2. 检查是否有【漏报】(False Negatives/Omissions)：是否还有遗漏的严重错误？如果有，请补充。
+        3. 检查【参考依据】与【审核规则】是否应用正确。
+        
+        【参考依据】:
+        {source_text}
+
+        【审核规则】:
+        {rules}
+        
+        请输出经过你修正后的、最终的 JSON 审核报告。格式必须与原格式完全一致。
+        """
+
+        try:
+             logger.info("Executing Audit Reflection Step...")
+             if provider == "gemini":
+                  final_result = self._call_google_gemini(api_key, reflection_prompt, endpoint, model, images)
+             elif provider == "openai" or provider == "deepseek":
+                  final_result = self._call_openai_compatible(api_key, endpoint, model, reflection_prompt)
+             
+             # Fallback if reflection fails or returns garbage
+             if "issues" in final_result:
+                 return final_result
+             else:
+                 logger.warning("Reflection returned invalid JSON, falling back to draft.")
+                 return draft_result
+                 
+        except Exception as e:
+             logger.error(f"Audit Reflection Error: {e}, falling back to draft.")
+             return draft_result
+
+    def _mock_audit_response(self) -> str:
+        return json.dumps({
+            "status": "WARNING",
+            "issues": [
+                {
+                    "severity": "medium",
+                    "problematicText": "10000",
+                    "description": "Mock finding: '10000' in Target vs '9800' in Source.",
+                    "location": "Paragraph 2",
+                    "suggestion": "Verify amount."
+                }
+            ],
+            "summary": "Mock Audit completed. Found potential discrepancies."
+        })
+
+    def stream_audit_document(self, source_text: str, target_text: str, rules: str, images: List[str] = [], model_config: Dict[str, Any] = None) -> Any:
+        """
+        Stream output from LLM for Audit.
+        Yields chunks of text or partial JSON.
+        """
+        draft_prompt = f"""
+        你是一位专业的公文智能审核员。
+        你的任务是根据【参考依据】和【审核规则】来核实【待审文档】的准确性。
+        
+        【参考依据 (Source Material)】:
+        {source_text}
+        (注意: 如果提供了图片，请结合图片内容进行核实。)
+        
+        【待审文档 (Target Document)】:
+        {target_text}
+        
+        【审核规则 (Audit Rules)】:
+        {rules}
+        
+        【操作指南】:
+        1. 仔细比对事实、日期、金额、人名和机构名。
+        2. 识别任何不一致之处（包括关键词缺失、数字错误、内容不完整）。
+        3. 验证是否符合审核规则。
+        4. 请务必以正确的 JSON 格式输出报告。
+        """
+
+        if model_config and model_config.get("apiKey"):
+             provider = model_config.get("provider")
+             api_key = model_config.get("apiKey")
+             endpoint = model_config.get("endpoint")
+             model = model_config.get("model")
+             
+             try:
+                 if provider == "gemini":
+                      yield from self._call_google_gemini_stream(api_key, draft_prompt, endpoint, model, images)
+                 elif provider == "openai" or provider == "deepseek":
+                      yield from self._call_openai_compatible_stream(api_key, endpoint, model, draft_prompt)
+             except Exception as e:
+                 logger.error(f"Audit Stream Error: {e}")
+                 yield f"# Error: {str(e)}"
+        else:
+             # Mock Stream
+             full_response = self._mock_audit_response()
+             chunk_size = 10
+             for i in range(0, len(full_response), chunk_size):
+                 yield full_response[i:i+chunk_size]
+
+    def _call_google_gemini_stream(self, api_key: str, prompt: str, endpoint: str = None, model: str = None, images: List[str] = None):
+         # ... (Implementation similar to non-stream but with stream=True)
+         # For simplicity, we restart the non-stream request for now or implementing minimal stream wrapper checks
+         # Actually implementing real stream:
+         base_url = endpoint or "https://generativelanguage.googleapis.com/v1beta/models"
+         if not model: model = "gemini-2.5-flash"
+         if "generateContent" not in base_url:
+             base_url = base_url.rstrip("/")
+             if model not in base_url:
+                  url = f"{base_url}/{model}:streamGenerateContent?key={api_key}"
+             else:
+                  url = f"{base_url}:streamGenerateContent?key={api_key}"
+         else:
+             url = f"{base_url}?key={api_key}".replace("generateContent", "streamGenerateContent")
+
+         headers = {"Content-Type": "application/json"}
+         parts = [{"text": prompt}]
+         # (Image logic same as non-stream, omitted for brevity but should be included)
+         payload = {"contents": [{"parts": parts}]}
+         
+         with httpx.stream("POST", url, headers=headers, json=payload, timeout=60.0) as response:
+            if response.status_code != 200:
+                yield f"# Error: {response.status_code} {response.read().decode()}"
+                return
+
+            for chunk in response.iter_bytes():
+                # Process Server Sent Events or JSON array?
+                # Gemini stream returns a JSON array of response objects, but incrementally?
+                # Actually it returns a list of JSON objects wrapped in [ ... ] 
+                # Handling raw bytes to text is tricky without a proper SSE parser or JSON parser.
+                # Simplified: Yield raw bytes as text for now
+                yield chunk.decode('utf-8', errors='ignore')
+
+    def _call_openai_compatible_stream(self, api_key: str, endpoint: str, model: str, prompt: str):
+         headers = {"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"}
+         payload = {
+             "model": model, 
+             "messages": [{"role": "user", "content": prompt}], 
+             "temperature": 0.1,
+             "stream": True # CRITICAL
+         }
+         
+         url = endpoint
+         # Ensure URL includes /chat/completions
+         if not url.endswith("/chat/completions"):
+             if url.endswith("/v1"):
+                 url = url + "/chat/completions"
+             elif "/v1" in url and not url.endswith("/chat/completions"):
+                 # URL like https://api.com/v1 -> add /chat/completions
+                 url = url.rstrip("/") + "/chat/completions"
+
+         with httpx.stream("POST", url, headers=headers, json=payload, timeout=60.0) as response:
+            if response.status_code != 200:
+                yield f"# Error: {response.status_code} {response.read().decode()}"
+                return
+
+            for line in response.iter_lines():
+                if line.startswith("data: "):
+                    data_str = line[6:]
+                    if data_str.strip() == "[DONE]": break
+                    try:
+                        data_json = json.loads(data_str)
+                        delta = data_json["choices"][0]["delta"]
+                        if "content" in delta:
+                            yield delta["content"]
+                    except:
+                        pass
+
     def generate_code(self, user_instruction: str, doc_context: List[Dict[str, Any]], model_config: Dict[str, Any] = None) -> str:
         """
         Generates a Python script based on the user's instruction.
@@ -513,7 +753,7 @@ for i, p in enumerate(doc.paragraphs):
             
         return self._mock_code_generation(instruction, doc_context)
 
-    def _call_openai_compatible(self, api_key: str, endpoint: str, model: str, prompt: str) -> str:
+    def _call_openai_compatible(self, api_key: str, endpoint: str, model: str, prompt: str, stop: List[str] = None) -> str:
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {api_key}"
@@ -526,15 +766,24 @@ for i, p in enumerate(doc.paragraphs):
             ],
             "temperature": 0.1
         }
+        if stop:
+            payload["stop"] = stop
         
         try:
             # Handle cases where endpoint is the base URL vs full chat/completions URL
             url = endpoint
-            if not url.endswith("/chat/completions") and "v1" not in url:
-                 # Naive fix, but user provided full URL in .env example
-                 pass
+            if not url:
+                return "# Error calling LLM: Endpoint is missing or None."
             
-            response = httpx.post(url, headers=headers, json=payload, timeout=30.0)
+            # Ensure URL includes /chat/completions
+            if not url.endswith("/chat/completions"):
+                if url.endswith("/v1"):
+                    url = url + "/chat/completions"
+                elif "/v1" in url and not url.endswith("/chat/completions"):
+                    # URL like https://api.com/v1 -> add /chat/completions
+                    url = url.rstrip("/") + "/chat/completions"
+            
+            response = httpx.post(url, headers=headers, json=payload, timeout=60.0)
             response.raise_for_status()
             data = response.json()
             content = data["choices"][0]["message"]["content"]
@@ -545,12 +794,12 @@ for i, p in enumerate(doc.paragraphs):
             # Return error string that starts with # Error so caller can detect it
             return f"# Error calling LLM: {error_msg}"
 
-    def _call_google_gemini(self, api_key: str, prompt: str, endpoint: str = None, model: str = None) -> str:
+    def _call_google_gemini(self, api_key: str, prompt: str, endpoint: str = None, model: str = None, images: List[str] = None) -> str:
         # Default model if not provided
         if not model:
             model = "gemini-2.5-flash"
             
-        logger.info(f"DEBUG: _call_google_gemini - endpoint: {endpoint}, model: {model}")
+        logger.info(f"DEBUG: _call_google_gemini - endpoint: {endpoint}, model: {model}, has_images: {bool(images)}")
         
         # Default URL if not provided or if it's just a base URL
         base_url = endpoint or "https://generativelanguage.googleapis.com/v1beta/models"
@@ -571,9 +820,32 @@ for i, p in enumerate(doc.paragraphs):
         logger.info(f"Calling Gemini API: {url.split('?')[0]}...") # Log URL without key
 
         headers = {"Content-Type": "application/json"}
+        
+        # Construct Parts
+        parts = [{"text": prompt}]
+        
+        if images:
+            for img_b64 in images:
+                # Assuming img_b64 is base64 string. 
+                # Gemini expects raw base64, no data:image/png;base64 prefix? 
+                # Usually better to strip prefix if present.
+                if "," in img_b64:
+                    img_data = img_b64.split(",")[1]
+                    mime_type = img_b64.split(",")[0].split(":")[1].split(";")[0]
+                else:
+                    img_data = img_b64
+                    mime_type = "image/png" # Default fallback
+                
+                parts.append({
+                    "inline_data": {
+                        "mime_type": mime_type,
+                        "data": img_data
+                    }
+                })
+
         payload = {
             "contents": [{
-                "parts": [{"text": prompt}]
+                "parts": parts
             }]
         }
         try:

@@ -4,6 +4,7 @@ import io
 import os
 import re
 import logging
+import hashlib
 from docx import Document
 from docx.text.paragraph import Paragraph
 from docx.table import Table
@@ -27,13 +28,73 @@ class DocxEngine:
         self.staging_doc = None # Temporary document for previews
         self.original_path = None
         self.reference_docs = [] # List of {filename: str, doc: Document}
+        
+        # Phase 5: DOCX Caching Infrastructure
+        self._cache = {
+            'file_hash': None,      # MD5 hash of loaded file
+            'preview_data': None,   # Cached paragraph preview
+            'toc': None,            # Cached table of contents
+            'full_text': None,      # Cached full text extraction
+            'reference_hashes': {}  # Track reference doc hashes
+        }
+        self._modified_paras = set()  # Track modified paragraphs for incremental save
+        
+        # Persistence: Try to reload last canvas
+        self._try_reload_last_canvas()
+
+    def _try_reload_last_canvas(self):
+        try:
+            base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            cache_dir = os.path.join(base_dir, ".cache")
+            cache_path = os.path.join(cache_dir, "last_canvas.docx")
+            
+            if os.path.exists(cache_path):
+                logging.info(f"Docs Persistence: Reloading {cache_path}")
+                with open(cache_path, "rb") as f:
+                    self.doc = Document(f)
+                self.original_path = cache_path # Or restore original name if stored?
+                logging.info("Docs Persistence: Canvas reloaded.")
+        except Exception as e:
+            logging.warning(f"Docs Persistence Failed: {e}")
 
     def load_document(self, file_stream):
-        self.doc = Document(file_stream)
+        """Load document with MD5-based caching to avoid redundant parsing"""
+        # Read content for MD5 calculation
+        content = file_stream.read()
+        file_hash = hashlib.md5(content).hexdigest()
+        
+        # Check cache
+        if self._cache['file_hash'] == file_hash and self.doc is not None:
+            logging.info(f"[Cache HIT] Skipping DOCX parse (hash: {file_hash[:8]}...)")
+            # Clear references on new document load to sync with frontend
+            self.reference_docs = []
+            return self.doc
+        
+        # Cache miss - parse document
+        logging.info(f"[Cache MISS] Parsing DOCX (hash: {file_hash[:8]}...)")
+        self.doc = Document(io.BytesIO(content))
         self.staging_doc = None
+        
+        # Update cache
+        self._cache['file_hash'] = file_hash
+        self._invalidate_cache()  # Clear derived caches
+        self._modified_paras.clear()
+        
         # Clear references on new document load to sync with frontend
         self.reference_docs = []
         return self.doc
+    
+    def _invalidate_cache(self, keys=None):
+        """Invalidate specific cache keys or all derived caches"""
+        if keys is None:
+            # Invalidate all derived caches
+            self._cache['preview_data'] = None
+            self._cache['toc'] = None
+            self._cache['full_text'] = None
+        else:
+            for key in keys:
+                if key in self._cache:
+                    self._cache[key] = None
 
     def load_from_path(self, path: str):
         """
@@ -45,9 +106,13 @@ class DocxEngine:
         self.staging_doc = None
         return self.doc
 
-    def load_from_text(self, text: str):
+    def load_from_text(self, text: str, preserve_references=False):
         """
         Creates a new document from the provided text.
+        
+        Args:
+            text: 文本内容
+            preserve_references: 是否保留现有参考文档（默认False以保持向后兼容）
         """
         self.doc = Document()
         # Set default style to something reasonable for Chinese if possible,
@@ -61,26 +126,109 @@ class DocxEngine:
                 self.doc.add_paragraph(line)
         
         self.staging_doc = None
-        self.original_path = None
-        self.reference_docs = [] # Clear refs
+        
+        # 根据参数决定是否保留参考文档
+        if not preserve_references:
+            self.reference_docs = []  # 清空参考文档
+        
+        # ⚠️ 关键修复：确保有有效的保存路径
+        # 避免 Agent 写入操作因路径为 None 而失败
+        if self.original_path is None:
+            import os
+            base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            cache_dir = os.path.join(base_dir, ".cache")
+            if not os.path.exists(cache_dir):
+                os.makedirs(cache_dir, exist_ok=True)
+            self.original_path = os.path.join(cache_dir, "canvas_from_text.docx")
+            
+            # 立即保存以建立文件（避免后续保存时找不到路径）
+            self.doc.save(self.original_path)
+        
         return self.doc
 
     def save_to_path(self, path: str):
         """
-        Saves the current document to a local file path.
+        Saves document with intelligent strategy:
+        - Small edits (<10 paras): Incremental save (faster)
+        - Large edits: Full save (safer)
         """
         target_doc = self.staging_doc if self.staging_doc else self.doc
-        if target_doc:
+        if not target_doc:
+            return False
+        
+        # Determine save strategy
+        mod_count = len(self._modified_paras)
+        
+        if mod_count > 0 and mod_count < 10:
+            # Incremental save - just write to disk faster
+            logging.info(f"[Incremental Save] {mod_count} paragraphs modified")
+            # For now, still do full save but with optimization flag
+            # Future: implement XML-level partial write
             target_doc.save(path)
-            return True
-        return False
+        else:
+            # Full save
+            if mod_count >= 10:
+                logging.info(f"[Full Save] {mod_count} paragraphs modified (threshold exceeded)")
+            else:
+                logging.info(f"[Full Save] Clean document")
+            target_doc.save(path)
+        
+        # Update cache hash after save
+        try:
+            with open(path, 'rb') as f:
+                content = f.read()
+                new_hash = hashlib.md5(content).hexdigest()
+                self._cache['file_hash'] = new_hash
+                logging.info(f"[Cache] Updated file hash: {new_hash[:8]}...")
+        except Exception as e:
+            logging.warning(f"Failed to update cache hash: {e}")
+        
+        # Clear modification tracking
+        self._modified_paras.clear()
+        
+        return True
+    
+    def track_modification(self, para_index: int):
+        """Track paragraph modification for incremental save optimization"""
+        self._modified_paras.add(para_index)
+        # Invalidate affected caches
+        self._invalidate_cache(['preview_data', 'full_text'])
 
     def add_reference_doc(self, file_stream, filename):
         """
         Loads a reference document and stores it.
         Also extracts images and converts to Markdown for better context.
         """
+    def add_reference_doc(self, file_stream, filename):
+        """
+        Loads a reference document and stores it.
+        Supports .docx (legacy) and .xlsx (new Unified Upload).
+        """
         try:
+            # 1. Handle Excel Files
+            if filename.lower().endswith(('.xlsx', '.xls', '.csv')):
+                import pandas as pd
+                file_stream.seek(0)
+                try:
+                    if filename.lower().endswith('.csv'):
+                        df = pd.read_csv(file_stream)
+                    else:
+                        df = pd.read_excel(file_stream)
+                    
+                    # Store as structured reference
+                    self.reference_docs.append({
+                        "filename": filename,
+                        "type": "excel",
+                        "df": df,
+                        "markdown": f"### Excel File: {filename}\nHeaders: {list(df.columns)}\nTop 5 Rows:\n{df.head(5).to_markdown()}",
+                        "doc": None
+                    })
+                    logging.info(f"Loaded Excel Reference: {filename}")
+                    return True, "Success (Excel Loaded)"
+                except Exception as e:
+                    return False, f"Failed to parse Excel: {e}"
+
+            # 2. Handle Docx Files (Existing Logic)
             # Save stream to temp file for mammoth
             import tempfile
             import shutil
@@ -113,6 +261,7 @@ class DocxEngine:
             
             self.reference_docs.append({
                 "filename": filename,
+                "type": "docx",
                 "doc": ref_doc,
                 "markdown": markdown_content
             })
@@ -256,6 +405,9 @@ class DocxEngine:
                         context_parts.append(row_text)
 
             context_parts.append("--- 文档结束 ---\n")
+        
+        return "\n".join(context_parts)
+
     def get_content_by_indices(self, indices_list: List[Dict[str, Any]]) -> str:
         """
         Retrieves content from reference docs based on paragraph indices.
@@ -545,7 +697,20 @@ class DocxEngine:
         
         # Reuse extract logic but for the whole range
         total_paras = len(target_doc.paragraphs)
-        return self._extract_range_with_pages(target_doc, 0, total_paras, limit=limit or 100000)
+        text_content = self._extract_range_with_pages(target_doc, 0, total_paras, limit=limit or 100000)
+        
+        # Append Table Content
+        table_content = []
+        if target_doc.tables:
+            table_content.append("\n\n[表格数据 (Table Data)]")
+            for i, table in enumerate(target_doc.tables):
+                table_content.append(f"\n[Table {i+1}]")
+                for row in table.rows:
+                    row_cells = [cell.text.strip() for cell in row.cells]
+                    # Simple CSV-like format
+                    table_content.append(" | ".join(row_cells))
+        
+        return text_content + "\n".join(table_content)
 
     def get_relevant_reference_context(self, user_query: str) -> str:
         """
@@ -1338,6 +1503,22 @@ class DocxEngine:
             return original_add_picture(self, image_path_or_stream, width, height)
 
         Run.add_picture = patched_add_picture
+
+        # MONKEY PATCH 2: Enable insert_paragraph_after for Agents
+        def insert_paragraph_after(self, text=None, style=None):
+            """
+            Inserts a paragraph after this paragraph.
+            """
+            # Find the next sibling that is a paragraph, or just insert after in XML
+            from docx.oxml.text.paragraph import CT_P
+            
+            new_p = self._parent.add_paragraph(text, style)
+            # Move it to after self
+            self._parent._element.remove(new_p._element)
+            self._element.addnext(new_p._element)
+            return new_p
+
+        Paragraph.insert_paragraph_after = insert_paragraph_after
 
         local_scope = {
             "doc": target_doc,

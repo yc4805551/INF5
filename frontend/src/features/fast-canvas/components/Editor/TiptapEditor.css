@@ -1,0 +1,89 @@
+.tiptap-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: #ffffff;
+}
+
+.tiptap-menu-bar {
+    padding: 8px 16px;
+    border-bottom: 1px solid #e5e7eb;
+    background: #f9fafb;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.tiptap-menu-bar button {
+    padding: 4px 8px;
+    border: 1px solid #d1d5db;
+    background: white;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    color: #374151;
+    transition: all 0.2s;
+}
+
+.tiptap-menu-bar button:hover {
+    background: #f3f4f6;
+}
+
+.tiptap-menu-bar button.is-active {
+    background: #e5e7eb;
+    color: #000;
+    font-weight: 600;
+    border-color: #9ca3af;
+}
+
+.ProseMirror {
+    padding: 24px 40px;
+    outline: none !important;
+    min-height: 100%;
+    font-size: 16px;
+    line-height: 1.75;
+    color: #1f2937 !important;
+    /* Force dark text */
+    max-width: 800px;
+    /* Readability width */
+    margin: 0 auto;
+    /* Center */
+}
+
+.ProseMirror p {
+    margin-bottom: 1em;
+}
+
+.ProseMirror h1 {
+    font-size: 2em;
+    font-weight: bold;
+    margin-top: 1em;
+    margin-bottom: 0.5em;
+    line-height: 1.2;
+    color: #111827;
+}
+
+.ProseMirror h2 {
+    font-size: 1.5em;
+    font-weight: bold;
+    margin-top: 1em;
+    margin-bottom: 0.5em;
+    color: #111827;
+}
+
+.ProseMirror ul,
+.ProseMirror ol {
+    padding-left: 1.5em;
+    margin-bottom: 1em;
+}
+
+.ProseMirror li {
+    margin-bottom: 0.2em;
+}
+
+.ProseMirror blockquote {
+    border-left: 3px solid #e5e7eb;
+    padding-left: 1em;
+    color: #6b7280;
+    font-style: italic;
+}

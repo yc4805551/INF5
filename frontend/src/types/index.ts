@@ -48,7 +48,7 @@ export type NoteChatMessage = {
     isComplete?: boolean;
 };
 
-export type ModelProvider = 'gemini' | 'openai' | 'deepseek' | 'ali' | 'depOCR' | 'doubao';
+export type ModelProvider = 'gemini' | 'openai' | 'deepseek' | 'ali' | 'depOCR' | 'doubao' | 'anything';
 
 export type ChatMessage = {
     role: 'user' | 'model';
@@ -63,6 +63,7 @@ export interface AuditResult {
     issues: AuditIssue[];
     error?: string;
     rawResponse?: string;
+    report?: string; // For AnythingLLM Agent text report
 }
 
 export type AuditResults = {

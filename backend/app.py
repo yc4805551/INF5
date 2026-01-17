@@ -12,8 +12,13 @@ from watchdog.observers import Observer
 from features.common.routes import common_bp
 from features.knowledge.routes import knowledge_bp
 from features.canvas.routes import canvas_bp
+from features.canvas.converter_routes import canvas_converter_bp  # Phase 5: DOCX互转
 from features.smart_canvas.routes import smart_canvas_bp
 from features.analysis.routes import analysis_bp
+from features.audit.routes import audit_bp
+from features.smart_filler.routes import smart_filler_bp
+from features.advisor.routes import advisor_bp
+from features.agent_anything.routes import agent_anything_bp # AnythingLLM Agent
 
 # Import Services for CLI
 from features.knowledge.services import (
@@ -28,7 +33,12 @@ from features.knowledge.services import (
 dotenv_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'config', '.env')
 load_dotenv(dotenv_path)
 
-# Configure Logging
+# Also load .env.local if it exists (for overrides)
+dotenv_local_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'config', '.env.local')
+if os.path.exists(dotenv_local_path):
+    load_dotenv(dotenv_local_path, override=True)
+    logging.info(f"Loaded config from {dotenv_local_path}")
+
 # Configure Logging
 logging.basicConfig(level=logging.INFO, 
                     format='%(asctime)s - %(levelname)s - %(message)s',
@@ -45,12 +55,17 @@ def create_app():
     app.register_blueprint(common_bp, url_prefix='/api')
     app.register_blueprint(knowledge_bp, url_prefix='/api') # /list-collections, /find-related
     app.register_blueprint(canvas_bp, url_prefix='/api/canvas') # /upload, /chat, /preview...
+    app.register_blueprint(canvas_converter_bp)  # Phase 5: /api/canvas/export-to-docx, /import-from-docx
     app.register_blueprint(smart_canvas_bp, url_prefix='/api/smart_canvas') # /upload (mammoth)
     app.register_blueprint(analysis_bp, url_prefix='/api/analysis') 
+    app.register_blueprint(audit_bp, url_prefix='/api/audit')
+    app.register_blueprint(smart_filler_bp, url_prefix='/api/smart-filler')
+    app.register_blueprint(advisor_bp, url_prefix='/api/advisor') # /suggestions - Fixed from /api/agent
+    app.register_blueprint(agent_anything_bp, url_prefix='/api/agent-anything') # /audit
 
     # Initialize Milvus Connection
     try:
-        connections.connect("default", host=os.getenv("MILVUS_HOST", "127.0.0.1"), port=os.getenv("MILVUS_PORT", "19530"))
+        connections.connect("default", host=os.getenv("MILVUS_HOST", "127.00.1"), port=os.getenv("MILVUS_PORT", "19530"))
         logging.info("Connected to Milvus.")
     except Exception as e:
         logging.error(f"Failed to connect to Milvus on startup: {e}")
@@ -128,4 +143,5 @@ if __name__ == "__main__":
     port = int(os.getenv("PORT", "5179"))
     
     # Use standard Flask dev server (WSGI)
+    print("Starting Flask Server...")
     app.run(host=host, port=port, debug=True)

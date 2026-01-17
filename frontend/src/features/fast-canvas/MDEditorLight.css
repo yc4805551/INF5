@@ -1,0 +1,25 @@
+/* Import MDEditor CSS for light theme */
+@import '@uiw/react-md-editor/markdown-editor.css';
+@import '@uiw/react-markdown-preview/markdown.css';
+
+.fast-canvas-view {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    background: #ffffff;
+}
+
+/* Force light theme on editor */
+.fast-canvas-editor[data-color-mode="light"] .w-md-editor,
+.fast-canvas-editor[data-color-mode="light"] .w-md-editor-toolbar,
+.fast-canvas-editor[data-color-mode="light"] .w-md-editor-preview,
+.fast-canvas-editor[data-color-mode="light"] .w-md-editor-text {
+    background: #ffffff !important;
+    color: #1f2937 !important;
+}
+
+.fast-canvas-editor[data-color-mode="light"] .w-md-editor-text-pre,
+.fast-canvas-editor[data-color-mode="light"] .w-md-editor-text-input {
+    background: #ffffff !important;
+    color: #1f2937 !important;
+}

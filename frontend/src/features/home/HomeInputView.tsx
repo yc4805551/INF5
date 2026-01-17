@@ -7,7 +7,6 @@ interface HomeInputViewProps {
     inputText: string;
     setInputText: React.Dispatch<React.SetStateAction<string>>;
     onOrganize: () => void;
-    onAudit: () => void;
     selectedModel: ModelProvider;
     setSelectedModel: (model: ModelProvider) => void;
     isProcessing: boolean;
@@ -17,10 +16,9 @@ interface HomeInputViewProps {
     selectedKnowledgeBase: string | null;
     setSelectedKnowledgeBase: (id: string) => void;
     onKnowledgeChat: () => void;
-    onWriting: () => void;
     onTextRecognition: () => void;
-    onCoCreation: () => void;
     onWordCanvas: () => void;
+    onFastCanvas: () => void;
     executionMode: ExecutionMode;
     setExecutionMode: (mode: ExecutionMode) => void;
 }
@@ -29,7 +27,6 @@ export const HomeInputView: React.FC<HomeInputViewProps> = ({
     inputText,
     setInputText,
     onOrganize,
-    onAudit,
     selectedModel,
     setSelectedModel,
     isProcessing,
@@ -39,10 +36,9 @@ export const HomeInputView: React.FC<HomeInputViewProps> = ({
     selectedKnowledgeBase,
     setSelectedKnowledgeBase,
     onKnowledgeChat,
-    onWriting,
     onTextRecognition,
-    onCoCreation,
     onWordCanvas,
+    onFastCanvas,
     executionMode,
     setExecutionMode,
 }) => {
@@ -239,23 +235,17 @@ export const HomeInputView: React.FC<HomeInputViewProps> = ({
                 <button className="action-btn" onClick={onOrganize} disabled={!inputText || isProcessing}>
                     1. 整理笔记
                 </button>
-                <button className="action-btn" onClick={onAudit} disabled={!inputText || isProcessing}>
-                    2. 审阅文本
-                </button>
                 <button className="action-btn" onClick={onKnowledgeChat} disabled={!inputText || isProcessing || !selectedKnowledgeBase}>
-                    3. 内参对话
-                </button>
-                <button className="action-btn" onClick={onWriting} disabled={isProcessing}>
-                    4. 沉浸写作
+                    2. 内参对话
                 </button>
                 <button className="action-btn" onClick={onTextRecognition} disabled={isProcessing}>
-                    5. 文本识别
-                </button>
-                <button className="action-btn" onClick={onCoCreation} disabled={isProcessing}>
-                    6. 共创画布
+                    3. 文本识别
                 </button>
                 <button className="action-btn" onClick={onWordCanvas} disabled={isProcessing}>
-                    7. 我的画布
+                    4. 我的画布 (DOCX)
+                </button>
+                <button className="action-btn" onClick={onFastCanvas} disabled={isProcessing}>
+                    5. 快速画布 ⚡
                 </button>
             </div>
         </>

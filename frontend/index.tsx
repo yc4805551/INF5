@@ -9,8 +9,9 @@ import {
 import { GoogleGenAI } from '@google/genai';
 import { callGenerativeAi, callGenerativeAiStream, API_BASE_URL } from './src/services/ai';
 
-import { WordCanvas } from './src/components/Canvas/WordCanvas';
-import { CoCreationView } from './src/components/CoCreation/CoCreationView';
+import { WordCanvas } from './src/features/canvas/WordCanvas';
+
+import { FastCanvasView } from './src/features/fast-canvas';
 
 // Helper to clean environment variables (remove accidentally added quotes/smart-quotes)
 //doujunhao- 设置了后端连接
@@ -525,10 +526,12 @@ const AuditView = ({
     initialText,
     selectedModel,
     executionMode,
+    selectedKnowledgeBaseId
 }: {
     initialText: string;
     selectedModel: ModelProvider;
     executionMode: ExecutionMode;
+    selectedKnowledgeBaseId: string | null;
 }) => {
     const [text] = useState(initialText);
     const [auditResults, setAuditResults] = useState<AuditResults>({});
@@ -566,8 +569,44 @@ const AuditView = ({
         setSelectedIssueId(null);
         const model = selectedModel;
 
-        const systemInstruction = `You are a professional editor. Analyze the provided text based ONLY on the rules in the following checklist. For each issue you find, return a JSON object with "problematicText" (the exact, verbatim text segment from the original), "suggestion" (your proposed improvement), "checklistItem" (the specific rule from the checklist that was violated), and "explanation" (a brief explanation of why it's a problem). Your entire response MUST be a single JSON array of these objects, or an empty array [] if no issues are found.
+        // AnythingLLM Agent Routing
+        if (selectedKnowledgeBaseId === 'anything-llm') {
+            try {
+                // Call explicit Anything Agent Endpoint
+                const response = await fetch(`${API_BASE_URL}/agent-anything/audit`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        target_text: text,
+                        source_context: "From Home Workspace",
+                        rules: checklist.filter(item => item.trim()).join('\n')
+                    })
+                });
 
+                if (!response.ok) throw new Error("Agent Audit Failed");
+
+                const data = await response.json();
+
+                // Format as a Report
+                const reportContent = `### 🤖 智能体初审意见 (Draft)\n\n${data.draft}\n\n---\n\n### 👴 老杨复盘 (Critique)\n\n${data.critique}`;
+
+                setAuditResults({
+                    'anything': {
+                        issues: [], // No structured issues for report mode
+                        report: reportContent
+                    }
+                });
+
+            } catch (err: any) {
+                console.error("Agent Audit Error:", err);
+                setAuditResults({ 'anything': { issues: [], error: err.message } });
+            } finally {
+                setIsLoading(false);
+            }
+            return;
+        }
+
+        const systemInstruction = `You are a professional editor. Analyze the provided text based ONLY on the rules in the following checklist. For each issue you find, return a JSON object with "problematicText" (the exact, verbatim text segment from the original), "suggestion" (your proposed improvement), "checklistItem" (the specific rule from the checklist that was violated), and "explanation" (a brief explanation of why it's a problem). Your entire response MUST be a single JSON array of these objects, or an empty array [] if no issues are found.
 [Checklist]:
 - ${checklist.filter(item => item.trim()).join('\n- ')}
 `;
@@ -729,11 +768,24 @@ const AuditView = ({
                 <div className="content-section audit-issues-section">
                     <h2>审核问题</h2>
                     <div className="issues-list-container">
-                        {!isLoading && Object.keys(auditResults).length > 0 && !hasAnyIssues && !hasAnyErrors && <div className="large-placeholder">未发现任何问题。</div>}
-                        {/* FIX: Explicitly cast the result of Object.entries to fix type inference
-                        // issues where 'result' was being inferred as 'unknown'. */}
+                        {!isLoading && Object.keys(auditResults).length > 0 && !hasAnyIssues && !hasAnyErrors && !Object.values(auditResults).some(r => !!r?.report) && <div className="large-placeholder">未发现任何问题。</div>}
+
                         {(Object.entries(auditResults) as [string, AuditResult | undefined][]).map(([model, result]: [string, AuditResult | undefined]) => {
                             if (!result) return null;
+
+                            // Render Agent Report (AnythingLLM)
+                            if (result.report) {
+                                return (
+                                    <div key={model} className="issue-group-content" style={{ padding: '10px' }}>
+                                        <div className="issue-card" style={{ cursor: 'default' }}>
+                                            <div className="issue-card-header" style={{ background: '#fce7f3', color: '#be185d' }}>🤖 智能体审核报告</div>
+                                            <div className="issue-card-body">
+                                                <div dangerouslySetInnerHTML={{ __html: marked.parse(result.report) }} />
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            }
 
                             if (result.error && result.rawResponse) {
                                 return (
@@ -786,8 +838,8 @@ const AuditView = ({
                         })}
                     </div>
                 </div>
-            </div>
-        </div>
+            </div >
+        </div >
     );
 };
 
@@ -884,50 +936,63 @@ const KnowledgeChatView = ({
         setChatHistory(prev => [...prev, placeholderMessage]);
 
         try {
-            // Step 1: ALWAYS query the knowledge base
-            const backendResponse = await fetch(`${API_BASE_URL}/find-related`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ text: messageToSend, collection_name: knowledgeBaseId, top_k: 30 })
-            });
-            if (!backendResponse.ok) {
-                const errorText = await backendResponse.text().catch(() => backendResponse.statusText);
-                throw new Error(`知识库查询失败: ${errorText}`);
+            let retrievedSources: Source[] = [];
+            let finalSources: Source[] | undefined = undefined;
+
+            // [Dual Engine] Anything Routing - Bypass Milvus RAG
+            if (knowledgeBaseId === 'anything-llm' || knowledgeBaseId === 'cherry-studio') {
+                // Skip /find-related call
+                retrievedSources = [];
+                finalSources = undefined; // No sources to cite
+            } else {
+                // Normal RAG Flow
+                const backendResponse = await fetch(`${API_BASE_URL}/find-related`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: messageToSend, collection_name: knowledgeBaseId, top_k: 30 })
+                });
+                if (!backendResponse.ok) {
+                    const errorText = await backendResponse.text().catch(() => backendResponse.statusText);
+                    throw new Error(`知识库查询失败: ${errorText}`);
+                }
+
+                const result = await backendResponse.json();
+                if (result.error) throw new Error(`知识库返回错误: ${result.error}`);
+
+                retrievedSources = result.related_documents || [];
+                finalSources = retrievedSources;
             }
 
-            const result = await backendResponse.json();
-            if (result.error) throw new Error(`知识库返回错误: ${result.error}`);
-
-            const retrievedSources: Source[] = result.related_documents || [];
-            const finalSources: Source[] | undefined = retrievedSources;
-
-            const context = retrievedSources.map((s: Source) => `
+            const context = retrievedSources.length > 0 ? retrievedSources.map((s: Source) => `
 <document>
   <source>${s.source_file}</source>
   <content>
     ${s.content_chunk}
   </content>
 </document>
-`).join('');
+`).join('') : '';
 
-            const systemInstruction = `You are a helpful Q&A assistant. Answer the user's question based ONLY on the provided documents.
+            const systemInstruction = (knowledgeBaseId === 'anything-llm' || knowledgeBaseId === 'cherry-studio')
+                ? `You are the AnythingLLM Agent. You are a helpful assistant. Answer the user's question directly.`
+                : `You are a helpful Q&A assistant. Answer the user's question based ONLY on the provided documents.
 - Structure your answer clearly using Markdown formatting (like lists, bold text, etc.).
 - For each piece of information or claim in your answer, you MUST cite its origin by appending "[Source: file_name.txt]" at the end of the sentence.
 - You must use the exact filename from the <source> tag of the document you used.
 - If the information comes from multiple sources, cite them all, like "[Source: file1.txt], [Source: file2.txt]".
 - If you cannot answer the question from the documents, state that clearly. Do not use outside knowledge.`;
 
+
             const userPrompt = `[DOCUMENTS]${context}\n\n[USER QUESTION]\n${messageToSend}`;
             const chatHistoryForApi: ChatMessage[] = []; // No history is passed for KB-mode to force focus on provided context
 
             await callGenerativeAiStream(
                 provider, executionMode, systemInstruction, userPrompt, chatHistoryForApi,
-                (chunk) => {
+                (textChunk) => {
                     setChatHistory(prev => {
                         const newHistory = [...prev];
                         const lastMessage = newHistory[newHistory.length - 1];
                         if (lastMessage?.role === 'model') {
-                            lastMessage.text += chunk;
+                            lastMessage.text += textChunk;
                         }
                         return newHistory;
                     });
@@ -1053,579 +1118,6 @@ const KnowledgeChatView = ({
     );
 };
 
-const DiffView = ({ originalText, revisedText }: { originalText: string; revisedText: string }) => {
-    const diff = (a: string[], b: string[]) => {
-        const matrix = Array(a.length + 1).fill(null).map(() => Array(b.length + 1).fill(0));
-        for (let i = 1; i <= a.length; i++) {
-            for (let j = 1; j <= b.length; j++) {
-                if (a[i - 1] === b[j - 1]) {
-                    matrix[i][j] = matrix[i - 1][j - 1] + 1;
-                } else {
-                    matrix[i][j] = Math.max(matrix[i - 1][j], matrix[i][j - 1]);
-                }
-            }
-        }
-        let i = a.length;
-        let j = b.length;
-        const result: { value: string; type: 'common' | 'removed' | 'added' }[] = [];
-        while (i > 0 || j > 0) {
-            if (i > 0 && j > 0 && a[i - 1] === b[j - 1]) {
-                result.unshift({ value: a[i - 1], type: 'common' });
-                i--;
-                j--;
-            } else if (j > 0 && (i === 0 || matrix[i][j - 1] >= matrix[i - 1][j])) {
-                result.unshift({ value: b[j - 1], type: 'added' });
-                j--;
-            } else if (i > 0 && (j === 0 || matrix[i][j - 1] < matrix[i - 1][j])) {
-                result.unshift({ value: a[i - 1], type: 'removed' });
-                i--;
-            } else {
-                break;
-            }
-        }
-        return result;
-    };
-
-    const diffResult = diff(originalText.split(/(\s+)/), revisedText.split(/(\s+)/));
-
-    return (
-        <div className="diff-view">
-            {diffResult.map((part, index) => {
-                if (part.type === 'added') {
-                    return <span key={index} className="diff-add">{part.value}</span>;
-                }
-                if (part.type === 'removed') {
-                    return <span key={index} className="diff-remove">{part.value}</span>;
-                }
-                return <span key={index}>{part.value}</span>;
-            })}
-        </div>
-    );
-};
-
-
-const WritingView = ({
-    initialText,
-    onTextChange,
-    selectedModel,
-    selectedKnowledgeBase,
-    knowledgeBases,
-    executionMode,
-}: {
-    initialText: string;
-    onTextChange: (newText: string) => void;
-    selectedModel: ModelProvider;
-    selectedKnowledgeBase: string | null;
-    knowledgeBases: { id: string; name: string }[];
-    executionMode: ExecutionMode;
-}) => {
-    const [text, setText] = useState(initialText);
-    const [suggestions, setSuggestions] = useState<WritingSuggestion[]>([]);
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    const [styleReferenceText, setStyleReferenceText] = useState('');
-    const [copyMessage, setCopyMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
-
-    const [kbResults, setKbResults] = useState<Source[] | null>(null);
-    const [isKbSearching, setIsKbSearching] = useState(false);
-    const [kbError, setKbError] = useState<string | null>(null);
-    const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState<number | null>(null);
-
-    // New state for chat
-    const [chatHistory, setChatHistory] = useState<NoteChatMessage[]>([]);
-    const [chatInput, setChatInput] = useState('');
-    const [isChatLoading, setIsChatLoading] = useState(false);
-    const chatHistoryRef = useRef<HTMLDivElement>(null);
-
-    const editorRef = useRef<HTMLTextAreaElement>(null);
-    const styleFileRef = useRef<HTMLInputElement>(null);
-    const suppressSuggestionFetch = useRef(false);
-    const fetchIdRef = useRef(0);
-
-    // For resizable panel and responsive layout
-    const containerRef = useRef<HTMLDivElement>(null);
-    const isResizingRef = useRef(false);
-    const [panelGridStyle, setPanelGridStyle] = useState({ gridTemplateColumns: '2fr 8px 1fr' });
-    const [isMobileLayout, setIsMobileLayout] = useState(window.innerWidth <= 1000);
-
-    const debouncedResizeHandler = useRef(
-        debounce(() => {
-            setIsMobileLayout(window.innerWidth <= 1000);
-        }, 200)
-    ).current;
-
-    useEffect(() => {
-        const handler = () => debouncedResizeHandler();
-        window.addEventListener('resize', handler);
-        handler(); // Initial check
-        return () => {
-            window.removeEventListener('resize', handler);
-            debouncedResizeHandler.clearTimeout();
-        };
-    }, [debouncedResizeHandler]);
-
-
-    useEffect(() => {
-        // Initialize chat with a welcome message
-        setChatHistory([{ role: 'model', text: '您好！我是您的写作助手，您可以随时向我提问。' }]);
-    }, []);
-
-    useEffect(() => {
-        if (chatHistoryRef.current) {
-            chatHistoryRef.current.scrollTop = chatHistoryRef.current.scrollHeight;
-        }
-    }, [chatHistory]);
-
-    const handleMouseDown = (e: React.MouseEvent) => {
-        e.preventDefault();
-        isResizingRef.current = true;
-        document.body.style.cursor = 'col-resize';
-        document.body.style.userSelect = 'none';
-        window.addEventListener('mousemove', handleMouseMove);
-        window.addEventListener('mouseup', handleMouseUp);
-    };
-
-    const handleMouseUp = () => {
-        isResizingRef.current = false;
-        document.body.style.cursor = 'default';
-        document.body.style.userSelect = 'auto';
-        window.removeEventListener('mousemove', handleMouseMove);
-        window.removeEventListener('mouseup', handleMouseUp);
-    };
-
-    const handleMouseMove = useCallback((e: MouseEvent) => {
-        if (isResizingRef.current && containerRef.current) {
-            const rect = containerRef.current.getBoundingClientRect();
-            const editorPanelWidth = e.clientX - rect.left;
-            // Subtract resizer width from the assistant panel width
-            const assistantPanelWidth = rect.right - e.clientX - 8;
-
-            // Set min widths to prevent collapsing
-            if (editorPanelWidth > 300 && assistantPanelWidth > 300) {
-                setPanelGridStyle({
-                    gridTemplateColumns: `${editorPanelWidth}px 8px ${assistantPanelWidth}px`
-                });
-            }
-        }
-    }, []);
-
-    useEffect(() => {
-        // Cleanup event listeners when component unmounts
-        return () => {
-            window.removeEventListener('mousemove', handleMouseMove);
-            window.removeEventListener('mouseup', handleMouseUp);
-        };
-    }, [handleMouseMove]);
-
-
-    const fetchSuggestions = useCallback(debounce(async (currentText: string, styleText: string) => {
-        if (currentText.trim().length < 50) { // Don't run on very short text
-            setSuggestions([]);
-            return;
-        }
-        const fetchId = ++fetchIdRef.current;
-        setIsLoading(true);
-        setError(null);
-        setSelectedSuggestionIndex(null);
-
-        let systemInstruction = `你是一位专业的中文写作助理。你的任务是实时帮助用户改进他们的中文写作。
-- 分析所提供的文本，并找出最多6个关键的改进点。
-- 保持文档原有的语调和风格。
-- 针对每一条建议，提供精准的原文片段 ("originalText")、你修改后的版本 ("revisedText")，以及简明扼要的修改说明 ("explanation")。
-- 你所有的输出，包括建议和说明，都必须是中文。
-- 你的整个响应必须是一个JSON对象数组，每个对象包含 "originalText"、"revisedText" 和 "explanation" 这三个键。
-- 如果文本写得很好，无需修改，请返回一个空数组 []。`;
-
-        if (styleText.trim()) {
-            systemInstruction += `\n\n- 重要：你必须严格遵循以下“写作风格参考”文档中的写作风格、语气和词汇。
-
-[写作风格参考]:
----
-${styleText.trim()}
----
-`;
-        }
-
-        const userPrompt = `[Text for Analysis]:\n\n${currentText}`;
-
-        try {
-            const responseText = await callGenerativeAi(selectedModel, executionMode, systemInstruction, userPrompt, true, 'writing');
-
-            if (fetchId !== fetchIdRef.current) return;
-
-            const { data, error: parseError, rawResponse } = parseJsonResponse<unknown>(responseText);
-
-            if (parseError || !data) {
-                console.error("Raw response on parse error:", rawResponse);
-                throw new Error(parseError || "Received invalid data from model.");
-            }
-
-            let suggestionsArray: WritingSuggestion[] = [];
-
-            if (Array.isArray(data)) {
-                suggestionsArray = data as WritingSuggestion[];
-            }
-            else if (typeof data === 'object' && data !== null && 'suggestions' in data && Array.isArray((data as { suggestions: any }).suggestions)) {
-                suggestionsArray = (data as { suggestions: WritingSuggestion[] }).suggestions;
-            }
-            else {
-                throw new Error("Model returned an unexpected JSON format (not an array, or an object with 'suggestions').");
-            }
-
-            const validSuggestions = suggestionsArray.filter(s => s.originalText && s.revisedText && s.explanation);
-            setSuggestions(validSuggestions);
-
-        } catch (err: any) {
-            if (fetchId === fetchIdRef.current) {
-                setError(`获取建议失败: ${err.message}`);
-                setSuggestions([]);
-            }
-        } finally {
-            if (fetchId === fetchIdRef.current) {
-                setIsLoading(false);
-            }
-        }
-    }, 1500), [selectedModel, executionMode]);
-
-    useEffect(() => {
-        onTextChange(text);
-        if (suppressSuggestionFetch.current) {
-            suppressSuggestionFetch.current = false;
-            return;
-        }
-        fetchSuggestions(text, styleReferenceText);
-    }, [text, styleReferenceText, fetchSuggestions, onTextChange]);
-
-    const handleApplySuggestion = (suggestion: WritingSuggestion) => {
-        suppressSuggestionFetch.current = true;
-        setText(prevText => prevText.replace(suggestion.originalText, suggestion.revisedText));
-        setSuggestions(prev => prev.filter(s => s !== suggestion));
-        setSelectedSuggestionIndex(null);
-    };
-
-    const handleRefresh = () => {
-        fetchSuggestions.clearTimeout();
-        fetchSuggestions(text, styleReferenceText);
-    };
-
-    const handleSuggestionClick = (suggestion: WritingSuggestion, index: number) => {
-        setSelectedSuggestionIndex(index);
-        if (editorRef.current) {
-            const fullText = editorRef.current.value;
-            const startIndex = fullText.indexOf(suggestion.originalText);
-            if (startIndex !== -1) {
-                const endIndex = startIndex + suggestion.originalText.length;
-                editorRef.current.focus();
-                editorRef.current.setSelectionRange(startIndex, endIndex);
-            }
-        }
-    };
-
-    const handleCopy = () => {
-        if (!text) return;
-
-        const copyLegacy = () => {
-            const textArea = document.createElement("textarea");
-            textArea.value = text;
-            // Make the textarea invisible and out of the viewport
-            textArea.style.position = 'fixed';
-            textArea.style.top = '-9999px';
-            textArea.style.left = '-9999px';
-
-            document.body.appendChild(textArea);
-            textArea.focus();
-            textArea.select();
-
-            try {
-                const successful = document.execCommand('copy');
-                if (successful) {
-                    setCopyMessage({ text: '已复制!', type: 'success' });
-                } else {
-                    setCopyMessage({ text: '复制失败!', type: 'error' });
-                }
-            } catch (err) {
-                console.error('Fallback copy method failed:', err);
-                setCopyMessage({ text: '复制失败!', type: 'error' });
-            }
-
-            document.body.removeChild(textArea);
-            setTimeout(() => setCopyMessage(null), 2000);
-        };
-
-        // Use modern clipboard API if available and in a secure context
-        if (navigator.clipboard && window.isSecureContext) {
-            navigator.clipboard.writeText(text).then(() => {
-                setCopyMessage({ text: '已复制!', type: 'success' });
-                setTimeout(() => setCopyMessage(null), 2000);
-            }).catch(err => {
-                console.error('Clipboard API failed, trying fallback:', err);
-                copyLegacy();
-            });
-        } else {
-            console.warn('Clipboard API not available, using fallback.');
-            copyLegacy();
-        }
-    };
-
-    const handleKbSearch = async () => {
-        if (!selectedKnowledgeBase) {
-            setKbError("请返回首页选择一个知识库。");
-            return;
-        }
-        if (text.trim().length < 20) {
-            setKbError("请写入更多内容以便进行有效检索。");
-            return;
-        }
-        setIsKbSearching(true);
-        setKbError(null);
-        setKbResults(null);
-        try {
-            const backendResponse = await fetch(`${API_BASE_URL}/find-related`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ text: text, collection_name: selectedKnowledgeBase, top_k: 3 })
-            });
-            if (!backendResponse.ok) {
-                const errorText = await backendResponse.text();
-                throw new Error(errorText || "知识库查询失败。");
-            }
-            const data = await backendResponse.json();
-            if (data.error) throw new Error(data.error);
-            const sources = data.related_documents || [];
-            setKbResults(sources);
-            if (sources.length === 0) setKbError("未找到相关内容。");
-        } catch (err: any) {
-            setKbError(`知识库检索出错: ${err.message}`);
-        } finally {
-            setIsKbSearching(false);
-        }
-    };
-
-    const handleSendWritingChatMessage = async (e?: React.FormEvent) => {
-        e?.preventDefault();
-        if (!chatInput.trim() || isChatLoading) return;
-
-        const newUserMessage: NoteChatMessage = { role: 'user', text: chatInput };
-        const currentHistory = [...chatHistory, newUserMessage];
-        setChatHistory(currentHistory);
-        setChatInput('');
-        setIsChatLoading(true);
-
-        const systemInstruction = `You are a writing assistant. The user is currently writing the following text and has a question about it. Your role is to answer questions, help refine the text, or brainstorm ideas based on this text. Be helpful and conversational.\n\n--- CURRENT TEXT ---\n${text}\n--- END TEXT ---`;
-
-        const chatHistoryForApi = currentHistory
-            .slice(0, -1)
-            .filter(msg => !(msg.role === 'model' && msg.text.startsWith('您好！我是您的写作助手')))
-            .map(msg => ({ role: msg.role, parts: [{ text: msg.text }] }));
-
-        const modelResponse: NoteChatMessage = { role: 'model', text: '' };
-        setChatHistory(prev => [...prev, modelResponse]);
-
-        try {
-            await callGenerativeAiStream(
-                selectedModel, executionMode, systemInstruction, chatInput, chatHistoryForApi,
-                (chunk) => {
-                    setChatHistory(prev => {
-                        const newHistory = [...prev];
-                        const lastMessage = newHistory[newHistory.length - 1];
-                        if (lastMessage?.role === 'model') {
-                            lastMessage.text += chunk;
-                        }
-                        return newHistory;
-                    });
-                },
-                () => { setIsChatLoading(false); },
-                (error) => {
-                    setChatHistory(prev => {
-                        const newHistory = [...prev];
-                        const lastMessage = newHistory[newHistory.length - 1];
-                        if (lastMessage?.role === 'model') {
-                            lastMessage.isError = true;
-                            lastMessage.text = `抱歉，出错了: ${error.message}`;
-                        }
-                        return newHistory;
-                    });
-                    setIsChatLoading(false);
-                }
-            );
-        } catch (error: any) {
-            setChatHistory(prev => {
-                const newHistory = [...prev];
-                const lastMessage = newHistory[newHistory.length - 1];
-                if (lastMessage?.role === 'model') {
-                    lastMessage.isError = true;
-                    lastMessage.text = `抱歉，出错了: ${error.message}`;
-                }
-                return newHistory;
-            });
-            setIsChatLoading(false);
-        }
-    };
-
-
-    const processStyleFile = async (file: File) => {
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = async (event) => {
-            const fileContent = event.target?.result;
-            let fileText = '';
-            if (file.name.endsWith('.docx')) {
-                try {
-                    const result = await mammoth.extractRawText({ arrayBuffer: fileContent as ArrayBuffer });
-                    fileText = result.value;
-                } catch (err) {
-                    setError("无法解析 DOCX 文件。");
-                    return;
-                }
-            } else {
-                fileText = fileContent as string;
-            }
-            setStyleReferenceText(fileText);
-        };
-        if (file.name.endsWith('.docx')) {
-            reader.readAsArrayBuffer(file);
-        } else if (file.name.endsWith('.txt') || file.name.endsWith('.md')) {
-            reader.readAsText(file);
-        } else {
-            alert("不支持的文件类型。请上传 .txt, .md 或 .docx 文件。");
-        }
-    };
-
-    const handleStyleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files?.[0]) {
-            processStyleFile(e.target.files[0]);
-            e.target.value = '';
-        }
-    };
-
-    const handleUploadStyleClick = () => {
-        styleFileRef.current?.click();
-    };
-
-    return (
-        <div
-            ref={containerRef}
-            className={`writing-view-container ${isMobileLayout ? 'mobile-layout' : ''}`}
-            style={!isMobileLayout ? panelGridStyle : undefined}
-        >
-            <div className="writing-editor-panel">
-                <div className="assistant-panel-header">
-                    <h2>沉浸式写作</h2>
-                    <div className="header-actions">
-                        {copyMessage && <span className={`copy-message ${copyMessage.type}`}>{copyMessage.text}</span>}
-                        <button className="btn btn-secondary" onClick={handleCopy} disabled={!text}>
-                            复制全文
-                        </button>
-                    </div>
-                </div>
-                <textarea
-                    ref={editorRef}
-                    className="text-area writing-editor"
-                    value={text}
-                    onChange={(e) => setText(e.target.value)}
-                    placeholder="在此开始写作，AI 将在您停顿时提供建议..."
-                />
-            </div>
-
-            {!isMobileLayout && <div className="resizer" onMouseDown={handleMouseDown}></div>}
-
-            <div className="writing-assistant-panel">
-                <div className="assistant-panel-header">
-                    <h2 style={{ textTransform: 'capitalize' }}>AI 助手 ({selectedModel})</h2>
-                    <button className="btn btn-secondary" onClick={handleRefresh} disabled={isLoading}>
-                        {isLoading ? <span className="spinner"></span> : null}
-                        刷新建议
-                    </button>
-                </div>
-                <div className="assistant-content">
-                    <div className="suggestions-container">
-                        {isLoading && <div className="spinner-container"><div className="spinner large" /></div>}
-                        {!isLoading && error && <div className="error-message">{error}</div>}
-                        {!isLoading && !error && suggestions.length === 0 && (
-                            <div className="large-placeholder">
-                                <p>暂无建议。</p>
-                                <p className="instruction-text">请继续写作，或确保文本长度超过50个字符以便AI分析。</p>
-                            </div>
-                        )}
-                        {!isLoading && !error && suggestions.length > 0 && (
-                            <div className="suggestions-list">
-                                {suggestions.map((s, i) => (
-                                    <div
-                                        key={i}
-                                        className={`suggestion-card ${selectedSuggestionIndex === i ? 'selected' : ''}`}
-                                        onClick={() => handleSuggestionClick(s, i)}
-                                    >
-                                        <div className="suggestion-body">
-                                            <p><strong>差异对比:</strong></p>
-                                            <DiffView originalText={s.originalText} revisedText={s.revisedText} />
-                                            <p style={{ marginTop: '8px' }}><strong>说明:</strong> {s.explanation}</p>
-                                        </div>
-                                        <div className="suggestion-actions">
-                                            <button className="btn btn-primary" onClick={(e) => { e.stopPropagation(); handleApplySuggestion(s); }}>
-                                                应用此建议
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                    <div className="writing-chat-container">
-                        <h4>连续对话</h4>
-                        <div className="kb-chat-history" ref={chatHistoryRef}>
-                            {chatHistory.map((msg, index) => (
-                                <div key={index} className={`kb-message ${msg.role} ${msg.isError ? 'error' : ''}`}>
-                                    <div className="message-content" style={{ padding: '8px 12px', maxWidth: '100%' }}>
-                                        <p>{msg.text}</p>
-                                    </div>
-                                </div>
-                            ))}
-                            {isChatLoading && chatHistory[chatHistory.length - 1]?.role === 'model' && !chatHistory[chatHistory.length - 1]?.text && (
-                                <div className="spinner-container" style={{ padding: '10px 0' }}><div className="spinner"></div></div>
-                            )}
-                        </div>
-                        <form className="chat-input-form" onSubmit={handleSendWritingChatMessage}>
-                            <textarea
-                                className="chat-input"
-                                value={chatInput}
-                                onChange={(e) => setChatInput(e.target.value)}
-                                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendWritingChatMessage(); } }}
-                                placeholder="就当前文本提问..."
-                                rows={1}
-                                disabled={isChatLoading}
-                            />
-                            <button type="submit" className="btn btn-primary send-btn" disabled={isChatLoading || !chatInput.trim()}>发送</button>
-                        </form>
-                    </div>
-                </div>
-                <div className="style-reference-section">
-                    <h4>写作风格参考 (可选)</h4>
-                    <textarea
-                        className="text-area style-reference-textarea"
-                        value={styleReferenceText}
-                        onChange={(e) => setStyleReferenceText(e.target.value)}
-                        placeholder="在此处粘贴范文，或上传文件，以固定AI的写作风格..."
-                    />
-                    <input
-                        type="file"
-                        ref={styleFileRef}
-                        style={{ display: 'none' }}
-                        accept=".txt,.md,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                        onChange={handleStyleFileChange}
-                    />
-                    <div className="utility-btn-group" style={{ justifyContent: 'flex-end' }}>
-                        <button className="btn btn-secondary" onClick={handleUploadStyleClick}>
-                            上传风格文件
-                        </button>
-                        <button className="btn btn-secondary" onClick={() => setStyleReferenceText('')} disabled={!styleReferenceText}>
-                            清空风格参考
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-};
 
 const blobToBase64 = (blob: Blob): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -2025,7 +1517,7 @@ const TextRecognitionView = ({ provider, executionMode }: { provider: ModelProvi
 
 
 const App = () => {
-    type View = 'home' | 'notes' | 'audit' | 'chat' | 'writing' | 'ocr' | 'word-canvas' | 'cocreation';
+    type View = 'home' | 'notes' | 'audit' | 'chat' | 'writing' | 'ocr' | 'word-canvas';
     const [view, setView] = useState<View>('home');
     const [inputText, setInputText] = useState('');
     const [noteAnalysisResult, setNoteAnalysisResult] = useState<NoteAnalysis | null>(null);
@@ -2066,10 +1558,14 @@ const App = () => {
                 const data = await response.json();
                 const collections: string[] = data.collections || [];
                 const formattedKbs = collections.map(name => ({ id: name, name }));
+
+                // [Dual Engine] Inject AnythingLLM Agent
+                formattedKbs.unshift({ id: 'anything-llm', name: '🤖 AnythingLLM Agent' });
+
                 setKnowledgeBases(formattedKbs);
                 // If nothing is selected, or the previously selected one no longer exists, select the first one.
                 if (formattedKbs.length > 0) {
-                    if (!selectedKnowledgeBase || !collections.includes(selectedKnowledgeBase)) {
+                    if (!selectedKnowledgeBase || (!collections.includes(selectedKnowledgeBase) && selectedKnowledgeBase !== 'anything-llm')) {
                         setSelectedKnowledgeBase(formattedKbs[0].id);
                     }
                 } else {
@@ -2077,10 +1573,13 @@ const App = () => {
                 }
             } catch (error: any) {
                 console.error("Failed to fetch knowledge bases:", error);
-                const userFriendlyError = "无法连接到知识库服务。请检查后端服务是否正在运行，并刷新页面重试。";
-                setKbError(userFriendlyError);
-                setKnowledgeBases([]);
-                setSelectedKnowledgeBase(null);
+                const userFriendlyError = "无法连接到知识库服务 (Milvus)。但您仍可使用 Cherry Agent。";
+                setKbError(null); // Clear error to allow UI to render the list
+
+                // [Dual Engine] Fallback: AnythingLLM Agent
+                const fallbackKbs = [{ id: 'anything-llm', name: '🤖 AnythingLLM Agent' }];
+                setKnowledgeBases(fallbackKbs);
+                setSelectedKnowledgeBase('anything-llm');
             } finally {
                 setIsKbLoading(false);
             }
@@ -2123,14 +1622,12 @@ const App = () => {
         setView('ocr');
     };
 
-
-
-    const handleCoCreation = () => {
-        setView('cocreation');
-    };
-
     const handleWordCanvas = () => {
         setView('word-canvas');
+    };
+
+    const handleFastCanvas = () => {
+        setView('fast-canvas');
     };
 
     const handleTriggerAudit = () => {
@@ -2138,7 +1635,7 @@ const App = () => {
     };
 
     const handleTriggerWriting = () => {
-        setView('writing');
+        setView('fast-canvas'); // Redirect legacy Writing to Fast Canvas
     };
 
     const handleKnowledgeChat = () => {
@@ -2181,6 +1678,7 @@ const App = () => {
                     initialText={inputText}
                     selectedModel={selectedModel}
                     executionMode={executionMode}
+                    selectedKnowledgeBaseId={selectedKnowledgeBase}
                 />;
             case 'chat':
                 if (!selectedKnowledgeBase) {
@@ -2193,15 +1691,7 @@ const App = () => {
                     provider={selectedModel}
                     executionMode={executionMode}
                 />;
-            case 'writing':
-                return <WritingView
-                    initialText={inputText}
-                    onTextChange={setInputText}
-                    selectedModel={selectedModel}
-                    selectedKnowledgeBase={selectedKnowledgeBase}
-                    knowledgeBases={knowledgeBases}
-                    executionMode={executionMode}
-                />;
+
             case 'ocr':
                 return <TextRecognitionView
                     provider={selectedModel}
@@ -2210,30 +1700,8 @@ const App = () => {
 
             case 'word-canvas':
                 return <WordCanvas onBack={handleBackToHome} initialContent={inputText} />;
-            case 'cocreation':
-                return <CoCreationView
-                    onBack={handleBackToHome}
-                    onNavigateToCanvas={handleWordCanvas}
-                    selectedModel={selectedModel}
-                    onModelChange={(m) => setSelectedModel(m as any)}
-                    callAiStream={async (sys, user, hist, onChunk, onComp, onErr) => {
-                        const adaptedHistory = hist.map(h => ({
-                            role: h.role,
-                            parts: [{ text: h.text }]
-                        })) as ChatMessage[];
-
-                        await callGenerativeAiStream(
-                            selectedModel,
-                            executionMode,
-                            sys,
-                            user,
-                            adaptedHistory,
-                            onChunk,
-                            onComp,
-                            onErr
-                        );
-                    }}
-                />;
+            case 'fast-canvas':
+                return <FastCanvasView onBack={handleBackToHome} />;
             case 'home':
             default:
                 return (
@@ -2254,8 +1722,8 @@ const App = () => {
                         onWriting={handleTriggerWriting}
                         onTextRecognition={handleTextRecognition}
 
-                        onCoCreation={handleCoCreation}
                         onWordCanvas={handleWordCanvas}
+                        onFastCanvas={handleFastCanvas}
                         executionMode={executionMode}
                         setExecutionMode={setExecutionMode}
                     />
@@ -2273,14 +1741,12 @@ const App = () => {
 
     return (
         <div className="main-layout">
-            {(view !== 'cocreation') && (
-                <div className="app-header">
-                    <h1>写作笔记助手</h1>
-                    <div className="button-group">
-                        {view !== 'home' && <button className="btn btn-secondary" onClick={handleBackToHome}>返回首页</button>}
-                    </div>
+            <div className="app-header">
+                <h1>写作笔记助手</h1>
+                <div className="button-group">
+                    {view !== 'home' && <button className="btn btn-secondary" onClick={handleBackToHome}>返回首页</button>}
                 </div>
-            )}
+            </div>
 
             <div className="view-container">
                 {renderView()}

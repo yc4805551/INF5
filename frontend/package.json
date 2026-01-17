@@ -24,6 +24,7 @@
     "@tiptap/extension-text": "^3.13.0",
     "@tiptap/react": "^3.13.0",
     "@tiptap/starter-kit": "^3.13.0",
+    "@types/uuid": "^10.0.0",
     "axios": "^1.13.2",
     "lucide-react": "^0.555.0",
     "mammoth": "^1.7.2",
@@ -32,7 +33,8 @@
     "react-dom": "^18.3.1",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
-    "tiptap-markdown": "^0.9.0"
+    "tiptap-markdown": "^0.9.0",
+    "uuid": "^13.0.0"
   },
   "devDependencies": {
     "@types/marked": "^6.0.0",
