@@ -20,12 +20,12 @@ from features.smart_filler.routes import smart_filler_bp
 from features.advisor.routes import advisor_bp
 from features.agent_anything.routes import agent_anything_bp # AnythingLLM Agent
 
-# Import Services for CLI
+# ⚠️ 知识库CLI命令（独立文件，请勿随意修改）
+from features.knowledge.cli import register_knowledge_commands
+
+# Import Services for CLI (用于 flask ingest 命令)
 from features.knowledge.services import (
-    ingest_all_data, 
-    KnowledgeBaseEventHandler, 
-    get_model_for_collection,
-    KNOWLEDGE_BASE_DIR, KNOWLEDGE_BASE_DIR_NOMIC,
+    ingest_all_data,
     MILVUS_HOST, MILVUS_PORT
 )
 
@@ -80,6 +80,9 @@ def create_app():
 
 app = create_app()
 
+# ⚠️ 注册知识库CLI命令（定义在 features/knowledge/cli.py）
+register_knowledge_commands(app)
+
 # --- CLI Commands ---
 
 @app.cli.command("ingest")
@@ -88,107 +91,8 @@ def ingest_command():
     ingest_all_data()
     click.echo("Ingestion complete.")
 
-@app.cli.command("watch")
-def watch_command():
-    """Watch knowledge_base directory for changes."""
-    collection_to_watch = 'kb_qwen_0_6b'
-    
-    # 动态获取知识库路径（确保读取最新的环境变量）
-    kb_dir = os.getenv("KNOWLEDGE_BASE_DIR", "./knowledge_base")
-    # 实际监控的是子目录
-    watch_path = os.path.join(kb_dir, collection_to_watch)
-    
-    click.echo(f"📂 Knowledge base dir: {kb_dir}")
-    click.echo(f"👁️  Actual watch path: {watch_path}")
-    
-    # 检查目录是否存在
-    if not os.path.exists(watch_path):
-        click.echo(f"❌ Error: Directory '{watch_path}' does not exist!")
-        click.echo(f"   Please create it or check your KNOWLEDGE_BASE_DIR setting.")
-        return
-    
-    try:
-        connections.connect("default", host=MILVUS_HOST, port=MILVUS_PORT)
-    except Exception as e:
-        click.echo(f"Error connecting to Milvus: {e}")
-        return
 
-    model_name = get_model_for_collection(collection_to_watch)
-    if not utility.has_collection(collection_to_watch):
-        click.echo(f"Error: Collection '{collection_to_watch}' does not exist. Run 'flask ingest' first.")
-        return
-
-    event_handler = KnowledgeBaseEventHandler(collection_to_watch, model_name, base_dir=kb_dir)
-    
-    # Windows上使用 PollingObserver 更可靠
-    import platform
-    if platform.system() == 'Windows':
-        from watchdog.observers.polling import PollingObserver
-        observer = PollingObserver()
-        click.echo("🔍 Using PollingObserver (Windows)")
-    else:
-        observer = Observer()
-        click.echo("🔍 Using Default Observer")
-    
-    observer.schedule(event_handler, watch_path, recursive=False)  # 不递归，只监控此目录
-    click.echo(f"✅ Watching: {collection_to_watch} ({watch_path})")
-    observer.start()
-    try:
-        while True: time.sleep(1)
-    except KeyboardInterrupt:
-        observer.stop()
-    observer.join()
-
-@app.cli.command("watch-nomic")
-def watch_nomic_command():
-    """Watch knowledge_base_nomic directory for changes."""
-    collection_to_watch = 'kb_nomic'
-    
-    # 动态获取知识库路径（确保读取最新的环境变量）
-    kb_dir_nomic = os.getenv("KNOWLEDGE_BASE_DIR_NOMIC", "./knowledge_base_nomic")
-    # 实际监控的是子目录
-    watch_path = os.path.join(kb_dir_nomic, collection_to_watch)
-    
-    click.echo(f"📂 Knowledge base dir (nomic): {kb_dir_nomic}")
-    click.echo(f"👁️  Actual watch path: {watch_path}")
-    
-    # 检查目录是否存在
-    if not os.path.exists(watch_path):
-        click.echo(f"❌ Error: Directory '{watch_path}' does not exist!")
-        click.echo(f"   Please create it or check your KNOWLEDGE_BASE_DIR_NOMIC setting.")
-        return
-    
-    try:
-        connections.connect("default", host=MILVUS_HOST, port=MILVUS_PORT)
-    except Exception as e:
-        click.echo(f"Error connecting to Milvus: {e}")
-        return
-        
-    model_name = get_model_for_collection(collection_to_watch)
-    if not utility.has_collection(collection_to_watch):
-        click.echo(f"Error: Collection '{collection_to_watch}' does not exist.")
-        return
-
-    event_handler = KnowledgeBaseEventHandler(collection_to_watch, model_name, base_dir=kb_dir_nomic)
-    
-    # Windows上使用 PollingObserver 更可靠
-    import platform
-    if platform.system() == 'Windows':
-        from watchdog.observers.polling import PollingObserver
-        observer = PollingObserver()
-        click.echo("🔍 Using PollingObserver (Windows)")
-    else:
-        observer = Observer()
-        click.echo("🔍 Using Default Observer")
-    
-    observer.schedule(event_handler, watch_path, recursive=False)
-    click.echo(f"✅ Watching: {collection_to_watch} ({watch_path})")
-    observer.start()
-    try:
-        while True: time.sleep(1)
-    except KeyboardInterrupt:
-        observer.stop()
-    observer.join()
+# ⚠️ watch 和 watch-nomic 命令已移至 features/knowledge/cli.py
 
 if __name__ == "__main__":
     host = os.getenv("HOST", "127.0.0.1")
