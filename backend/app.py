@@ -119,7 +119,17 @@ def watch_command():
         return
 
     event_handler = KnowledgeBaseEventHandler(collection_to_watch, model_name, base_dir=kb_dir)
-    observer = Observer()
+    
+    # Windows上使用 PollingObserver 更可靠
+    import platform
+    if platform.system() == 'Windows':
+        from watchdog.observers.polling import PollingObserver
+        observer = PollingObserver()
+        click.echo("🔍 Using PollingObserver (Windows)")
+    else:
+        observer = Observer()
+        click.echo("🔍 Using Default Observer")
+    
     observer.schedule(event_handler, watch_path, recursive=False)  # 不递归，只监控此目录
     click.echo(f"✅ Watching: {collection_to_watch} ({watch_path})")
     observer.start()

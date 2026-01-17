@@ -3,9 +3,11 @@ import logging
 import requests
 import hashlib
 import uuid
+import platform
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pymilvus import connections, Collection, utility, FieldSchema, DataType, CollectionSchema
 from watchdog.observers import Observer
+from watchdog.observers.polling import PollingObserver
 from watchdog.events import FileSystemEventHandler
 import time
 
@@ -176,27 +178,30 @@ class KnowledgeBaseEventHandler(FileSystemEventHandler):
         self.model_name = model_name
         self.base_dir = base_dir or KNOWLEDGE_BASE_DIR
         self.watch_path = os.path.normpath(os.path.join(self.base_dir, self.collection_to_watch))
+        print(f"[Watcher] Initialized for: {self.watch_path}")
         logging.info(f"Watcher initialized for: {self.watch_path}")
     def process_if_relevant(self, event):
-        # 调试：显示所有事件
+        # 调试：显示所有事件（使用print确保输出）
+        print(f"[DEBUG] Raw event: {event.event_type} | is_dir: {event.is_directory} | path: {event.src_path}")
         logging.info(f"[DEBUG] Raw event: {event.event_type} | is_dir: {event.is_directory} | path: {event.src_path}")
         
         if event.is_directory: 
-            logging.info(f"[DEBUG] Skipped: is directory")
+            print(f"[DEBUG] Skipped: is directory")
             return
         if not (event.src_path.endswith(".txt") or event.src_path.endswith(".md")): 
-            logging.info(f"[DEBUG] Skipped: not .txt or .md file")
+            print(f"[DEBUG] Skipped: not .txt or .md file")
             return
         
         event_dir = os.path.normpath(os.path.dirname(event.src_path))
-        logging.info(f"[DEBUG] Event dir: {event_dir}")
-        logging.info(f"[DEBUG] Watch path: {self.watch_path}")
-        logging.info(f"[DEBUG] Match (case-insensitive): {event_dir.lower() == self.watch_path.lower()}")
+        print(f"[DEBUG] Event dir: {event_dir}")
+        print(f"[DEBUG] Watch path: {self.watch_path}")
+        print(f"[DEBUG] Match (case-insensitive): {event_dir.lower() == self.watch_path.lower()}")
         
         if event_dir.lower() != self.watch_path.lower(): 
-            logging.info(f"[DEBUG] Skipped: path mismatch")
+            print(f"[DEBUG] Skipped: path mismatch")
             return
             
+        print(f"✅ Event {event.event_type}: {event.src_path}")
         logging.info(f"✅ Event {event.event_type}: {event.src_path}")
         if event.event_type in ('created', 'modified'):
             upsert_file_to_milvus(event.src_path, self.collection_to_watch, self.model_name)
