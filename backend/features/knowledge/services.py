@@ -27,8 +27,16 @@ MODEL_MAPPING = {
     "kb_nomic": "nomic-embed-text"
 }
 
-KNOWLEDGE_BASE_DIR = os.getenv("KNOWLEDGE_BASE_DIR", "./knowledge_base")
-KNOWLEDGE_BASE_DIR_NOMIC = os.getenv("KNOWLEDGE_BASE_DIR_NOMIC", "./knowledge_base_nomic")
+# 延迟加载环境变量，确保在 load_dotenv 之后读取
+def get_knowledge_base_dir():
+    return os.getenv("KNOWLEDGE_BASE_DIR", "./knowledge_base")
+
+def get_knowledge_base_dir_nomic():
+    return os.getenv("KNOWLEDGE_BASE_DIR_NOMIC", "./knowledge_base_nomic")
+
+# 为了向后兼容，保留变量但使用函数
+KNOWLEDGE_BASE_DIR = get_knowledge_base_dir()
+KNOWLEDGE_BASE_DIR_NOMIC = get_knowledge_base_dir_nomic()
 CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", 500))
 CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", 50))
 INGEST_WORKERS = int(os.getenv("INGEST_WORKERS", 8))

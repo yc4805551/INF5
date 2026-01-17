@@ -39,6 +39,12 @@ if os.path.exists(dotenv_local_path):
     load_dotenv(dotenv_local_path, override=True)
     logging.info(f"Loaded config from {dotenv_local_path}")
 
+# 重新初始化知识库路径（在load_dotenv之后）
+from features.knowledge import services as knowledge_services
+knowledge_services.KNOWLEDGE_BASE_DIR = knowledge_services.get_knowledge_base_dir()
+knowledge_services.KNOWLEDGE_BASE_DIR_NOMIC = knowledge_services.get_knowledge_base_dir_nomic()
+logging.info(f"Knowledge base directories: {knowledge_services.KNOWLEDGE_BASE_DIR}, {knowledge_services.KNOWLEDGE_BASE_DIR_NOMIC}")
+
 # Configure Logging
 logging.basicConfig(level=logging.INFO, 
                     format='%(asctime)s - %(levelname)s - %(message)s',
