@@ -95,6 +95,17 @@ def watch_command():
     
     # 动态获取知识库路径（确保读取最新的环境变量）
     kb_dir = os.getenv("KNOWLEDGE_BASE_DIR", "./knowledge_base")
+    # 实际监控的是子目录
+    watch_path = os.path.join(kb_dir, collection_to_watch)
+    
+    click.echo(f"📂 Knowledge base dir: {kb_dir}")
+    click.echo(f"👁️  Actual watch path: {watch_path}")
+    
+    # 检查目录是否存在
+    if not os.path.exists(watch_path):
+        click.echo(f"❌ Error: Directory '{watch_path}' does not exist!")
+        click.echo(f"   Please create it or check your KNOWLEDGE_BASE_DIR setting.")
+        return
     
     try:
         connections.connect("default", host=MILVUS_HOST, port=MILVUS_PORT)
@@ -107,10 +118,10 @@ def watch_command():
         click.echo(f"Error: Collection '{collection_to_watch}' does not exist. Run 'flask ingest' first.")
         return
 
-    event_handler = KnowledgeBaseEventHandler(collection_to_watch, model_name)
+    event_handler = KnowledgeBaseEventHandler(collection_to_watch, model_name, base_dir=kb_dir)
     observer = Observer()
-    observer.schedule(event_handler, kb_dir, recursive=True)
-    click.echo(f"✅ Watching: {collection_to_watch} ({kb_dir})")
+    observer.schedule(event_handler, watch_path, recursive=False)  # 不递归，只监控此目录
+    click.echo(f"✅ Watching: {collection_to_watch} ({watch_path})")
     observer.start()
     try:
         while True: time.sleep(1)
