@@ -92,6 +92,10 @@ def ingest_command():
 def watch_command():
     """Watch knowledge_base directory for changes."""
     collection_to_watch = 'kb_qwen_0_6b'
+    
+    # 动态获取知识库路径（确保读取最新的环境变量）
+    kb_dir = os.getenv("KNOWLEDGE_BASE_DIR", "./knowledge_base")
+    
     try:
         connections.connect("default", host=MILVUS_HOST, port=MILVUS_PORT)
     except Exception as e:
@@ -105,8 +109,8 @@ def watch_command():
 
     event_handler = KnowledgeBaseEventHandler(collection_to_watch, model_name)
     observer = Observer()
-    observer.schedule(event_handler, KNOWLEDGE_BASE_DIR, recursive=True)
-    click.echo(f"✅ Watching: {collection_to_watch} ({KNOWLEDGE_BASE_DIR})")
+    observer.schedule(event_handler, kb_dir, recursive=True)
+    click.echo(f"✅ Watching: {collection_to_watch} ({kb_dir})")
     observer.start()
     try:
         while True: time.sleep(1)
@@ -118,6 +122,10 @@ def watch_command():
 def watch_nomic_command():
     """Watch knowledge_base_nomic directory for changes."""
     collection_to_watch = 'kb_nomic'
+    
+    # 动态获取知识库路径（确保读取最新的环境变量）
+    kb_dir_nomic = os.getenv("KNOWLEDGE_BASE_DIR_NOMIC", "./knowledge_base_nomic")
+    
     try:
         connections.connect("default", host=MILVUS_HOST, port=MILVUS_PORT)
     except Exception as e:
@@ -129,14 +137,14 @@ def watch_nomic_command():
         click.echo(f"Error: Collection '{collection_to_watch}' does not exist.")
         return
 
-    event_handler = KnowledgeBaseEventHandler(collection_to_watch, model_name, base_dir=KNOWLEDGE_BASE_DIR_NOMIC)
+    event_handler = KnowledgeBaseEventHandler(collection_to_watch, model_name, base_dir=kb_dir_nomic)
     observer = Observer()
     # Ensure dir exists or observer might fail?
-    if not os.path.exists(KNOWLEDGE_BASE_DIR_NOMIC):
-         click.echo(f"Warning: Directory '{KNOWLEDGE_BASE_DIR_NOMIC}' does not exist.")
+    if not os.path.exists(kb_dir_nomic):
+         click.echo(f"Warning: Directory '{kb_dir_nomic}' does not exist.")
     
-    observer.schedule(event_handler, KNOWLEDGE_BASE_DIR_NOMIC, recursive=True)
-    click.echo(f"✅ Watching: {collection_to_watch} ({KNOWLEDGE_BASE_DIR_NOMIC})")
+    observer.schedule(event_handler, kb_dir_nomic, recursive=True)
+    click.echo(f"✅ Watching: {collection_to_watch} ({kb_dir_nomic})")
     observer.start()
     try:
         while True: time.sleep(1)
