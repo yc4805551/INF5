@@ -146,6 +146,17 @@ def watch_nomic_command():
     
     # 动态获取知识库路径（确保读取最新的环境变量）
     kb_dir_nomic = os.getenv("KNOWLEDGE_BASE_DIR_NOMIC", "./knowledge_base_nomic")
+    # 实际监控的是子目录
+    watch_path = os.path.join(kb_dir_nomic, collection_to_watch)
+    
+    click.echo(f"📂 Knowledge base dir (nomic): {kb_dir_nomic}")
+    click.echo(f"👁️  Actual watch path: {watch_path}")
+    
+    # 检查目录是否存在
+    if not os.path.exists(watch_path):
+        click.echo(f"❌ Error: Directory '{watch_path}' does not exist!")
+        click.echo(f"   Please create it or check your KNOWLEDGE_BASE_DIR_NOMIC setting.")
+        return
     
     try:
         connections.connect("default", host=MILVUS_HOST, port=MILVUS_PORT)
@@ -159,13 +170,19 @@ def watch_nomic_command():
         return
 
     event_handler = KnowledgeBaseEventHandler(collection_to_watch, model_name, base_dir=kb_dir_nomic)
-    observer = Observer()
-    # Ensure dir exists or observer might fail?
-    if not os.path.exists(kb_dir_nomic):
-         click.echo(f"Warning: Directory '{kb_dir_nomic}' does not exist.")
     
-    observer.schedule(event_handler, kb_dir_nomic, recursive=True)
-    click.echo(f"✅ Watching: {collection_to_watch} ({kb_dir_nomic})")
+    # Windows上使用 PollingObserver 更可靠
+    import platform
+    if platform.system() == 'Windows':
+        from watchdog.observers.polling import PollingObserver
+        observer = PollingObserver()
+        click.echo("🔍 Using PollingObserver (Windows)")
+    else:
+        observer = Observer()
+        click.echo("🔍 Using Default Observer")
+    
+    observer.schedule(event_handler, watch_path, recursive=False)
+    click.echo(f"✅ Watching: {collection_to_watch} ({watch_path})")
     observer.start()
     try:
         while True: time.sleep(1)
