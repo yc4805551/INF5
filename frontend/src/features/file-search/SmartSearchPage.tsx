@@ -1,6 +1,47 @@
 import React, { useState } from 'react';
-import { smartSearch, openFileLocation, SmartSearchResult } from './smartSearchApi';
+import { smartSearch, openFileLocation, copyTextToClipboard, SmartSearchResult } from './smartSearchApi';
 import './SmartSearchPage.css';
+
+// 复制路径 (增强版: 服务器端复制)
+const handleCopyPath = async (path: string) => {
+    if (!path) return;
+
+    try {
+        // 优先尝试服务器端复制 (因为浏览器可能有安全限制)
+        const success = await copyTextToClipboard(path);
+        if (success) {
+            // alert('✅ 路径已复制');
+            return;
+        }
+
+        // 如果服务器端失败 (比如网络问题)，降级到浏览器端
+        throw new Error('Server copy failed');
+    } catch (err) {
+        console.error('Server copy failed, trying local fallback', err);
+
+        // Fallback for non-secure contexts or older browsers
+        try {
+            // ... (keep existing fallback logic as last resort)
+            await navigator.clipboard.writeText(path);
+        } catch (fallbackErr) {
+            // ... (keep existing DOM fallback)
+            try {
+                const textArea = document.createElement("textarea");
+                textArea.value = path;
+                textArea.style.position = "fixed";
+                textArea.style.left = "-9999px";
+                textArea.style.top = "0";
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+            } catch (domErr) {
+                alert('❌ 无法自动复制，请手动复制');
+            }
+        }
+    }
+};
 
 /**
  * AI 智能文件搜索页面 - 简洁版

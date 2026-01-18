@@ -1,6 +1,45 @@
 import React from 'react';
 import './FileSearchResultCard.css';
-import { openFileLocation } from '../features/file-search/smartSearchApi';
+import { openFileLocation, copyTextToClipboard } from '../features/file-search/smartSearchApi';
+
+// ...
+
+// 复制路径 (增强版: 服务器端复制)
+const handleCopyPath = async (path: string) => {
+    if (!path) return;
+    try {
+        // 优先尝试服务器端复制
+        const success = await copyTextToClipboard(path);
+        if (success) {
+            alert('路径已复制！');
+            return;
+        }
+        throw new Error('Server copy failed');
+    } catch (err) {
+        console.error('Server copy failed, trying local', err);
+        // Fallback
+        try {
+            await navigator.clipboard.writeText(path);
+            alert('路径已复制！');
+        } catch (e) {
+            // DOM Fallback
+            try {
+                const textArea = document.createElement("textarea");
+                textArea.value = path;
+                textArea.style.position = "fixed";
+                textArea.style.left = "-9999px";
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                alert('路径已复制！(兼容模式)');
+            } catch (domErr) {
+                alert('复制失败，请手动复制');
+            }
+        }
+    }
+};
 
 export interface FileSearchFile {
     // ...

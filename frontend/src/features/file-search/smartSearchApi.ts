@@ -50,6 +50,25 @@ export async function smartSearch(
 }
 
 /**
+ * 复制文本到剪贴板 (服务器端)
+ */
+export async function copyTextToClipboard(text: string): Promise<boolean> {
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/file-search/copy`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ text }),
+        });
+        return response.ok;
+    } catch (e) {
+        console.error('Failed to copy text:', e);
+        return false;
+    }
+}
+
+/**
  * 打开文件所在位置
  */
 export async function openFileLocation(path: string): Promise<boolean> {

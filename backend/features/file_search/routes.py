@@ -280,6 +280,36 @@ def open_file_location():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@file_search_bp.route('/copy', methods=['POST'])
+def copy_text():
+    """
+    复制文本到剪贴板
+    
+    请求体：
+    {
+        "text": "要复制的内容"
+    }
+    """
+    try:
+        data = request.get_json() or {}
+        text = data.get('text') or data.get('path', '')
+        text = str(text).strip()
+        
+        if not text:
+            return jsonify({'success': False, 'error': 'Text is required'}), 400
+            
+        result = search_service.copy_to_clipboard(text)
+        
+        if result['success']:
+            return jsonify(result), 200
+        else:
+            return jsonify(result), 500
+            
+    except Exception as e:
+        logger.error(f"Copy error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @file_search_bp.route('/health', methods=['GET'])
 def health_check():
     """

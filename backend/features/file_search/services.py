@@ -200,3 +200,45 @@ class FileSearchService:
         except Exception as e:
             logger.error(f"Failed to open file location: {e}")
             return {'success': False, 'error': str(e)}
+
+    def copy_to_clipboard(self, text: str) -> Dict:
+        """
+        复制文本到服务器端剪贴板 (Windows)
+        
+        Args:
+            text: 要复制的文本
+            
+        Returns:
+            Success status
+        """
+        try:
+            import subprocess
+            
+            if not text:
+                return {'success': False, 'error': 'Text is empty'}
+                
+            # 使用 clip 命令将文本写入剪贴板
+            # echo text | clip (但在 Python 中用 subprocess.run 输入更安全)
+            process = subprocess.run(
+                ['clip'],
+                input=text.strip(),
+                text=True,  # 使用文本模式
+                encoding='gbk', # Windows 剪贴板通常接受本地编码，但也尝试自适应
+                shell=True  # Windows 下 clip 是 cmd 命令的一部分
+            )
+            
+            if process.returncode == 0:
+                logger.info(f"Copied to clipboard: {text[:50]}...")
+                return {'success': True}
+            else:
+                return {'success': False, 'error': 'Clip command failed'}
+            
+        except Exception as e:
+            logger.error(f"Failed to copy to clipboard: {e}")
+            # Fallback retry with utf-16 if gbk fails (rare but possible)
+            try:
+                import subprocess
+                subprocess.run(['clip'], input=text.strip(), text=True, encoding='utf-16', shell=True)
+                return {'success': True}
+            except Exception as e2:
+                return {'success': False, 'error': str(e)}
