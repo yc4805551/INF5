@@ -189,16 +189,18 @@ class FileSearchAgent:
             # 解析结果
             filtered_results = self._parse_json_response(response)
             
-            if isinstance(filtered_results, list):
-                logger.info(f"Filtered to {len(filtered_results)} results")
+            if isinstance(filtered_results, list) and len(filtered_results) > 0:
+                logger.info(f"AI filtered to {len(filtered_results)} results")
                 return filtered_results[:top_k]
             else:
-                logger.warning("Invalid filter response format")
+                # AI 筛选失败或返回空，降级返回原始结果
+                logger.warning(f"AI filter returned empty or invalid, falling back to original {len(candidates[:top_k])} results")
                 return candidates[:top_k]
         
         except Exception as e:
             logger.error(f"Failed to filter results: {e}")
             # 降级策略：返回前 K 个原始结果
+            logger.info(f"Exception occurred, returning original {len(candidates[:top_k])} results")
             return candidates[:top_k]
     
     def _parse_json_response(self, response: str) -> Dict:
@@ -269,7 +271,15 @@ class FileSearchAgent:
             )
             
             # Step 5: 生成 AI 分析说明
-            ai_analysis = f"根据\"{intent.get('intent', '查询')}\"找到 {len(filtered_results)} 个最相关文件"
+            if len(filtered_results) > 0:
+                ai_analysis = f"根据\"{intent.get('intent', '查询')}\"找到 {len(filtered_results)} 个最相关文件"
+            elif len(candidates) > 0:
+                # AI 筛选失败，但 Everything 有结果
+                ai_analysis = f"关键词搜索找到 {len(candidates)} 个文件（AI 分析不可用，显示全部结果）"
+                filtered_results = candidates[:top_k]  # 确保返回 Everything 结果
+            else:
+                # Everything 也没找到
+                ai_analysis = "未找到匹配的文件"
             
             return {
                 'success': True,
