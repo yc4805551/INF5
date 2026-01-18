@@ -19,6 +19,7 @@ from features.audit.routes import audit_bp
 from features.smart_filler.routes import smart_filler_bp
 from features.advisor.routes import advisor_bp
 from features.agent_anything.routes import agent_anything_bp # AnythingLLM Agent
+from features.file_search.routes import file_search_bp  # 智能文件搜索
 
 # ⚠️ 知识库CLI命令（独立文件，请勿随意修改）
 from features.knowledge.cli import register_knowledge_commands
@@ -68,6 +69,7 @@ def create_app():
     app.register_blueprint(smart_filler_bp, url_prefix='/api/smart-filler')
     app.register_blueprint(advisor_bp, url_prefix='/api/advisor') # /suggestions - Fixed from /api/agent
     app.register_blueprint(agent_anything_bp, url_prefix='/api/agent-anything') # /audit
+    app.register_blueprint(file_search_bp, url_prefix='/api/file-search') # 智能文件搜索
 
     # Initialize Milvus Connection
     try:
