@@ -1,0 +1,156 @@
+/* 文件搜索结果卡片样式 */
+
+.file-search-result-card {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 16px;
+    margin: 8px 0;
+    border-left: 4px solid #4285f4;
+}
+
+.search-analysis {
+    font-weight: 600;
+    color: #1a73e8;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.file-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.file-item {
+    background: white;
+    border-radius: 6px;
+    padding: 12px;
+    border: 1px solid #e0e0e0;
+    transition: box-shadow 0.2s;
+}
+
+.file-item:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.file-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.file-icon {
+    font-size: 18px;
+}
+
+.file-name {
+    font-weight: 600;
+    color: #202124;
+    flex: 1;
+    word-break: break-word;
+}
+
+.file-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 8px;
+    font-size: 13px;
+}
+
+.score {
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 12px;
+}
+
+.score-90,
+.score-100 {
+    background: #c8e6c9;
+    color: #2e7d32;
+}
+
+.score-80 {
+    background: #fff9c4;
+    color: #f57f17;
+}
+
+.score-70,
+.score-60,
+.score-50 {
+    background: #ffccbc;
+    color: #d84315;
+}
+
+.file-size,
+.file-date {
+    color: #5f6368;
+}
+
+.file-path {
+    background: #f1f3f4;
+    padding: 6px 8px;
+    border-radius: 4px;
+    margin: 8px 0;
+    font-size: 12px;
+    color: #5f6368;
+    overflow-x: auto;
+}
+
+.file-path code {
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+}
+
+.file-reason {
+    color: #5f6368;
+    font-size: 13px;
+    margin: 6px 0;
+    font-style: italic;
+}
+
+.file-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid #f1f3f4;
+}
+
+.action-btn {
+    background: none;
+    border: 1px solid #dadce0;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: #1a73e8;
+}
+
+.action-btn:hover {
+    background: #e8f0fe;
+    border-color: #1a73e8;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .file-search-result-card {
+        padding: 12px;
+    }
+
+    .file-item {
+        padding: 10px;
+    }
+
+    .file-meta {
+        font-size: 12px;
+    }
+
+    .file-path code {
+        font-size: 11px;
+    }
+}
