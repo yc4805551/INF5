@@ -191,16 +191,54 @@ class FileSearchAgent:
             
             if isinstance(filtered_results, list) and len(filtered_results) > 0:
                 logger.info(f"AI filtered to {len(filtered_results)} results")
-                return filtered_results[:top_k]
+                
+                # 补充完整的文件信息（AI 可能只返回部分字段）
+                complete_results = []
+                for ai_file in filtered_results[:top_k]:
+                    # 找到原始文件数据
+                    original_file = None
+                    for candidate in candidates:
+                        if candidate.get('name') == ai_file.get('name') or candidate.get('path') == ai_file.get('path'):
+                            original_file = candidate
+                            break
+                    
+                    if original_file:
+                        # 合并 AI 评分和原始文件数据
+                        complete_file = {
+                            **original_file,  # 原始数据（包含 size, date_modified 等）
+                            'score': ai_file.get('score'),  # AI 评分
+                            'reason': ai_file.get('reason')  # AI 推荐理由
+                        }
+                        complete_results.append(complete_file)
+                    else:
+                        # 如果找不到原始文件，至少返回 AI 的数据
+                        complete_results.append(ai_file)
+                
+                return complete_results
             else:
-                # AI 筛选失败或返回空，降级返回原始结果
+                # AI 筛选失败或返回空，降级返回原始结果（添加默认评分）
                 logger.warning(f"AI filter returned empty or invalid, falling back to original {len(candidates[:top_k])} results")
-                return candidates[:top_k]
+                fallback_results = []
+                for i, file in enumerate(candidates[:top_k]):
+                    fallback_results.append({
+                        **file,
+                        'score': max(100 - i * 5, 50),  # 简单评分：第一个100分，递减
+                        'reason': '基于文件名匹配'
+                    })
+                return fallback_results
         
         except Exception as e:
             logger.error(f"Failed to filter results: {e}")
-            # 降级策略：返回前 K 个原始结果
+            # 降级策略：返回前 K 个原始结果（添加默认评分）
             logger.info(f"Exception occurred, returning original {len(candidates[:top_k])} results")
+            fallback_results = []
+            for i, file in enumerate(candidates[:top_k]):
+                fallback_results.append({
+                    **file,
+                    'score': max(100 - i * 5, 50),
+                    'reason': '搜索结果'
+                })
+            return fallback_results
             return candidates[:top_k]
     
     def _parse_json_response(self, response: str) -> Dict:
