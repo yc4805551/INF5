@@ -1,0 +1,81 @@
+"""
+简单的 LLM 调用包装函数
+供 search_agent 使用
+"""
+import logging
+import os
+from core.llm_engine import LLMEngine
+
+logger = logging.getLogger(__name__)
+
+
+def call_llm(
+    provider: str,
+    system_prompt: str,
+    user_prompt: str,
+    temperature: float = 0.3,
+    json_mode: bool = False
+) -> str:
+    """
+    调用大语言模型
+    
+    Args:
+        provider: 模型提供商（gemini/openai/deepseek等）
+        system_prompt: 系统提示
+        user_prompt: 用户提示
+        temperature: 温度（0-1，越низ越确定）
+        json_mode: 是否要求返回 JSON 格式
+        
+    Returns:
+        模型响应文本
+    """
+    try:
+        # 读取环境变量中的 API 配置
+        api_key = None
+        endpoint = None
+        model = None
+        
+        if provider == "gemini":
+            api_key = os.getenv("GEMINI_API_KEY")
+            endpoint = os.getenv("GEMINI_ENDPOINT", "https://generativelanguage.googleapis.com/v1beta/models")
+            model = os.getenv("GEMINI_MODEL", "gemini-2.0-flash-exp")
+        elif provider == "openai":
+            api_key = os.getenv("OPENAI_API_KEY")
+            endpoint = os.getenv("OPENAI_ENDPOINT", "https://api.openai.com/v1")
+            model = os.getenv("OPENAI_MODEL", "gpt-4")
+        elif provider == "deepseek":
+            api_key = os.getenv("DEEPSEEK_API_KEY")
+            endpoint = os.getenv("DEEPSEEK_ENDPOINT", "https://api.deepseek.com/v1")
+            model = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
+        
+        if not api_key:
+            raise ValueError(f"API key for {provider} not found in environment variables")
+        
+        # 构造完整的 prompt
+        full_prompt = f"{system_prompt}\n\n{user_prompt}"
+        
+        if json_mode:
+            full_prompt += "\n\n请仅返回 JSON 格式的结果，不要包含任何其他解释文字。"
+        
+        # 使用 LLMEngine 调用模型
+        engine = LLMEngine()
+        model_config = {
+            "provider": provider,
+            "apiKey": api_key,
+            "endpoint": endpoint,
+            "model": model
+        }
+        
+        # 根据提供商选择调用方法
+        if provider == "gemini":
+            response = engine._call_google_gemini(api_key, full_prompt, endpoint, model)
+        elif provider in ["openai", "deepseek"]:
+            response = engine._call_openai_compatible(api_key, endpoint, model, full_prompt)
+        else:
+            raise ValueError(f"Unsupported provider: {provider}")
+        
+        return response
+    
+    except Exception as e:
+        logger.error(f"LLM call failed: {e}")
+        raise

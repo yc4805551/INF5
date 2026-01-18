@@ -1,0 +1,291 @@
+"""
+AI 文件搜索助手
+使用大语言模型理解自然语言查询，智能筛选文件搜索结果
+"""
+import logging
+import json
+from typing import List, Dict, Optional
+from core.llm_helper import call_llm
+
+logger = logging.getLogger(__name__)
+
+
+class FileSearchAgent:
+    """AI 文件搜索助手"""
+    
+    INTENT_UNDERSTANDING_PROMPT = """你是一个文件搜索助手。用户会用自然语言描述他们想找的文件。
+
+你的任务：理解用户意图，提取关键搜索信息。
+
+请分析用户查询并返回 JSON 格式结果：
+{
+  "keywords": ["关键词1", "关键词2"],  // 提取的搜索关键词
+  "file_types": [".docx", ".pptx"],    // 推断的文件类型（可选）
+  "time_range": "lastweek",             // 时间范围（today/yesterday/lastweek/lastmonth，可选）
+  "intent": "用户意图的简短描述"
+}
+
+示例：
+用户: "帮我找最近关于机器学习的PPT"
+返回: {
+  "keywords": ["机器学习"],
+  "file_types": [".pptx", ".ppt"],
+  "time_range": "lastweek",
+  "intent": "查找机器学习相关的演示文稿"
+}
+
+用户: "上周讨论的项目文档在哪"
+返回: {
+  "keywords": ["项目", "文档"],
+  "file_types": [".docx", ".pdf", ".md"],
+  "time_range": "lastweek",
+  "intent": "查找上周的项目文档"
+}
+
+用户: "吴军的课程材料"
+返回: {
+  "keywords": ["吴军", "课程"],
+  "file_types": [],
+  "time_range": "",
+  "intent": "查找吴军相关的课程材料"
+}
+
+请仅返回 JSON，不要包含其他解释。
+"""
+    
+    INTELLIGENT_FILTER_PROMPT = """你是一个文件搜索助手。用户搜索了"{query}"，从 Everything 获得了 {total} 个结果。
+
+请从这些文件中选出最相关的前 {top_k} 个，并为每个文件打分（0-100）和说明推荐理由。
+
+文件列表：
+{file_list}
+
+请返回 JSON 格式：
+[
+  {{
+    "name": "文件名",
+    "path": "完整路径",
+    "score": 95,
+    "reason": "文件名高度匹配查询关键词"
+  }},
+  ...
+]
+
+评分标准：
+- 文件名与关键词匹配度（40%）
+- 路径相关性（30%）
+- 时间新鲜度（20%）
+- 文件类型匹配（10%）
+
+请仅返回 JSON 数组，不要包含其他解释。
+"""
+    
+    def __init__(self, model_provider: str = "gemini"):
+        """
+        初始化 AI 搜索助手
+        
+        Args:
+            model_provider: LLM 提供商（gemini/openai/deepseek等）
+        """
+        self.model_provider = model_provider
+    
+    def understand_query(self, natural_language_query: str) -> Dict:
+        """
+        理解自然语言查询
+        
+        Args:
+            natural_language_query: 用户的自然语言输入
+            
+        Returns:
+            {
+                'keywords': List[str],
+                'file_types': List[str],
+                'time_range': str,
+                'intent': str
+            }
+        """
+        try:
+            logger.info(f"Understanding query: {natural_language_query}")
+            
+            # 调用 LLM 理解意图
+            response = call_llm(
+                provider=self.model_provider,
+                system_prompt=self.INTENT_UNDERSTANDING_PROMPT,
+                user_prompt=f"用户查询: {natural_language_query}",
+                temperature=0.3,  # 低温度以获得更确定的结果
+                json_mode=True
+            )
+            
+            # 解析 JSON 响应
+            intent_data = self._parse_json_response(response)
+            
+            logger.info(f"Understood intent: {intent_data}")
+            return intent_data
+        
+        except Exception as e:
+            logger.error(f"Failed to understand query: {e}")
+            # 降级策略：返回原始查询作为关键词
+            return {
+                'keywords': [natural_language_query],
+                'file_types': [],
+                'time_range': '',
+                'intent': '关键词搜索'
+            }
+    
+    def intelligent_filter(
+        self,
+        query: str,
+        candidates: List[Dict],
+        top_k: int = 10
+    ) -> List[Dict]:
+        """
+        AI 智能筛选结果
+        
+        Args:
+            query: 用户查询
+            candidates: 候选文件列表
+            top_k: 返回前 K 个结果
+            
+        Returns:
+            筛选后的文件列表，每个文件包含 score 和 reason 字段
+        """
+        try:
+            if not candidates:
+                return []
+            
+            if len(candidates) <= top_k:
+                # 如果候选数量本身就不多，直接返回
+                return candidates
+            
+            logger.info(f"Filtering {len(candidates)} candidates to top {top_k}")
+            
+            # 准备文件列表（简化信息以减少 token）
+            file_list = []
+            for i, file in enumerate(candidates[:50]):  # 最多分析前50个
+                file_list.append({
+                    'index': i,
+                    'name': file.get('name', ''),
+                    'path': file.get('path', ''),
+                    'size': file.get('size', 0),
+                    'date_modified': file.get('date_modified', '')
+                })
+            
+            # 调用 LLM 进行智能筛选
+            prompt = self.INTELLIGENT_FILTER_PROMPT.format(
+                query=query,
+                total=len(candidates),
+                top_k=top_k,
+                file_list=json.dumps(file_list, ensure_ascii=False, indent=2)
+            )
+            
+            response = call_llm(
+                provider=self.model_provider,
+                system_prompt="你是一个专业的文件搜索助手。",
+                user_prompt=prompt,
+                temperature=0.3,
+                json_mode=True
+            )
+            
+            # 解析结果
+            filtered_results = self._parse_json_response(response)
+            
+            if isinstance(filtered_results, list):
+                logger.info(f"Filtered to {len(filtered_results)} results")
+                return filtered_results[:top_k]
+            else:
+                logger.warning("Invalid filter response format")
+                return candidates[:top_k]
+        
+        except Exception as e:
+            logger.error(f"Failed to filter results: {e}")
+            # 降级策略：返回前 K 个原始结果
+            return candidates[:top_k]
+    
+    def _parse_json_response(self, response: str) -> Dict:
+        """解析 JSON 响应"""
+        try:
+            # 移除可能的 markdown 代码块
+            cleaned = response.strip()
+            if cleaned.startswith('```'):
+                # 提取代码块内容
+                lines = cleaned.split('\n')
+                cleaned = '\n'.join(lines[1:-1])
+            
+            return json.loads(cleaned)
+        except Exception as e:
+            logger.error(f"Failed to parse JSON: {e}, response: {response}")
+            raise
+    
+    def smart_search(
+        self,
+        natural_language_query: str,
+        everything_search_func,
+        max_candidates: int = 100,
+        top_k: int = 10
+    ) -> Dict:
+        """
+        完整的智能搜索流程
+        
+        Args:
+            natural_language_query: 自然语言查询
+            everything_search_func: Everything 搜索函数
+            max_candidates: 最多获取多少候选结果
+            top_k: 返回前 K 个结果
+            
+        Returns:
+            {
+                'success': bool,
+                'query': str,
+                'intent': str,
+                'total_candidates': int,
+                'results': List[Dict],
+                'ai_analysis': str
+            }
+        """
+        try:
+            # Step 1: 理解用户意图
+            intent = self.understand_query(natural_language_query)
+            
+            # Step 2: 构造 Everything 查询
+            keywords = ' '.join(intent.get('keywords', []))
+            file_types = intent.get('file_types', [])
+            time_range = intent.get('time_range', '')
+            
+            # Step 3: 使用 Everything 快速检索
+            candidates = everything_search_func(
+                keywords=keywords,
+                file_types=file_types if file_types else None,
+                date_range=time_range if time_range else None,
+                max_results=max_candidates
+            )
+            
+            logger.info(f"Everything returned {len(candidates)} candidates")
+            
+            # Step 4: AI 智能筛选
+            filtered_results = self.intelligent_filter(
+                query=natural_language_query,
+                candidates=candidates,
+                top_k=top_k
+            )
+            
+            # Step 5: 生成 AI 分析说明
+            ai_analysis = f"根据\"{intent.get('intent', '查询')}\"找到 {len(filtered_results)} 个最相关文件"
+            
+            return {
+                'success': True,
+                'query': natural_language_query,
+                'intent': intent.get('intent', ''),
+                'total_candidates': len(candidates),
+                'results': filtered_results,
+                'ai_analysis': ai_analysis
+            }
+        
+        except Exception as e:
+            logger.error(f"Smart search failed: {e}")
+            return {
+                'success': False,
+                'query': natural_language_query,
+                'error': str(e),
+                'total_candidates': 0,
+                'results': []
+            }

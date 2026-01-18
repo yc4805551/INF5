@@ -5,6 +5,7 @@
 import logging
 from flask import Blueprint, request, jsonify
 from features.file_search.services import FileSearchService
+from features.file_search.search_agent import FileSearchAgent
 
 logger = logging.getLogger(__name__)
 
@@ -13,6 +14,55 @@ file_search_bp = Blueprint('file_search', __name__)
 
 # 创建服务实例
 search_service = FileSearchService()
+search_agent = FileSearchAgent()
+
+
+@file_search_bp.route('/smart', methods=['POST'])
+def smart_search():
+    """
+    AI 智能搜索 - 支持自然语言查询
+    
+    请求体：
+    {
+        "query": "帮我找最近关于吴军的课程PPT",
+        "maxResults":  10,
+        "modelProvider": "gemini" 
+    }
+    """
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'success': False, 'error': '请求体不能为空'}), 400
+        
+        query = data.get('query', '').strip()
+        if not query:
+            return jsonify({'success': False, 'error': '查询不能为空'}), 400
+        
+        max_results = min(data.get('maxResults', 10), 50)
+        model_provider = data.get('modelProvider', 'gemini')
+        max_candidates = min(data.get('maxCandidates', 100), 200)
+        
+        logger.info(f"AI Smart search: query='{query}'")
+        
+        # 使用 AI Agent 进行智能搜索
+        agent = FileSearchAgent(model_provider=model_provider)
+        
+        result = agent.smart_search(
+            natural_language_query=query,
+            everything_search_func=search_service.everything_client.search_with_filters,
+            max_candidates=max_candidates,
+            top_k=max_results
+        )
+        
+        if result['success']:
+            return jsonify(result), 200
+        else:
+            return jsonify(result), 500
+    
+    except Exception as e:
+        logger.error(f"Smart search error: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': f'智能搜索失败: {str(e)}'}), 500
 
 
 @file_search_bp.route('/search', methods=['POST'])

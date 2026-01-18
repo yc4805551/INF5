@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import ReactDOM from 'react-dom/client';
 import { HomeInputView } from './src/features/home/HomeInputView';
-import { SearchPage } from './src/features/file-search';
+import { SearchPage, SmartSearchPage } from './src/features/file-search';
 import { marked } from 'marked';
 import {
     NoteAnalysis, AuditIssue, WritingSuggestion, Source, RoamingResultItem,
@@ -1769,7 +1769,7 @@ const App = () => {
             case 'fast-canvas':
                 return <FastCanvasView onBack={handleBackToHome} />;
             case 'file-search':
-                return <SearchPage />;
+                return <SmartSearchPage />;
             case 'home':
             default:
                 return (
