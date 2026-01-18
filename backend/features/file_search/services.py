@@ -166,3 +166,37 @@ class FileSearchService:
             file_types=['.xlsx', '.xls', '.csv'],
             max_results=max_results
         )
+
+    def open_file_location(self, path: str) -> Dict:
+        """
+        打开文件所在位置并选中文件
+        
+        Args:
+            path: 文件完整路径
+            
+        Returns:
+            Success status
+        """
+        try:
+            import subprocess
+            import os
+            
+            if not path:
+                return {'success': False, 'error': 'Path is empty'}
+                
+            # 规范化路径
+            norm_path = os.path.normpath(path)
+            
+            if not os.path.exists(norm_path):
+                return {'success': False, 'error': 'File does not exist'}
+            
+            # 使用 explorer /select, <path> 打开并选中
+            cmd = f'explorer /select,"{norm_path}"'
+            subprocess.Popen(cmd, shell=True)
+            
+            logger.info(f"Opened file location: {norm_path}")
+            return {'success': True}
+            
+        except Exception as e:
+            logger.error(f"Failed to open file location: {e}")
+            return {'success': False, 'error': str(e)}

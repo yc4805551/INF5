@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { smartSearch, SmartSearchResult } from './smartSearchApi';
+import { smartSearch, openFileLocation, SmartSearchResult } from './smartSearchApi';
 import './SmartSearchPage.css';
 
 /**
@@ -26,6 +26,7 @@ export const SmartSearchPage: React.FC = () => {
         setError(null);
         setResults([]);
         setAiAnalysis('');
+        setIntent('');
 
         try {
             const response = await smartSearch(query, {
@@ -65,8 +66,6 @@ export const SmartSearchPage: React.FC = () => {
 
         try {
             await navigator.clipboard.writeText(path);
-            // 这里可以加一个临时 Toast，但 alert 比较简单直接
-            // alert('✅ 路径已复制');
         } catch (err) {
             console.error('Clipboard API failed, trying fallback', err);
             // Fallback for non-secure contexts or older browsers
@@ -85,11 +84,24 @@ export const SmartSearchPage: React.FC = () => {
 
                 document.execCommand('copy');
                 document.body.removeChild(textArea);
-                // alert('✅ 路径已复制 (兼容模式)');
             } catch (fallbackErr) {
                 console.error('Copy failed completely', fallbackErr);
                 alert('❌ 无法自动复制，请手动复制');
             }
+        }
+    };
+
+    // 打开所在位置
+    const handleOpenFolder = async (path: string) => {
+        if (!path) return;
+        try {
+            const success = await openFileLocation(path);
+            if (!success) {
+                alert('无法打开文件夹，可能文件不存在');
+            }
+        } catch (e) {
+            console.error(e);
+            alert('打开文件夹失败');
         }
     };
 
@@ -175,6 +187,16 @@ export const SmartSearchPage: React.FC = () => {
                             </div>
 
                             <div className="result-actions">
+                                <button
+                                    className="simple-action-btn"
+                                    onClick={() => {
+                                        const fullPath = getFullPath(file);
+                                        handleOpenFolder(fullPath);
+                                    }}
+                                    title="打开所在文件夹"
+                                >
+                                    📂
+                                </button>
                                 <button
                                     className="simple-action-btn"
                                     onClick={() => {

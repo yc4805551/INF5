@@ -48,3 +48,22 @@ export async function smartSearch(
 
     return response.json();
 }
+
+/**
+ * 打开文件所在位置
+ */
+export async function openFileLocation(path: string): Promise<boolean> {
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/file-search/open`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ path }),
+        });
+        return response.ok;
+    } catch (e) {
+        console.error('Failed to open file location:', e);
+        return false;
+    }
+}

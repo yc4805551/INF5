@@ -251,6 +251,35 @@ def search_spreadsheets():
         }), 500
 
 
+@file_search_bp.route('/open', methods=['POST'])
+def open_file_location():
+    """
+    打开文件所在位置
+    
+    请求体：
+    {
+        "path": "C:\\path\\to\\file.txt"
+    }
+    """
+    try:
+        data = request.get_json() or {}
+        path = data.get('path', '').strip()
+        
+        if not path:
+            return jsonify({'success': False, 'error': 'Path is required'}), 400
+            
+        result = search_service.open_file_location(path)
+        
+        if result['success']:
+            return jsonify(result), 200
+        else:
+            return jsonify(result), 404 if 'not exist' in result.get('error', '') else 500
+            
+    except Exception as e:
+        logger.error(f"Open location error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @file_search_bp.route('/health', methods=['GET'])
 def health_check():
     """

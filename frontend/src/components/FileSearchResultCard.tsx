@@ -1,7 +1,9 @@
 import React from 'react';
 import './FileSearchResultCard.css';
+import { openFileLocation } from '../features/file-search/smartSearchApi';
 
 export interface FileSearchFile {
+    // ...
     name: string;
     path: string;
     score?: number;
@@ -64,6 +66,20 @@ export const FileSearchResultCard: React.FC<FileSearchResultCardProps> = ({ data
         }
     };
 
+    // 打开所在位置
+    const handleOpenFolder = async (path: string) => {
+        if (!path) return;
+        try {
+            const success = await openFileLocation(path);
+            if (!success) {
+                alert('无法打开文件夹，可能文件不存在');
+            }
+        } catch (e) {
+            console.error(e);
+            alert('打开文件夹失败');
+        }
+    };
+
     // 格式化文件大小
     const formatFileSize = (bytes?: number): string => {
         if (!bytes) return '-';
@@ -115,6 +131,13 @@ export const FileSearchResultCard: React.FC<FileSearchResultCardProps> = ({ data
                         )}
 
                         <div className="file-actions">
+                            <button
+                                className="action-btn"
+                                onClick={() => handleOpenFolder(getFullPath(file))}
+                                title="打开所在文件夹"
+                            >
+                                📂 打开位置
+                            </button>
                             <button
                                 className="action-btn"
                                 onClick={() => handleCopyPath(getFullPath(file))}
