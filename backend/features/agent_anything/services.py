@@ -45,6 +45,7 @@ def chat_with_anything(message, history=[], workspace_slug=None):
     """
     Send chat to AnythingLLM workspace.
     If workspace_slug is provided, use it directly; otherwise resolve from DEFAULT_WORKSPACE.
+    Returns: { 'response': str, 'sources': list }
     """
     if not workspace_slug:
         slug = resolve_workspace_slug()
@@ -67,9 +68,12 @@ def chat_with_anything(message, history=[], workspace_slug=None):
         response.raise_for_status()
         data = response.json()
         
-        # AnythingLLM response format verification needed.
-        # Usually: { "textResponse": "...", "sources": [...] }
-        return data.get('textResponse', 'No response text found.')
+        # AnythingLLM response format: { "textResponse": "...", "sources": [...] }
+        # Return both response and sources
+        return {
+            'response': data.get('textResponse', 'No response text found.'),
+            'sources': data.get('sources', [])
+        }
         
     except Exception as e:
         logging.error(f"AnythingLLM Chat Failed: {e}")

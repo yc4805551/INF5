@@ -28,6 +28,7 @@ def chat_endpoint():
     """
     Endpoint for Chat via AnythingLLM (Knowledge Base Chat).
     Expects JSON: { "message": "...", "history": [...], "workspace_slug": "..." (optional) }
+    Returns: { "response": "...", "sources": [...] }
     """
     data = request.json
     message = data.get('message', '')
@@ -35,8 +36,9 @@ def chat_endpoint():
     workspace_slug = data.get('workspace_slug')  # NEW: Accept slug from frontend
     
     try:
-        response_text = chat_with_anything(message, history, workspace_slug)
-        return jsonify({"response": response_text})
+        result = chat_with_anything(message, history, workspace_slug)
+        # result is now { 'response': '...', 'sources': [...] }
+        return jsonify(result)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

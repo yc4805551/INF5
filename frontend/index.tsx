@@ -966,12 +966,21 @@ const KnowledgeChatView = ({
                 }
 
                 const responseText = data.response || '没有收到回复';
+                const anythingSources = data.sources || [];
+
+                // Convert AnythingLLM sources format to unified Source format
+                const formattedSources: Source[] = anythingSources.map((src: any) => ({
+                    source_file: src.title || 'Unknown Source',
+                    content_chunk: src.chunk || src.text || '',
+                    score: src.score || 0
+                }));
 
                 setChatHistory(prev => {
                     const newHistory = [...prev];
                     const lastMessage = newHistory[newHistory.length - 1];
                     if (lastMessage?.role === 'model') {
                         lastMessage.text = responseText;
+                        lastMessage.sources = formattedSources; // Add sources
                         lastMessage.isComplete = true;
                     }
                     return newHistory;
