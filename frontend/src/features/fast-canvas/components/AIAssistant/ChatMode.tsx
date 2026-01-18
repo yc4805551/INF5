@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, User, Bot, AlertCircle, Loader, Sparkles } from 'lucide-react';
 import { ChatMessage } from '../../types';
+import { FileSearchResultCard, parseFileSearchResult, hasFileSearchResult } from '../../../../components/FileSearchResultCard';
 import './ChatMode.css';
 
 interface ChatModeProps {
@@ -67,18 +68,30 @@ export const ChatMode: React.FC<ChatModeProps> = ({
                     </div>
                 )}
 
-                {history.map((msg, idx) => (
-                    <div key={idx} className={`chat-message ${msg.role}`}>
-                        <div className="avatar">
-                            {msg.role === 'user' ? <User size={16} /> : <Bot size={16} />}
+                {history.map((msg, idx) => {
+                    // 检测是否包含文件搜索结果
+                    const messageText = msg.parts.map(p => p.text).join('');
+                    const fileSearchData = parseFileSearchResult(messageText);
+
+                    return (
+                        <div key={idx} className={`chat-message ${msg.role}`}>
+                            <div className="avatar">
+                                {msg.role === 'user' ? <User size={16} /> : <Bot size={16} />}
+                            </div>
+                            <div className="message-content">
+                                {fileSearchData ? (
+                                    // 渲染文件搜索结果卡片
+                                    <FileSearchResultCard data={fileSearchData} />
+                                ) : (
+                                    // 普通文本消息
+                                    msg.parts.map((part, pIdx) => (
+                                        <p key={pIdx}>{part.text}</p>
+                                    ))
+                                )}
+                            </div>
                         </div>
-                        <div className="message-content">
-                            {msg.parts.map((part, pIdx) => (
-                                <p key={pIdx}>{part.text}</p>
-                            ))}
-                        </div>
-                    </div>
-                ))}
+                    );
+                })}
 
                 {isLoading && (
                     <div className="chat-message model loading">
