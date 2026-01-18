@@ -936,16 +936,53 @@ const KnowledgeChatView = ({
         setChatHistory(prev => [...prev, placeholderMessage]);
 
         try {
+            // [Dual Engine] Direct AnythingLLM Agent Routing
+            if (knowledgeBaseId === 'anything-llm') {
+                const response = await fetch(`${API_BASE_URL}/agent-anything/chat`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        message: messageToSend,
+                        history: [] // AnythingLLM manages its own conversation context
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text().catch(() => response.statusText);
+                    throw new Error(`AnythingLLM 请求失败: ${errorText}`);
+                }
+
+                const data = await response.json();
+
+                if (data.error) {
+                    throw new Error(`AnythingLLM 返回错误: ${data.error}`);
+                }
+
+                const responseText = data.response || '没有收到回复';
+
+                setChatHistory(prev => {
+                    const newHistory = [...prev];
+                    const lastMessage = newHistory[newHistory.length - 1];
+                    if (lastMessage?.role === 'model') {
+                        lastMessage.text = responseText;
+                        lastMessage.isComplete = true;
+                    }
+                    return newHistory;
+                });
+                setIsChatLoading(false);
+                return; // Exit early for AnythingLLM
+            }
+
+            // [Normal RAG Flow] for other knowledge bases
             let retrievedSources: Source[] = [];
             let finalSources: Source[] | undefined = undefined;
 
-            // [Dual Engine] Anything Routing - Bypass Milvus RAG
-            if (knowledgeBaseId === 'anything-llm' || knowledgeBaseId === 'cherry-studio') {
-                // Skip /find-related call
+            if (knowledgeBaseId === 'cherry-studio') {
+                // Cherry Studio: Bypass Milvus RAG but still use LLM
                 retrievedSources = [];
-                finalSources = undefined; // No sources to cite
+                finalSources = undefined;
             } else {
-                // Normal RAG Flow
+                // Normal Milvus RAG Flow
                 const backendResponse = await fetch(`${API_BASE_URL}/find-related`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -972,8 +1009,8 @@ const KnowledgeChatView = ({
 </document>
 `).join('') : '';
 
-            const systemInstruction = (knowledgeBaseId === 'anything-llm' || knowledgeBaseId === 'cherry-studio')
-                ? `You are the AnythingLLM Agent. You are a helpful assistant. Answer the user's question directly.`
+            const systemInstruction = (knowledgeBaseId === 'cherry-studio')
+                ? `You are a helpful assistant. Answer the user's question directly.`
                 : `You are a helpful Q&A assistant. Answer the user's question based ONLY on the provided documents.
 - Structure your answer clearly using Markdown formatting (like lists, bold text, etc.).
 - For each piece of information or claim in your answer, you MUST cite its origin by appending "[Source: file_name.txt]" at the end of the sentence.
