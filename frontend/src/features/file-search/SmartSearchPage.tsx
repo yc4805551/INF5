@@ -46,11 +46,51 @@ export const SmartSearchPage: React.FC = () => {
         }
     };
 
-    // 复制路径
-    const handleCopyPath = (path: string) => {
+    // 获取文件的完整路径 (兼容 Everything 返回 path 为目录的情况)
+    const getFullPath = (file: SmartSearchResult) => {
+        if (!file.path) return '';
+        // 如果 path 已经包含 name (某些 API 变体)，则直接返回
+        if (file.path.endsWith(file.name)) return file.path;
+
+        // 否则拼接 (简单处理 Windows 路径分隔符)
+        const separator = file.path.includes('/') ? '/' : '\\';
+        return file.path.endsWith(separator)
+            ? file.path + file.name
+            : file.path + separator + file.name;
+    };
+
+    // 复制路径 (增强版: 支持 fallback)
+    const handleCopyPath = async (path: string) => {
         if (!path) return;
-        navigator.clipboard.writeText(path);
-        // 可以添加提示
+
+        try {
+            await navigator.clipboard.writeText(path);
+            // 这里可以加一个临时 Toast，但 alert 比较简单直接
+            // alert('✅ 路径已复制');
+        } catch (err) {
+            console.error('Clipboard API failed, trying fallback', err);
+            // Fallback for non-secure contexts or older browsers
+            try {
+                const textArea = document.createElement("textarea");
+                textArea.value = path;
+
+                // Ensure it's not visible but part of DOM
+                textArea.style.position = "fixed";
+                textArea.style.left = "-9999px";
+                textArea.style.top = "0";
+                document.body.appendChild(textArea);
+
+                textArea.focus();
+                textArea.select();
+
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                // alert('✅ 路径已复制 (兼容模式)');
+            } catch (fallbackErr) {
+                console.error('Copy failed completely', fallbackErr);
+                alert('❌ 无法自动复制，请手动复制');
+            }
+        }
     };
 
     // 格式化文件大小
@@ -137,9 +177,11 @@ export const SmartSearchPage: React.FC = () => {
                             <div className="result-actions">
                                 <button
                                     className="simple-action-btn"
-                                    onClick={() => file.path && handleCopyPath(file.path)}
-                                    title={file.path ? "复制路径" : "路径无效"}
-                                    disabled={!file.path}
+                                    onClick={() => {
+                                        const fullPath = getFullPath(file);
+                                        handleCopyPath(fullPath);
+                                    }}
+                                    title="复制完整路径"
                                 >
                                     📋
                                 </button>

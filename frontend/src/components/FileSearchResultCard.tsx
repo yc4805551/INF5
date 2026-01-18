@@ -28,13 +28,40 @@ interface FileSearchResultCardProps {
 export const FileSearchResultCard: React.FC<FileSearchResultCardProps> = ({ data }) => {
     const { files, ai_analysis } = data;
 
-    // 复制路径到剪贴板
-    const handleCopyPath = (path: string) => {
+    // 获取文件的完整路径
+    const getFullPath = (file: FileSearchFile) => {
+        if (!file.path) return '';
+        if (file.path.endsWith(file.name)) return file.path;
+        const separator = file.path.includes('/') ? '/' : '\\';
+        return file.path.endsWith(separator)
+            ? file.path + file.name
+            : file.path + separator + file.name;
+    };
+
+    // 复制路径 (增强版)
+    const handleCopyPath = async (path: string) => {
         if (!path) return;
-        navigator.clipboard.writeText(path).then(() => {
-            // 可以添加提示
+        try {
+            await navigator.clipboard.writeText(path);
             alert('路径已复制！');
-        });
+        } catch (err) {
+            console.error('Clipboard API failed', err);
+            // Fallback
+            try {
+                const textArea = document.createElement("textarea");
+                textArea.value = path;
+                textArea.style.position = "fixed";
+                textArea.style.left = "-9999px";
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                alert('路径已复制！(兼容模式)');
+            } catch (e) {
+                alert('复制失败，请手动复制');
+            }
+        }
     };
 
     // 格式化文件大小
@@ -90,8 +117,8 @@ export const FileSearchResultCard: React.FC<FileSearchResultCardProps> = ({ data
                         <div className="file-actions">
                             <button
                                 className="action-btn"
-                                onClick={() => handleCopyPath(file.path)}
-                                title="复制路径"
+                                onClick={() => handleCopyPath(getFullPath(file))}
+                                title="复制完整路径"
                             >
                                 📋 复制路径
                             </button>
