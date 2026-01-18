@@ -123,8 +123,8 @@ export const SearchPage: React.FC = () => {
                                             key={index}
                                             type="button"
                                             className={`filter-btn ${JSON.stringify(selectedFileTypes) === JSON.stringify(option.value)
-                                                    ? 'active'
-                                                    : ''
+                                                ? 'active'
+                                                : ''
                                                 }`}
                                             onClick={() => handleFileTypeChange(option.value)}
                                             disabled={isLoading}
@@ -163,6 +163,7 @@ export const SearchPage: React.FC = () => {
                                     <option value={10}>10 个</option>
                                     <option value={20}>20 个</option>
                                     <option value={50}>50 个</option>
+                                    <option value={100}>100 个</option>
                                 </select>
                             </div>
                         </div>

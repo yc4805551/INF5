@@ -44,8 +44,11 @@ class EverythingClient:
             文件列表，每个文件包含 name, path, size, date_modified 等字段
         """
         try:
-            # 构建请求 URL
-            search_url = f"{self.base_url}/?search={quote(query)}&json=1&count={max_results}"
+            # 构建请求 URL - 添加字段参数
+            # path=1: 返回完整路径
+            # size=1: 返回文件大小
+            # dm=1: 返回修改日期
+            search_url = f"{self.base_url}/?search={quote(query)}&json=1&count={max_results}&path=1&size=1&dm=1"
             
             logger.info(f"Searching Everything: {query}")
             
