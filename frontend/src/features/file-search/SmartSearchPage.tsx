@@ -10,7 +10,7 @@ const handleCopyPath = async (path: string) => {
         // 优先尝试服务器端复制 (因为浏览器可能有安全限制)
         const success = await copyTextToClipboard(path);
         if (success) {
-            // alert('✅ 路径已复制');
+            alert('✅ 路径已复制');
             return;
         }
 
