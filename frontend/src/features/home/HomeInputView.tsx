@@ -19,6 +19,7 @@ interface HomeInputViewProps {
     onTextRecognition: () => void;
     onWordCanvas: () => void;
     onFastCanvas: () => void;
+    onFileSearch: () => void;
     executionMode: ExecutionMode;
     setExecutionMode: (mode: ExecutionMode) => void;
 }
@@ -39,6 +40,7 @@ export const HomeInputView: React.FC<HomeInputViewProps> = ({
     onTextRecognition,
     onWordCanvas,
     onFastCanvas,
+    onFileSearch,
     executionMode,
     setExecutionMode,
 }) => {
@@ -246,6 +248,9 @@ export const HomeInputView: React.FC<HomeInputViewProps> = ({
                 </button>
                 <button className="action-btn" onClick={onFastCanvas} disabled={isProcessing}>
                     5. 快速画布 ⚡
+                </button>
+                <button className="action-btn" onClick={onFileSearch} disabled={isProcessing}>
+                    6. 文件搜索 🔍
                 </button>
             </div>
         </>

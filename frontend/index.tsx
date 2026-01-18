@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import ReactDOM from 'react-dom/client';
 import { HomeInputView } from './src/features/home/HomeInputView';
+import { SearchPage } from './src/features/file-search';
 import { marked } from 'marked';
 import {
     NoteAnalysis, AuditIssue, WritingSuggestion, Source, RoamingResultItem,
@@ -1570,7 +1571,7 @@ const TextRecognitionView = ({ provider, executionMode }: { provider: ModelProvi
 
 
 const App = () => {
-    type View = 'home' | 'notes' | 'audit' | 'chat' | 'writing' | 'ocr' | 'word-canvas';
+    type View = 'home' | 'notes' | 'audit' | 'chat' | 'writing' | 'ocr' | 'word-canvas' | 'fast-canvas' | 'file-search';
     const [view, setView] = useState<View>('home');
     const [inputText, setInputText] = useState('');
     const [noteAnalysisResult, setNoteAnalysisResult] = useState<NoteAnalysis | null>(null);
@@ -1711,6 +1712,10 @@ const App = () => {
         setView('chat');
     };
 
+    const handleFileSearch = () => {
+        setView('file-search');
+    };
+
     const handleCloseThoughtsModal = () => {
         setIsThoughtsModalOpen(false);
     }
@@ -1763,6 +1768,8 @@ const App = () => {
                 return <WordCanvas onBack={handleBackToHome} initialContent={inputText} />;
             case 'fast-canvas':
                 return <FastCanvasView onBack={handleBackToHome} />;
+            case 'file-search':
+                return <SearchPage />;
             case 'home':
             default:
                 return (
@@ -1770,7 +1777,6 @@ const App = () => {
                         inputText={inputText}
                         setInputText={setInputText}
                         onOrganize={handleTriggerOrganize}
-                        onAudit={handleTriggerAudit}
                         selectedModel={selectedModel}
                         setSelectedModel={setSelectedModel}
                         isProcessing={isProcessing}
@@ -1780,11 +1786,10 @@ const App = () => {
                         selectedKnowledgeBase={selectedKnowledgeBase}
                         setSelectedKnowledgeBase={setSelectedKnowledgeBase}
                         onKnowledgeChat={handleKnowledgeChat}
-                        onWriting={handleTriggerWriting}
                         onTextRecognition={handleTextRecognition}
-
                         onWordCanvas={handleWordCanvas}
                         onFastCanvas={handleFastCanvas}
+                        onFileSearch={handleFileSearch}
                         executionMode={executionMode}
                         setExecutionMode={setExecutionMode}
                     />
