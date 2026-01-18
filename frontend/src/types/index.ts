@@ -73,3 +73,10 @@ export type AuditResults = {
 export interface ModelConfig {
     [key: string]: any;
 }
+
+export interface KnowledgeBase {
+    id: string;
+    name: string;
+    slug?: string; // For AnythingLLM workspaces
+}
+

@@ -41,13 +41,17 @@ def resolve_workspace_slug(target_name=DEFAULT_WORKSPACE):
     
     return None
 
-def chat_with_anything(message, history=[]):
+def chat_with_anything(message, history=[], workspace_slug=None):
     """
     Send chat to AnythingLLM workspace.
+    If workspace_slug is provided, use it directly; otherwise resolve from DEFAULT_WORKSPACE.
     """
-    slug = resolve_workspace_slug()
-    if not slug:
-        raise ValueError(f"No workspace found matching '{DEFAULT_WORKSPACE}' or system is empty.")
+    if not workspace_slug:
+        slug = resolve_workspace_slug()
+        if not slug:
+            raise ValueError(f"No workspace found matching '{DEFAULT_WORKSPACE}' or system is empty.")
+    else:
+        slug = workspace_slug
         
     url = f"{ANYTHING_API_BASE}/workspace/{slug}/chat"
     

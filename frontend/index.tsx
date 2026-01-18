@@ -4,7 +4,7 @@ import { HomeInputView } from './src/features/home/HomeInputView';
 import { marked } from 'marked';
 import {
     NoteAnalysis, AuditIssue, WritingSuggestion, Source, RoamingResultItem,
-    NoteChatMessage, ModelProvider, ChatMessage, ExecutionMode, AuditResult, AuditResults
+    NoteChatMessage, ModelProvider, ChatMessage, ExecutionMode, AuditResult, AuditResults, KnowledgeBase
 } from './src/types';
 import { GoogleGenAI } from '@google/genai';
 import { callGenerativeAi, callGenerativeAiStream, API_BASE_URL } from './src/services/ai';
@@ -859,12 +859,14 @@ const KnowledgeChatView = ({
     initialQuestion,
     provider,
     executionMode,
+    knowledgeBases,
 }: {
     knowledgeBaseId: string;
     knowledgeBaseName: string;
     initialQuestion?: string;
     provider: ModelProvider;
     executionMode: ExecutionMode;
+    knowledgeBases: KnowledgeBase[];
 }) => {
     const [chatHistory, setChatHistory] = useState<NoteChatMessage[]>([]);
     const [chatInput, setChatInput] = useState('');
@@ -937,13 +939,18 @@ const KnowledgeChatView = ({
 
         try {
             // [Dual Engine] Direct AnythingLLM Agent Routing
-            if (knowledgeBaseId === 'anything-llm') {
+            if (knowledgeBaseId.startsWith('anything-llm-')) {
+                // Find the workspace data to get the slug
+                const workspace = knowledgeBases.find(kb => kb.id === knowledgeBaseId);
+                const workspaceSlug = workspace?.slug;
+
                 const response = await fetch(`${API_BASE_URL}/agent-anything/chat`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         message: messageToSend,
-                        history: [] // AnythingLLM manages its own conversation context
+                        history: [], // AnythingLLM manages its own conversation context
+                        workspace_slug: workspaceSlug // Pass the slug to backend
                     })
                 });
 
@@ -1565,7 +1572,7 @@ const App = () => {
     const [selectedModel, setSelectedModel] = useState<ModelProvider>('gemini');
     const [executionMode, setExecutionMode] = useState<ExecutionMode>('backend');
 
-    const [knowledgeBases, setKnowledgeBases] = useState<{ id: string; name: string }[]>([]);
+    const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBase[]>([]);
     const [isKbLoading, setIsKbLoading] = useState(true);
     const [kbError, setKbError] = useState<string | null>(null);
     const [selectedKnowledgeBase, setSelectedKnowledgeBase] = useState<string | null>(null);
@@ -1584,42 +1591,49 @@ const App = () => {
         const fetchKnowledgeBases = async () => {
             setIsKbLoading(true);
             setKbError(null);
+
+            let formattedKbs: KnowledgeBase[] = [];
+
+            // 1. Try to fetch AnythingLLM Workspaces
             try {
-                const response = await fetch(`${API_BASE_URL}/list-collections`);
-                if (!response.ok) {
-                    const errorText = await response.text().catch(() => response.statusText);
-                    let errorJson;
-                    try { errorJson = JSON.parse(errorText); } catch (e) {/* ignored */ }
-                    throw new Error(errorJson?.error || `获取知识库列表失败 (状态: ${response.status})`);
-                }
-                const data = await response.json();
-                const collections: string[] = data.collections || [];
-                const formattedKbs = collections.map(name => ({ id: name, name }));
-
-                // [Dual Engine] Inject AnythingLLM Agent
-                formattedKbs.unshift({ id: 'anything-llm', name: '🤖 AnythingLLM Agent' });
-
-                setKnowledgeBases(formattedKbs);
-                // If nothing is selected, or the previously selected one no longer exists, select the first one.
-                if (formattedKbs.length > 0) {
-                    if (!selectedKnowledgeBase || (!collections.includes(selectedKnowledgeBase) && selectedKnowledgeBase !== 'anything-llm')) {
-                        setSelectedKnowledgeBase(formattedKbs[0].id);
-                    }
-                } else {
-                    setSelectedKnowledgeBase(null);
+                const anythingResponse = await fetch(`${API_BASE_URL}/agent-anything/workspaces`);
+                if (anythingResponse.ok) {
+                    const data = await anythingResponse.json();
+                    const workspaces: KnowledgeBase[] = data.workspaces || [];
+                    formattedKbs = [...workspaces]; // Add AnythingLLM workspaces first
                 }
             } catch (error: any) {
-                console.error("Failed to fetch knowledge bases:", error);
-                const userFriendlyError = "无法连接到知识库服务 (Milvus)。但您仍可使用 Cherry Agent。";
-                setKbError(null); // Clear error to allow UI to render the list
-
-                // [Dual Engine] Fallback: AnythingLLM Agent
-                const fallbackKbs = [{ id: 'anything-llm', name: '🤖 AnythingLLM Agent' }];
-                setKnowledgeBases(fallbackKbs);
-                setSelectedKnowledgeBase('anything-llm');
-            } finally {
-                setIsKbLoading(false);
+                console.warn("AnythingLLM connection failed, skipping...", error);
             }
+
+            // 2. Try to fetch Milvus Collections
+            try {
+                const response = await fetch(`${API_BASE_URL}/list-collections`);
+                if (response.ok) {
+                    const data = await response.json();
+                    const collections: string[] = data.collections || [];
+                    const milvusKbs = collections.map(name => ({ id: name, name }));
+                    formattedKbs = [...formattedKbs, ...milvusKbs]; // Append Milvus collections
+                }
+            } catch (error: any) {
+                console.warn("Milvus connection failed, skipping...", error);
+            }
+
+            // Update state
+            setKnowledgeBases(formattedKbs);
+
+            // Auto-select first knowledge base if available
+            if (formattedKbs.length > 0) {
+                const existingIds = formattedKbs.map(kb => kb.id);
+                if (!selectedKnowledgeBase || !existingIds.includes(selectedKnowledgeBase)) {
+                    setSelectedKnowledgeBase(formattedKbs[0].id);
+                }
+            } else {
+                setSelectedKnowledgeBase(null);
+                setKbError("无法连接到任何知识库服务。请检查后端配置。");
+            }
+
+            setIsKbLoading(false);
         };
         fetchKnowledgeBases();
     }, []); // Run only once on component mount
@@ -1727,6 +1741,7 @@ const App = () => {
                     initialQuestion={initialKnowledgeChatQuestion}
                     provider={selectedModel}
                     executionMode={executionMode}
+                    knowledgeBases={knowledgeBases}
                 />;
 
             case 'ocr':

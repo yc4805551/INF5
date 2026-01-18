@@ -27,23 +27,30 @@ def audit_endpoint():
 def chat_endpoint():
     """
     Endpoint for Chat via AnythingLLM (Knowledge Base Chat).
-    Expects JSON: { "message": "...", "history": [...] }
+    Expects JSON: { "message": "...", "history": [...], "workspace_slug": "..." (optional) }
     """
     data = request.json
     message = data.get('message', '')
     history = data.get('history', [])
+    workspace_slug = data.get('workspace_slug')  # NEW: Accept slug from frontend
     
     try:
-        response_text = chat_with_anything(message, history)
+        response_text = chat_with_anything(message, history, workspace_slug)
         return jsonify({"response": response_text})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 @agent_anything_bp.route('/workspaces', methods=['GET'])
 def list_workspaces():
-    """List available workspaces"""
+    """List available AnythingLLM workspaces in frontend-friendly format"""
     try:
         workspaces = get_anything_workspaces()
-        return jsonify(workspaces)
+        # Format for frontend: [{ id: 'anything-llm-inf_knowledge', name: '🤖 inf_knowledge', slug: 'inf-knowledge' }]
+        formatted = [{
+            'id': f'anything-llm-{ws["name"]}',
+            'name': f'🤖 {ws["name"]}',
+            'slug': ws['slug']
+        } for ws in workspaces]
+        return jsonify({'workspaces': formatted})
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({'error': str(e)}), 500
