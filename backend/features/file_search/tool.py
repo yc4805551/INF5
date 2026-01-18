@@ -12,24 +12,26 @@ logger = logging.getLogger(__name__)
 # 工具定义（供 Agent 使用）
 FILE_SEARCH_TOOL = {
     "name": "file_search",
-    "description": """🔍 在本地文件系统中搜索文件。支持自然语言查询。
+    "description": """🔍 在本地文件系统中搜索文件。支持自然语言查询和多轮对话。
     
     使用场景：
     - 用户询问："帮我找一下关于智慧城市的文档"
-    - 用户询问："上周的预算表在哪里"
+    - 用户追问："最近一周修改的"（会自动细化之前的搜索）
     - 用户询问："有没有关于AI的PPT"
     
     工具能力：
     - 快速搜索整个文件系统（基于 Everything 引擎）
     - AI 自然语言理解和智能筛选
+    - 支持多轮对话和渐进式筛选
     - 相关度评分和推荐理由
+    - 智能推荐相关文件
     """,
     "parameters": {
         "type": "object",
         "properties": {
             "query": {
                 "type": "string",
-                "description": "搜索查询，支持自然语言描述。例如：'帮我找最近关于吴军的课程PPT'"
+                "description": "搜索查询，支持自然语言描述。例如：'帮我找最近关于吴军的课程PPT'，或追问：'最近一周的'"
             },
             "max_results": {
                 "type": "integer",
