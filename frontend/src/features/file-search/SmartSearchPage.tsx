@@ -48,6 +48,7 @@ export const SmartSearchPage: React.FC = () => {
 
     // 复制路径
     const handleCopyPath = (path: string) => {
+        if (!path) return;
         navigator.clipboard.writeText(path);
         // 可以添加提示
     };
@@ -110,52 +111,41 @@ export const SmartSearchPage: React.FC = () => {
                 </div>
             )}
 
-            {/* 结果表格 */}
+            {/* 结果列表 - 简化版 */}
             {!isLoading && results.length > 0 && (
-                <div className="results-container">
-                    <table className="results-table">
-                        <thead>
-                            <tr>
-                                <th style={{ width: '40px' }}>#</th>
-                                <th>文件名</th>
-                                <th style={{ width: '80px' }}>相关度</th>
-                                <th>推荐理由</th>
-                                <th style={{ width: '100px' }}>大小</th>
-                                <th style={{ width: '150px' }}>修改时间</th>
-                                <th style={{ width: '100px' }}>操作</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {results.map((file, index) => (
-                                <tr key={index} className={file.score && file.score >= 90 ? 'high-score' : ''}>
-                                    <td className="index-cell">{index + 1}</td>
-                                    <td className="file-name" title={file.path}>
-                                        <span className="file-icon">📄</span>
-                                        {file.name}
-                                    </td>
-                                    <td className="score-cell">
-                                        {file.score !== undefined ? (
-                                            <span className={`score score-${Math.floor(file.score / 10) * 10}`}>
-                                                {file.score}
-                                            </span>
-                                        ) : '-'}
-                                    </td>
-                                    <td className="reason-cell">{file.reason || '-'}</td>
-                                    <td className="size-cell">{formatFileSize(file.size)}</td>
-                                    <td className="date-cell">{file.date_modified || '-'}</td>
-                                    <td className="action-cell">
-                                        <button
-                                            className="copy-btn"
-                                            onClick={() => handleCopyPath(file.path)}
-                                            title="复制路径"
-                                        >
-                                            📋
-                                        </button>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                <div className="simple-results-list">
+                    {results.map((file, index) => (
+                        <div key={index} className="simple-result-card">
+                            <div className="result-main">
+                                <div className="result-header">
+                                    <span className="file-icon">📄</span>
+                                    <span className="file-name" title={file.name}>{file.name}</span>
+                                    {file.score !== undefined && file.score >= 80 && (
+                                        <span className="high-score-badge">推荐</span>
+                                    )}
+                                </div>
+                                <div className="result-path" title={file.path}>
+                                    📍 {file.path}
+                                </div>
+                                {file.reason && (
+                                    <div className="result-reason">
+                                        💡 {file.reason}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="result-actions">
+                                <button
+                                    className="simple-action-btn"
+                                    onClick={() => file.path && handleCopyPath(file.path)}
+                                    title={file.path ? "复制路径" : "路径无效"}
+                                    disabled={!file.path}
+                                >
+                                    📋
+                                </button>
+                            </div>
+                        </div>
+                    ))}
                 </div>
             )}
 

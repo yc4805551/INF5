@@ -30,6 +30,7 @@ export const FileSearchResultCard: React.FC<FileSearchResultCardProps> = ({ data
 
     // 复制路径到剪贴板
     const handleCopyPath = (path: string) => {
+        if (!path) return;
         navigator.clipboard.writeText(path).then(() => {
             // 可以添加提示
             alert('路径已复制！');
