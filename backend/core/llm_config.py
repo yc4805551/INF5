@@ -100,17 +100,17 @@ class LLMConfigManager:
         # 尝试从环境变量读取
         for prefix in env_prefixes:
             api_key = os.getenv(f"VITE_{prefix}_API_KEY") or os.getenv(f"{prefix}_API_KEY")
-            if api_key and not provider_config.get("api_key"):
+            if api_key:
                 provider_config["api_key"] = api_key
             
             endpoint = (os.getenv(f"VITE_{prefix}_ENDPOINT") or 
                        os.getenv(f"{prefix}_ENDPOINT") or
                        os.getenv(f"{prefix}_BASE_URL"))
-            if endpoint and not provider_config.get("endpoint"):
+            if endpoint:
                 provider_config["endpoint"] = endpoint
             
             model = os.getenv(f"VITE_{prefix}_MODEL") or os.getenv(f"{prefix}_MODEL_NAME")
-            if model and not provider_config.get("model"):
+            if model:
                 provider_config["model"] = model
         
         return {
