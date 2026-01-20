@@ -46,7 +46,11 @@ const handleCopyPath = async (path: string) => {
 /**
  * AI 智能文件搜索页面 - 简洁版
  */
-export const SmartSearchPage: React.FC = () => {
+interface SmartSearchPageProps {
+    modelProvider?: string;
+}
+
+export const SmartSearchPage: React.FC<SmartSearchPageProps> = ({ modelProvider }) => {
     const [query, setQuery] = useState('');
     const [results, setResults] = useState<SmartSearchResult[]>([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -72,6 +76,7 @@ export const SmartSearchPage: React.FC = () => {
         try {
             const response = await smartSearch(query, {
                 maxResults: 20,
+                modelProvider: modelProvider
             });
 
             if (response.success) {

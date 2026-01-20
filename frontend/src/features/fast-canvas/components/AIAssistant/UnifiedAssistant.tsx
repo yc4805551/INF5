@@ -83,8 +83,8 @@ export const UnifiedAssistant: React.FC<UnifiedAssistantProps> = ({
                     <ChatMode
                         history={chatHistory}
                         onSendMessage={onSendMessage || (async () => { })}
-                        isLoading={isAnalyzing} // Reuse isAnalyzing for chat loading? Or separate?
-                    // Note: usually chat loading is separate. We might need to map isAnalyzing to chat loading state if shared.
+                        isLoading={isAnalyzing}
+                        selectedText={selectedText}
                     />
                 )}
 

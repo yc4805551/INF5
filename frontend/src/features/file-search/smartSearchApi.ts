@@ -38,7 +38,7 @@ export async function smartSearch(
         body: JSON.stringify({
             query,
             maxResults: options?.maxResults || 10,
-            modelProvider: options?.modelProvider || 'gemini',
+            modelProvider: options?.modelProvider || 'openai',
         }),
     });
 

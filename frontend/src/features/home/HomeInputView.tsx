@@ -170,28 +170,11 @@ export const HomeInputView: React.FC<HomeInputViewProps> = ({
                 </div>
                 <div className="home-panel">
                     <h2>全局配置</h2>
-                    <div className="config-group">
+                    {/* Execution Mode Toggle Removed - Defaulting to Backend for simplicity */}
+                    {/* <div className="config-group">
                         <h4>执行模式</h4>
-                        <div className="model-selector-group">
-                            <button
-                                className={`model-btn ${executionMode === 'backend' ? 'active' : ''}`}
-                                onClick={() => setExecutionMode('backend')}
-                                disabled={isProcessing}
-                            >
-                                后端代理
-                            </button>
-                            <button
-                                className={`model-btn ${executionMode === 'frontend' ? 'active' : ''}`}
-                                onClick={() => setExecutionMode('frontend')}
-                                disabled={isProcessing}
-                            >
-                                前端直连
-                            </button>
-                        </div>
-                        {executionMode === 'frontend' && (
-                            <p className="instruction-text">前端直连模式将直接在浏览器中调用 AI 服务。请确保已在环境中配置了相应模型的 API Keys。</p>
-                        )}
-                    </div>
+                        ...
+                    </div> */}
                     <div className="config-group">
                         <h4>选择模型</h4>
                         <select

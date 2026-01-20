@@ -8,15 +8,8 @@ if exist .venv\Scripts\activate.bat (
     echo No virtual environment found, using system python...
 )
 
-echo Running Health Check...
-python backend/check_health.py
-if %errorlevel% neq 0 (
-    echo [WARNING] Health Check Failed! 
-    echo Proceeding as requested by user configuration...
-    echo Please check deployment_debug.log for details.
-    pause
-)
-start "Backend Server" cmd /k "cd backend && python app.py"
+echo Starting Backend...
+start "Backend Server" cmd /k "cd backend && "%~dp0.venv\Scripts\python.exe" app.py"
 
 echo Starting Frontend...
 start "Frontend Client" cmd /k "cd frontend && npm run dev"

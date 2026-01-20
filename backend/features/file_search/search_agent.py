@@ -14,40 +14,46 @@ class FileSearchAgent:
     """AI 文件搜索助手"""
     
     INTENT_UNDERSTANDING_PROMPT = """你是一个文件搜索助手。用户会用自然语言描述他们想找的文件。
+你的任务：理解用户意图，提取**最细粒度**的组合关键词，以最大化搜索召回率（Everything 搜索引擎使用 "词A 词B" 的 AND 逻辑）。
 
-你的任务：理解用户意图，提取关键搜索信息。
+### 关键规则：
+1.  **拆分复合词**：严禁将长名词作为一个关键词。必须拆分为独立的词根。
+    *   ❌ 错误：["碳效体系研究"] -> 只能搜到文件名包含连续"碳效体系研究"的文件。
+    *   ✅ 正确：["碳效", "体系", "研究"] -> 可以搜到 "碳效评价指标体系研究..."。
+2.  **去除停用词**：不要包含无意义的词，如 "帮我找", "有关", "相关", "的", "材料", "资料", "文档", "文件"。
+3.  **提取核心实体**：只保留最核心的、独一无二的特征词。
 
 请分析用户查询并返回 JSON 格式结果：
 {
-  "keywords": ["关键词1", "关键词2"],  // 提取的搜索关键词
+  "keywords": ["关键词1", "关键词2"],  // 细粒度的关键词列表
   "file_types": [".docx", ".pptx"],    // 推断的文件类型（可选）
   "time_range": "lastweek",             // 时间范围（today/yesterday/lastweek/lastmonth，可选）
   "intent": "用户意图的简短描述"
 }
 
-示例：
-用户: "帮我找最近关于机器学习的PPT"
+### 示例：
+用户: "帮我找碳效体系研究的有关材料"
 返回: {
-  "keywords": ["机器学习"],
-  "file_types": [".pptx", ".ppt"],
-  "time_range": "lastweek",
-  "intent": "查找机器学习相关的演示文稿"
-}
-
-用户: "上周讨论的项目文档在哪"
-返回: {
-  "keywords": ["项目", "文档"],
-  "file_types": [".docx", ".pdf", ".md"],
-  "time_range": "lastweek",
-  "intent": "查找上周的项目文档"
-}
-
-用户: "吴军的课程材料"
-返回: {
-  "keywords": ["吴军", "课程"],
+  "keywords": ["碳效", "体系", "研究"],
   "file_types": [],
   "time_range": "",
-  "intent": "查找吴军相关的课程材料"
+  "intent": "搜索碳效体系研究资料"
+}
+
+用户: "最近关于人工智能大模型的PPT"
+返回: {
+  "keywords": ["人工智能", "大模型"],
+  "file_types": [".pptx", ".ppt"],
+  "time_range": "lastweek",
+  "intent": "查找近期AI大模型演示文稿"
+}
+
+用户: "北碚区的项目合同"
+返回: {
+  "keywords": ["北碚", "项目", "合同"],
+  "file_types": [".docx", ".pdf"],
+  "time_range": "",
+  "intent": "查找北碚区项目合同"
 }
 
 请仅返回 JSON，不要包含其他解释。
@@ -80,7 +86,7 @@ class FileSearchAgent:
 请仅返回 JSON 数组，不要包含其他解释。
 """
     
-    def __init__(self, model_provider: str = "gemini"):
+    def __init__(self, model_provider: str = "openai"):
         """
         初始化 AI 搜索助手
         

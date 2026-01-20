@@ -17,11 +17,13 @@ import './FastCanvasView.css';
 interface FastCanvasViewProps {
     onBack?: () => void;
     documentId?: string;
+    modelProvider?: string;
 }
 
 export const FastCanvasView: React.FC<FastCanvasViewProps> = ({
     onBack,
-    documentId
+    documentId,
+    modelProvider
 }) => {
     const [selectedText, setSelectedText] = useState<string>('');
     const [editorHtml, setEditorHtml] = useState<string>('');
@@ -42,7 +44,7 @@ export const FastCanvasView: React.FC<FastCanvasViewProps> = ({
         removeSuggestion,
         chatHistory,
         sendChatMessage
-    } = useUnifiedAssistant();
+    } = useUnifiedAssistant(modelProvider);
 
     const {
         document,
@@ -122,10 +124,13 @@ export const FastCanvasView: React.FC<FastCanvasViewProps> = ({
 
     // Auto-trigger AI analysis
     useEffect(() => {
-        if (assistantMode !== 'realtime' || !editorText || editorText.length < 10) {
+        // Only clear if switching OUT of realtime mode
+        if (assistantMode !== 'realtime') {
             clearSuggestions();
             return;
         }
+
+        if (!editorText || editorText.length < 10) return;
 
         const timer = setTimeout(() => {
             analyzeRealtime(editorText, editorText);
@@ -235,7 +240,7 @@ export const FastCanvasView: React.FC<FastCanvasViewProps> = ({
                         onRunAudit={(agents) => runAudit(editorText, undefined, undefined, agents)}
                         selectedText={selectedText}
                         chatHistory={chatHistory}
-                        onSendMessage={sendChatMessage}
+                        onSendMessage={(text) => sendChatMessage(text, editorText)}
                     />
                 </div>
             </div>

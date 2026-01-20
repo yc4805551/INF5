@@ -1767,9 +1767,9 @@ const App = () => {
             case 'word-canvas':
                 return <WordCanvas onBack={handleBackToHome} initialContent={inputText} />;
             case 'fast-canvas':
-                return <FastCanvasView onBack={handleBackToHome} />;
+                return <FastCanvasView onBack={handleBackToHome} modelProvider={selectedModel} />;
             case 'file-search':
-                return <SmartSearchPage />;
+                return <SmartSearchPage modelProvider={selectedModel} />;
             case 'home':
             default:
                 return (

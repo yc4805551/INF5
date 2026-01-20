@@ -8,6 +8,16 @@ from dotenv import load_dotenv
 from pymilvus import connections, utility
 from watchdog.observers import Observer
 
+# Load Env (MUST be before blueprint imports)
+dotenv_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'config', '.env')
+load_dotenv(dotenv_path)
+
+# Also load .env.local if it exists (for overrides)
+dotenv_local_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'config', '.env.local')
+if os.path.exists(dotenv_local_path):
+    load_dotenv(dotenv_local_path, override=True)
+    logging.info(f"Loaded config from {dotenv_local_path}")
+
 # Import Blueprints
 from features.common.routes import common_bp
 from features.knowledge.routes import knowledge_bp
@@ -29,16 +39,6 @@ from features.knowledge.services import (
     ingest_all_data,
     MILVUS_HOST, MILVUS_PORT
 )
-
-# Load Env
-dotenv_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'config', '.env')
-load_dotenv(dotenv_path)
-
-# Also load .env.local if it exists (for overrides)
-dotenv_local_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'config', '.env.local')
-if os.path.exists(dotenv_local_path):
-    load_dotenv(dotenv_local_path, override=True)
-    logging.info(f"Loaded config from {dotenv_local_path}")
 
 # 重新初始化知识库路径（在load_dotenv之后）
 from features.knowledge import services as knowledge_services

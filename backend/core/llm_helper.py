@@ -36,20 +36,20 @@ def call_llm(
         model = None
         
         if provider == "gemini":
-            api_key = os.getenv("GEMINI_API_KEY")
-            endpoint = os.getenv("GEMINI_ENDPOINT", "https://generativelanguage.googleapis.com/v1beta/models")
-            model = os.getenv("GEMINI_MODEL", "gemini-2.0-flash-exp")
+            api_key = os.getenv("GEMINI_API_KEY") or os.getenv("VITE_GEMINI_API_KEY")
+            endpoint = os.getenv("GEMINI_ENDPOINT") or os.getenv("VITE_GEMINI_ENDPOINT") or "https://generativelanguage.googleapis.com/v1beta/models"
+            model = os.getenv("GEMINI_MODEL") or os.getenv("VITE_GEMINI_MODEL") or "gemini-2.0-flash-exp"
         elif provider == "openai":
-            api_key = os.getenv("OPENAI_API_KEY")
-            endpoint = os.getenv("OPENAI_ENDPOINT", "https://api.openai.com/v1")
-            model = os.getenv("OPENAI_MODEL", "gpt-4")
+            api_key = os.getenv("OPENAI_API_KEY") or os.getenv("VITE_OPENAI_API_KEY")
+            endpoint = os.getenv("OPENAI_ENDPOINT") or os.getenv("VITE_OPENAI_ENDPOINT") or "https://api.openai.com/v1"
+            model = os.getenv("OPENAI_MODEL") or os.getenv("VITE_OPENAI_MODEL") or "gpt-4"
         elif provider == "deepseek":
-            api_key = os.getenv("DEEPSEEK_API_KEY")
-            endpoint = os.getenv("DEEPSEEK_ENDPOINT", "https://api.deepseek.com/v1")
-            model = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
+            api_key = os.getenv("DEEPSEEK_API_KEY") or os.getenv("VITE_DEEPSEEK_API_KEY")
+            endpoint = os.getenv("DEEPSEEK_ENDPOINT") or os.getenv("VITE_DEEPSEEK_ENDPOINT") or "https://api.deepseek.com/v1"
+            model = os.getenv("DEEPSEEK_MODEL") or os.getenv("VITE_DEEPSEEK_MODEL") or "deepseek-chat"
         
         if not api_key:
-            raise ValueError(f"API key for {provider} not found in environment variables")
+            raise ValueError(f"API key for {provider} not found in environment variables (checked standard and VITE_ prefix)")
         
         # 构造完整的 prompt
         full_prompt = f"{system_prompt}\n\n{user_prompt}"

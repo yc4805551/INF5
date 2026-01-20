@@ -8,12 +8,14 @@ interface ChatModeProps {
     history: ChatMessage[];
     onSendMessage: (text: string) => Promise<void>;
     isLoading: boolean;
+    selectedText?: string;
 }
 
 export const ChatMode: React.FC<ChatModeProps> = ({
     history,
     onSendMessage,
-    isLoading
+    isLoading,
+    selectedText
 }) => {
     const [input, setInput] = useState('');
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -48,13 +50,13 @@ export const ChatMode: React.FC<ChatModeProps> = ({
                         <div className="chat-welcome-examples">
                             <button
                                 className="example-question"
-                                onClick={() => onSendMessage('帮我优化这段文字的表达')}
+                                onClick={() => onSendMessage(selectedText ? `帮我优化这段文字的表达：\n"${selectedText}"` : '帮我优化这段文字的表达')}
                             >
                                 ✨ 帮我优化这段文字的表达
                             </button>
                             <button
                                 className="example-question"
-                                onClick={() => onSendMessage('这个段落的语气是否合适？')}
+                                onClick={() => onSendMessage(selectedText ? `这个段落的语气是否合适？\n"${selectedText}"` : '这个段落的语气是否合适？')}
                             >
                                 💡 这个段落的语气是否合适？
                             </button>

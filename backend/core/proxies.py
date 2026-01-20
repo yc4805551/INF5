@@ -5,21 +5,22 @@ import json
 from flask import jsonify, Response, stream_with_context
 
 # Configs
+# Configs
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("VITE_GEMINI_API_KEY")
 GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai"
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash-exp")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL") or os.getenv("VITE_GEMINI_MODEL") or "gemini-2.0-flash-exp"
 
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "dummy-key-for-proxy")
-OPENAI_TARGET_URL = os.getenv("OPENAI_TARGET_URL", "https://api.chatanywhere.tech")
-OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-3.5-turbo")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY") or os.getenv("VITE_OPENAI_API_KEY")
+OPENAI_TARGET_URL = os.getenv("OPENAI_TARGET_URL") or os.getenv("VITE_OPENAI_TARGET_URL") or "https://api.chatanywhere.tech"
+OPENAI_MODEL = os.getenv("OPENAI_MODEL") or os.getenv("VITE_OPENAI_MODEL") or "gpt-3.5-turbo"
 
-DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "dummy-key-for-proxy")
-DEEPSEEK_ENDPOINT = os.getenv("DEEPSEEK_ENDPOINT", "https://api.deepseek.com/v1/chat/completions")
-DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
+DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY") or os.getenv("VITE_DEEPSEEK_API_KEY")
+DEEPSEEK_ENDPOINT = os.getenv("DEEPSEEK_ENDPOINT") or os.getenv("VITE_DEEPSEEK_ENDPOINT") or "https://api.deepseek.com/v1/chat/completions"
+DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL") or os.getenv("VITE_DEEPSEEK_MODEL") or "deepseek-chat"
 
-ALI_API_KEY = os.getenv("ALI_API_KEY")
-ALI_TARGET_URL = os.getenv("ALI_TARGET_URL", "https://dashscope.aliyuncs.com/compatible-mode")
-ALI_MODEL = os.getenv("ALI_MODEL", "qwen-plus")
+ALI_API_KEY = os.getenv("ALI_API_KEY") or os.getenv("VITE_ALI_API_KEY")
+ALI_TARGET_URL = os.getenv("ALI_TARGET_URL") or os.getenv("VITE_ALI_TARGET_URL") or "https://dashscope.aliyuncs.com/compatible-mode"
+ALI_MODEL = os.getenv("ALI_MODEL") or os.getenv("VITE_ALI_MODEL") or "qwen-plus"
 
 # --- 1. Gemini (OpenAI Compatible) ---
 def call_gemini_openai_proxy(data):
@@ -92,7 +93,9 @@ def call_openai_proxy(data):
     if data.get('systemInstruction'): messages.append({"role": "system", "content": data.get('systemInstruction')})
     for item in data.get('history', []):
         if item.get('role') and item.get('parts'):
-            messages.append({"role": item.get('role'), "content": item.get('parts')[0].get('text')})
+            role = item.get('role')
+            if role == 'model': role = 'assistant'
+            messages.append({"role": role, "content": item.get('parts')[0].get('text')})
     messages.append({"role": "user", "content": data.get('userPrompt')})
     payload = {"model": OPENAI_MODEL, "messages": messages, "temperature": 0.7}
     response = requests.post(url, headers=headers, json=payload, timeout=180)
@@ -113,7 +116,9 @@ def stream_openai_proxy(user_prompt, system_instruction, history):
     if system_instruction: messages.append({"role": "system", "content": system_instruction})
     for item in history:
         if item.get('role') and item.get('parts'):
-            messages.append({"role": item.get('role'), "content": item.get('parts')[0].get('text')})
+            role = item.get('role')
+            if role == 'model': role = 'assistant'
+            messages.append({"role": role, "content": item.get('parts')[0].get('text')})
     messages.append({"role": "user", "content": user_prompt})
     payload = {"model": OPENAI_MODEL, "messages": messages, "temperature": 0.7, "stream": True}
     try:
@@ -135,12 +140,17 @@ def stream_openai_proxy(user_prompt, system_instruction, history):
 # --- 3. DeepSeek ---
 def call_deepseek_proxy(data):
     url = DEEPSEEK_ENDPOINT
+    if not url.endswith('/chat/completions'):
+        url = url.rstrip('/') + '/chat/completions'
+        
     headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {DEEPSEEK_API_KEY}'}
     messages = []
     if data.get('systemInstruction'): messages.append({"role": "system", "content": data.get('systemInstruction')})
     for item in data.get('history', []):
         if item.get('role') and item.get('parts'):
-            messages.append({"role": item.get('role'), "content": item.get('parts')[0].get('text')})
+            role = item.get('role')
+            if role == 'model': role = 'assistant'
+            messages.append({"role": role, "content": item.get('parts')[0].get('text')})
     messages.append({"role": "user", "content": data.get('userPrompt')})
     payload = {"model": DEEPSEEK_MODEL, "messages": messages, "temperature": 0.7}
     response = requests.post(url, headers=headers, json=payload, timeout=180)
@@ -149,12 +159,17 @@ def call_deepseek_proxy(data):
 
 def stream_deepseek_proxy(user_prompt, system_instruction, history):
     url = DEEPSEEK_ENDPOINT
+    if not url.endswith('/chat/completions'):
+        url = url.rstrip('/') + '/chat/completions'
+
     headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {DEEPSEEK_API_KEY}'}
     messages = []
     if system_instruction: messages.append({"role": "system", "content": system_instruction})
     for item in history:
         if item.get('role') and item.get('parts'):
-            messages.append({"role": item.get('role'), "content": item.get('parts')[0].get('text')})
+            role = item.get('role')
+            if role == 'model': role = 'assistant'
+            messages.append({"role": role, "content": item.get('parts')[0].get('text')})
     messages.append({"role": "user", "content": user_prompt})
     payload = {"model": DEEPSEEK_MODEL, "messages": messages, "temperature": 0.7, "stream": True}
     try:
@@ -181,7 +196,9 @@ def call_ali_proxy(data):
     if data.get('systemInstruction'): messages.append({"role": "system", "content": data.get('systemInstruction')})
     for item in data.get('history', []):
         if item.get('role') and item.get('parts'):
-            messages.append({"role": item.get('role'), "content": item.get('parts')[0].get('text')})
+            role = item.get('role')
+            if role == 'model': role = 'assistant'
+            messages.append({"role": role, "content": item.get('parts')[0].get('text')})
     messages.append({"role": "user", "content": data.get('userPrompt')})
     payload = {"model": ALI_MODEL, "messages": messages, "temperature": 0.7}
     response = requests.post(url, headers=headers, json=payload, timeout=180)
@@ -196,7 +213,9 @@ def stream_ali_proxy(user_prompt, system_instruction, history):
     if system_instruction: messages.append({"role": "system", "content": system_instruction})
     for item in history:
         if item.get('role') and item.get('parts'):
-            messages.append({"role": item.get('role'), "content": item.get('parts')[0].get('text')})
+            role = item.get('role')
+            if role == 'model': role = 'assistant'
+            messages.append({"role": role, "content": item.get('parts')[0].get('text')})
     messages.append({"role": "user", "content": user_prompt})
     payload = {"model": ALI_MODEL, "messages": messages, "temperature": 0.7, "stream": True}
     try:

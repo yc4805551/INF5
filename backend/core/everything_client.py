@@ -48,7 +48,8 @@ class EverythingClient:
             # path=1: 返回完整路径
             # size=1: 返回文件大小
             # dm=1: 返回修改日期
-            search_url = f"{self.base_url}/?search={quote(query)}&json=1&count={max_results}&path=1&size=1&dm=1"
+            # path_column=1: Everything 1.5 需要此参数才能返回路径
+            search_url = f"{self.base_url}/?search={quote(query)}&json=1&count={max_results}&path=1&path_column=1&size=1&size_column=1&dm=1&date_modified_column=1"
             
             logger.info(f"Searching Everything: {query}")
             

@@ -11,7 +11,7 @@ const hashRequest = (content: string, agents: string[]): string => {
 /**
  * 统一智能助手Hook - 整合实时建议和审核功能
  */
-export const useUnifiedAssistant = () => {
+export const useUnifiedAssistant = (modelProvider: string = 'openai') => {
     const [mode, setMode] = useState<AssistantMode>('realtime');
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [suggestions, setSuggestions] = useState<AISuggestion[]>([]);
@@ -68,7 +68,7 @@ export const useUnifiedAssistant = () => {
                     content: selectedText, // 实时分析针对当前选段或全段
                     source: contextText,   // 上下文作为参考
                     agents: ['proofread'], // 指定只运行纠错代理
-                    model_config: modelConfig || {}
+                    model_config: { provider: modelProvider, ...modelConfig } // Pass model provider
                 })
             });
 
@@ -101,7 +101,7 @@ export const useUnifiedAssistant = () => {
         } finally {
             setIsAnalyzing(false);
         }
-    }, []);
+    }, [modelProvider]);
 
     /**
      * 审核分析 - 完整检查（使用全部6个代理）
@@ -132,7 +132,7 @@ export const useUnifiedAssistant = () => {
                         '风格统一性',
                         '禁用词检查'
                     ],
-                    model_config: modelConfig || {},
+                    model_config: { provider: modelProvider, ...modelConfig }, // Pass model provider
                     agents: agents || [],
                     stream: true // Enable NDJSON Streaming
                 })
@@ -226,7 +226,7 @@ export const useUnifiedAssistant = () => {
         } finally {
             setIsAnalyzing(false);
         }
-    }, []);
+    }, [modelProvider]);
 
     /**
      * 清除建议
@@ -257,11 +257,18 @@ export const useUnifiedAssistant = () => {
     //    setChatHistory([{ role: 'model', parts: [{ text: '您好！我是您的智能写作顾问。' }] }]);
     // }, []);
 
-    const sendChatMessage = useCallback(async (text: string) => {
+    const sendChatMessage = useCallback(async (text: string, context?: string) => {
         // Add user message
         const userMsg = { role: 'user', parts: [{ text }] };
         setChatHistory(prev => [...prev, userMsg]);
         setIsAnalyzing(true);
+
+        // Prepare context prompt if provided
+        let finalPrompt = text;
+        if (context) {
+            finalPrompt = `Current Document Content:\n"""\n${context}\n"""\n\nUser Question: ${text}`;
+        }
+
 
         try {
             // Import dynamically or use fetch directly? 
@@ -287,8 +294,8 @@ export const useUnifiedAssistant = () => {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    provider: 'deepseek', // Default or from config
-                    userPrompt: text,
+                    provider: modelProvider, // Use dynamic model provider
+                    userPrompt: finalPrompt,
                     systemInstruction: "You are a helpful writing assistant. Answer concisely.",
                     history: chatHistory,
                     executionMode: 'backend' // Prefer backend for proxy
@@ -297,7 +304,7 @@ export const useUnifiedAssistant = () => {
 
             if (!response.ok) throw new Error('Chat failed');
 
-            const data = await response.text(); // Assume text response for now, not stream
+            const data = await response.json(); // Parse JSON to get actual string (decodes Unicode)
             // If backend returns raw text
 
             const modelMsg = { role: 'model', parts: [{ text: data }] };
