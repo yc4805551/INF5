@@ -1,5 +1,5 @@
 .suggestion-card {
-    background: #ffffff;
+    background: var(--color-bg-white);
     border-radius: 8px;
     border-left: 3px solid;
     padding: 12px;
@@ -50,22 +50,22 @@
 .suggestion-original .label,
 .suggestion-new .label {
     font-weight: 600;
-    color: #6b7280;
+    color: var(--color-text-secondary);
     flex-shrink: 0;
 }
 
 .suggestion-original .text {
-    color: #9ca3af;
+    color: var(--color-text-secondary);
     text-decoration: line-through;
 }
 
 .suggestion-new .text {
-    color: #1f2937;
+    color: var(--color-text);
     font-weight: 500;
 }
 
 .suggestion-arrow {
-    color: #d1d5db;
+    color: var(--color-border);
     font-size: 12px;
     margin: 2px 0;
     padding-left: 40px;
@@ -73,10 +73,10 @@
 
 .suggestion-reason {
     font-size: 11px;
-    color: #6b7280;
+    color: var(--color-text-secondary);
     font-style: italic;
     padding: 8px;
-    background: #f9fafb;
+    background: var(--color-bg-card);
     border-radius: 4px;
     margin-bottom: 10px;
 }
@@ -111,12 +111,12 @@
 }
 
 .suggestion-btn.dismiss {
-    background: #f3f4f6;
-    color: #6b7280;
+    background: var(--color-bg-card);
+    color: var(--color-text-secondary);
 }
 
 .suggestion-btn.dismiss:hover {
-    background: #e5e7eb;
+    background: var(--color-bg-tab-hover);
 }
 
 .suggestion-btn:active {

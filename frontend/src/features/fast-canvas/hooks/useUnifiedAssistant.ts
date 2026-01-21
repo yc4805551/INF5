@@ -247,6 +247,13 @@ export const useUnifiedAssistant = (modelProvider: string = 'openai') => {
      */
     const removeSuggestion = useCallback((suggestionId: string) => {
         setSuggestions(prev => prev.filter(s => s.id !== suggestionId));
+        setAuditResult(prev => {
+            if (!prev) return null;
+            return {
+                ...prev,
+                issues: prev.issues.filter(issue => issue.id !== suggestionId)
+            };
+        });
     }, []);
 
     // --- Chat Logic ---
