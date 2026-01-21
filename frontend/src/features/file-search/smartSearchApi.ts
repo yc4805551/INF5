@@ -86,3 +86,10 @@ export async function openFileLocation(path: string): Promise<boolean> {
         return false;
     }
 }
+
+/**
+ * 获取文件下载链接
+ */
+export function getDownloadUrl(path: string): string {
+    return `${API_BASE_URL}/api/file-search/download?path=${encodeURIComponent(path)}`;
+}

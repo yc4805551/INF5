@@ -3,7 +3,8 @@
 提供 RESTful API 端点
 """
 import logging
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, send_file
+import os
 from features.file_search.services import FileSearchService
 from features.file_search.search_agent import FileSearchAgent
 
@@ -277,6 +278,30 @@ def open_file_location():
             
     except Exception as e:
         logger.error(f"Open location error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@file_search_bp.route('/download', methods=['GET'])
+def download_file():
+    """
+    下载文件
+    
+    查询参数：
+    - path: 文件完整路径
+    """
+    try:
+        path = request.args.get('path', '').strip()
+        
+        if not path:
+            return jsonify({'success': False, 'error': 'Path is required'}), 400
+            
+        if not os.path.exists(path):
+            return jsonify({'success': False, 'error': 'File not found'}), 404
+            
+        return send_file(path, as_attachment=True)
+            
+    except Exception as e:
+        logger.error(f"Download error: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 

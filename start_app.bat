@@ -1,21 +1,37 @@
 @echo off
 cd /d %~dp0
-echo Starting Backend...
-if exist .venv\Scripts\activate.bat (
-    echo Activating virtual environment...
-    call .venv\Scripts\activate.bat
+
+echo ==========================================
+echo       INFV5 Application Launcher
+echo ==========================================
+
+REM 1. Environment Setup (Auto-Detection & Creation)
+if not exist "backend\venv" (
+    echo [INFO] Virtual environment not found in backend\venv.
+    echo [INFO] Creating virtual environment...
+    cd backend
+    python -m venv venv
+    
+    echo [INFO] Installing dependencies...
+    venv\Scripts\python.exe -m pip install -r requirements.txt
+    
+    cd ..
+    echo [SUCCESS] Environment setup complete.
 ) else (
-    echo No virtual environment found, using system python...
+    echo [INFO] Virtual environment found in backend\venv.
 )
 
+REM 2. Start Services
 echo Starting Backend...
-start "Backend Server" cmd /k "cd backend && "%~dp0.venv\Scripts\python.exe" app.py"
+start "Backend Server" cmd /k "cd backend && venv\Scripts\python.exe app.py"
 
 echo Starting Frontend...
 start "Frontend Client" cmd /k "cd frontend && npm run dev"
 
+echo ==========================================
 echo Application started!
 echo Backend running on port 5179
 echo Frontend running on port 5178
 echo External Access: http://www.yc01.top:5178
+echo ==========================================
 pause

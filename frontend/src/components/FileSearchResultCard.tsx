@@ -1,6 +1,6 @@
 import React from 'react';
 import './FileSearchResultCard.css';
-import { openFileLocation, copyTextToClipboard } from '../features/file-search/smartSearchApi';
+import { openFileLocation, copyTextToClipboard, getDownloadUrl } from '../features/file-search/smartSearchApi';
 
 // ...
 
@@ -184,11 +184,29 @@ export const FileSearchResultCard: React.FC<FileSearchResultCardProps> = ({ data
                             >
                                 📋 复制路径
                             </button>
+                            <button
+                                className="action-btn"
+                                onClick={() => {
+                                    const path = getFullPath(file);
+                                    if (path) {
+                                        const url = getDownloadUrl(path);
+                                        const link = document.createElement('a');
+                                        link.href = url;
+                                        link.download = '';
+                                        document.body.appendChild(link);
+                                        link.click();
+                                        document.body.removeChild(link);
+                                    }
+                                }}
+                                title="下载文件"
+                            >
+                                📥 下载
+                            </button>
                         </div>
                     </div>
                 ))}
             </div>
-        </div>
+        </div >
     );
 };
 
