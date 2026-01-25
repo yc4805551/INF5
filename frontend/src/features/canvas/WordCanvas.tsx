@@ -18,7 +18,7 @@ export const WordCanvas: React.FC<{ onBack: () => void, initialContent?: string 
     const [popupStyle, setPopupStyle] = useState<{ left: number, top: number } | null>(null);
     const [showToc, setShowToc] = useState(false); // Default hidden as per user feedback
     const [activeTab, setActiveTab] = useState<'chat' | 'audit' | 'filler'>('chat');
-    const [auditModel, setAuditModel] = useState<string>('gemini');
+    const [auditModel, setAuditModel] = useState<string>('free');
 
     // Advisor Hook
     const { suggestions, isAdvising, getSuggestions, clearSuggestions } = useAdvisor();
@@ -28,7 +28,7 @@ export const WordCanvas: React.FC<{ onBack: () => void, initialContent?: string 
         if (state.selectionContext && state.selectionContext.text.length > 5 && activeTab === 'chat') {
             const timer = setTimeout(() => {
                 // Determine model config (default to gemini or use state if moved)
-                const config = { provider: 'gemini', apiKey: '', endpoint: '', model: '' };
+                const config = { provider: 'free', apiKey: '', endpoint: '', model: '' };
                 getSuggestions(state.selectionContext!.text, state.htmlPreview, config);
             }, 800); // 800ms debounce
             return () => clearTimeout(timer);
@@ -40,7 +40,7 @@ export const WordCanvas: React.FC<{ onBack: () => void, initialContent?: string 
     const handleApplyAdvisorSuggestion = (text: string) => {
         // Use Chat flow to apply change: "Replace selection with [text]"
         // This ensures it goes through the Diff/Confirm flow
-        handleSendMessage(`请将选中的内容修改为：\n${text}`, { provider: 'gemini' });
+        handleSendMessage(`请将选中的内容修改为：\n${text}`, { provider: 'free' });
     };
 
     // Audit Hook

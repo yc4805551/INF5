@@ -16,6 +16,11 @@ export const frontendApiConfig: Record<string, {
     endpoint?: string;
     model?: string;
 }> = {
+    free: {
+        apiKey: cleanEnv(import.meta.env?.VITE_FREE_API_KEY),
+        endpoint: cleanEnv(import.meta.env?.VITE_FREE_ENDPOINT) || (cleanEnv(import.meta.env?.VITE_FREE_TARGET_URL) ? `${cleanEnv(import.meta.env.VITE_FREE_TARGET_URL)}/v1/chat/completions` : undefined),
+        model: cleanEnv(import.meta.env?.VITE_FREE_MODEL),
+    },
     anything: {
         // Anything Agent is backend-only via /api/agent-anything usually, 
         // but if we support frontend direct, we'd need config.
@@ -23,7 +28,7 @@ export const frontendApiConfig: Record<string, {
     },
     gemini: {
         apiKey: cleanEnv(import.meta.env?.VITE_GEMINI_API_KEY),
-        model: 'gemini-2.5-flash',
+        model: 'gemini-1.5-flash',
     },
     openai: {
         apiKey: cleanEnv(import.meta.env?.VITE_OPENAI_API_KEY),
@@ -53,6 +58,7 @@ export const frontendApiConfig: Record<string, {
 };
 
 export const MODEL_DISPLAY_NAMES: Record<string, string> = {
+    free: 'FREE (GLM)',
     gemini: 'Gemini',
     openai: 'OpenAI',
     deepseek: 'DeepSeek',
@@ -244,7 +250,7 @@ export const callGenerativeAi = async (
 
 
             const response = await ai.models.generateContent({
-                model: (images && images.length > 0) ? 'gemini-2.5-flash' : config.model, // Use vision model if image is present
+                model: (images && images.length > 0) ? 'gemini-1.5-flash' : config.model, // Use vision model if image is present
                 contents: fullContents as any, // Cast to any to align with SDK expectations
                 config: {
                     systemInstruction: systemInstruction,
@@ -272,13 +278,21 @@ export const callGenerativeAi = async (
         }
 
     } else { // Backend mode
+        // Get the model configuration for the current provider
+        const config = frontendApiConfig[provider];
+        const modelConfig = {
+            apiKey: config?.apiKey,
+            endpoint: config?.endpoint,
+            model: config?.model,
+        };
+
         const retries = 2; // 1 initial attempt + 2 retries
         for (let i = 0; i <= retries; i++) {
             try {
                 const response = await fetch(`${API_BASE_URL}/generate`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ provider, systemInstruction, userPrompt, jsonResponse, mode, history, images })
+                    body: JSON.stringify({ provider, systemInstruction, userPrompt, jsonResponse, mode, history, images, modelConfig })
                 });
 
                 if (!response.ok) {
@@ -367,10 +381,18 @@ export const callGenerativeAiStream = async (
             }
 
         } else { // Backend mode
+            // Get the model configuration for the current provider
+            const config = frontendApiConfig[provider];
+            const modelConfig = {
+                apiKey: config?.apiKey,
+                endpoint: config?.endpoint,
+                model: config?.model,
+            };
+
             const response = await fetch(`${API_BASE_URL}/generate-stream`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ provider, systemInstruction, userPrompt, history, thinkingBudget })
+                body: JSON.stringify({ provider, systemInstruction, userPrompt, history, thinkingBudget, modelConfig })
             });
 
             if (!response.ok || !response.body) {

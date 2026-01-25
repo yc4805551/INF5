@@ -54,6 +54,7 @@ export const FastCanvasView: React.FC<FastCanvasViewProps> = ({
         loadDocument,
         updateBlock,
         saveDocument,
+        exportSmartDocx
     } = useFastCanvas();
 
     const [assistantWidth, setAssistantWidth] = useState(380);
@@ -132,16 +133,24 @@ export const FastCanvasView: React.FC<FastCanvasViewProps> = ({
 
         if (!editorText || editorText.length < 10) return;
 
+        // If there are pending suggestions, do NOT re-analyze.
+        // Wait for the user to handle them (Apply/Dismiss) until the list is empty.
+        if (suggestions.length > 0) return;
+
         const timer = setTimeout(() => {
             analyzeRealtime(editorText, editorText);
         }, 3000);
 
         return () => clearTimeout(timer);
-    }, [editorText, assistantMode, analyzeRealtime, clearSuggestions]);
+    }, [editorText, assistantMode, analyzeRealtime, clearSuggestions, suggestions.length]);
 
     // Handlers
     const handleSave = () => saveDocument();
-    const handleExportDocx = () => alert('DOCX导出功能开发中...');
+
+    // Call Smart Export
+    const handleExportDocx = () => {
+        exportSmartDocx();
+    };
 
     const handleApplySuggestion = useCallback((suggestion: AISuggestion) => {
         if (editorRef.current) {
@@ -161,6 +170,27 @@ export const FastCanvasView: React.FC<FastCanvasViewProps> = ({
             console.warn('Editor ref not available');
         }
     }, [removeSuggestion]);
+
+    const handleSuggestionClick = useCallback((id: string) => {
+        // Find the card in the sidebar
+        const element = document.getElementById(`suggestion-${id}`);
+        if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            // Add a temporary highlight class
+            element.classList.add('highlight-flash');
+            setTimeout(() => {
+                element.classList.remove('highlight-flash');
+            }, 1000);
+        } else {
+            console.warn(`Suggestion card ${id} not found in sidebar.`);
+        }
+    }, []);
+
+    const handleSuggestionSelect = useCallback((suggestion: AISuggestion) => {
+        if (editorRef.current && suggestion.original) {
+            editorRef.current.selectText(suggestion.original);
+        }
+    }, []);
 
     if (!document) {
         return <div className="fast-canvas-loading"><div className="loading-spinner" /><p>加载中...</p></div>;
@@ -201,7 +231,7 @@ export const FastCanvasView: React.FC<FastCanvasViewProps> = ({
                         <Save size={16} /><span>保存</span>
                     </button>
 
-                    <button className="action-btn" onClick={handleExportDocx}>
+                    <button className="action-btn" onClick={handleExportDocx} title="导出为智能公文格式 (黑体/楷体/仿宋)">
                         <Download size={16} /><span>导出DOCX</span>
                     </button>
                 </div>
@@ -215,6 +245,10 @@ export const FastCanvasView: React.FC<FastCanvasViewProps> = ({
                         ref={editorRef}
                         value={editorHtml}
                         onChange={handleEditorChange}
+                        suggestions={suggestions}
+                        onApplySuggestion={handleApplySuggestion}
+                        onDismissSuggestion={removeSuggestion}
+                        onSuggestionClick={handleSuggestionClick}
                     />
                 </div>
 
@@ -238,6 +272,7 @@ export const FastCanvasView: React.FC<FastCanvasViewProps> = ({
                         onApplySuggestion={handleApplySuggestion}
                         onDismissSuggestion={removeSuggestion}
                         onRunAudit={(agents) => runAudit(editorText, undefined, undefined, agents)}
+                        onSuggestionSelect={handleSuggestionSelect}
                         selectedText={selectedText}
                         chatHistory={chatHistory}
                         onSendMessage={(text) => sendChatMessage(text, editorText)}

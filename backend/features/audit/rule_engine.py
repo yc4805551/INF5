@@ -110,13 +110,17 @@ class RuleEngine:
                 "reason": "监测到中文词语中夹杂数字，可能是OCR或输入错误。"
             })
         
+        # Note: 搭配不当等复杂语法问题交由 AI (Proofread Agent) 处理
+        # 规则引擎只负责简单的模式匹配，避免过度硬编码
+        
         return issues
 
     def get_typos_text(self) -> str:
         """Returns a string representation of typos for LLM prompt context."""
-        if not self.typos_map:
+        combined = {**self.typos_map, **self.custom_map}
+        if not combined:
             return ""
-        return ", ".join([f"{k}->{v}" for k, v in self.typos_map.items()])
+        return ", ".join([f"{k}->{v}" for k, v in combined.items()])
 
     def get_forbidden_text(self) -> str:
         """Returns a string representation of forbidden words for LLM prompt context."""

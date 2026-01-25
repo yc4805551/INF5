@@ -171,6 +171,89 @@ export const useFastCanvas = () => {
         return document.content.map(block => block.text).join('\n\n');
     }, [document]);
 
+    // 智能导出为公文格式 DOCX
+    const exportSmartDocx = useCallback(async () => {
+        if (!document) return;
+
+        // 1. Adapter: Convert FastDocument to Tiptap JSON
+        // Since FastCanvas currently stores HTML string in block.text (bad practice but legacy),
+        // we need to PARSE that HTML to extract real paragraphs.
+
+        let tiptapContent: any[] = [];
+        const parser = new DOMParser();
+
+        // Helper to recursively extract text with manual newlines for block elements
+        const _extractTextWithNewlines = (node: Node): string => {
+            let text = "";
+            node.childNodes.forEach(child => {
+                if (child.nodeType === Node.TEXT_NODE) {
+                    text += child.textContent;
+                } else if (child.nodeType === Node.ELEMENT_NODE) {
+                    const tagName = (child as Element).tagName.toLowerCase();
+                    const isBlock = ['p', 'div', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'tr'].includes(tagName);
+                    const isBr = tagName === 'br';
+
+                    if (isBlock) text += "\n";
+                    text += _extractTextWithNewlines(child);
+                    if (isBlock || isBr) text += "\n";
+                }
+            });
+            return text;
+        }
+
+        document.content.forEach(block => {
+            if (!block.text) return;
+
+            // Check if text looks like HTML (starts with tag)
+            if (block.text.trim().startsWith('<')) {
+                const doc = parser.parseFromString(block.text, 'text/html');
+
+                // Use robust extraction
+                const rawText = _extractTextWithNewlines(doc.body);
+                // Split and clean
+                const lines = rawText.split('\n').map(l => l.trim()).filter(Boolean);
+
+                lines.forEach(line => {
+                    tiptapContent.push({
+                        type: 'paragraph',
+                        content: [{ type: 'text', text: line }]
+                    });
+                });
+            } else {
+                // Plain text block
+                tiptapContent.push({
+                    type: 'paragraph',
+                    content: [{ type: 'text', text: block.text }]
+                });
+            }
+        });
+
+        const payload = {
+            type: 'doc',
+            content: tiptapContent
+        };
+
+        try {
+            // 2. Call Backend Service
+            const { exportSmartDocxService } = await import('../../../services/canvasService');
+            const blob = await exportSmartDocxService(payload, document.title || '文档');
+
+            // 3. Trigger Download
+            const url = window.URL.createObjectURL(blob);
+            const a = window.document.createElement('a');
+            a.href = url;
+            a.download = `${document.title || '文档'}_智能排版.docx`;
+            window.document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            window.document.body.removeChild(a);
+
+        } catch (error) {
+            console.error('Smart Export failed:', error);
+            alert('导出失败，请检查后端服务');
+        }
+    }, [document]);
+
     return {
         document,
         isDirty,
@@ -181,6 +264,7 @@ export const useFastCanvas = () => {
         addBlock,
         deleteBlock,
         saveDocument,
-        exportText
+        exportText,
+        exportSmartDocx
     };
 };

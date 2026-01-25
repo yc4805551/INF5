@@ -1,4 +1,15 @@
 .fast-canvas-view {
+    /* Map FastCanvas variables to Global Dark Theme variables */
+    --color-bg-white: var(--background-color);
+    --color-bg-card: var(--surface-color);
+    --color-text: var(--text-color);
+    --color-text-secondary: #a0a0a0;
+    --color-border: var(--border-color);
+    --color-bg-border: var(--border-color);
+    --color-bg-tab-hover: var(--accent-hover-color);
+    --gradient-bg: var(--background-color);
+    --shadow-sm: none;
+
     display: flex;
     flex-direction: column;
     height: 100vh;

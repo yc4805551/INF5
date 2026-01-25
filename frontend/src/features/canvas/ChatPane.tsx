@@ -51,7 +51,7 @@ export const ChatPane = forwardRef<ChatPaneHandle, ChatPaneProps>(({
 }, ref) => {
     const [input, setInput] = useState('');
     const availableModels = getAvailableModels();
-    const [selectedModel, setSelectedModel] = useState<string>(availableModels[0] || 'gemini');
+    const [selectedModel, setSelectedModel] = useState<string>(availableModels[0] || 'free');
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -70,7 +70,7 @@ export const ChatPane = forwardRef<ChatPaneHandle, ChatPaneProps>(({
 
     const getModelConfig = (model: string): ModelConfig => {
         const config = frontendApiConfig[model];
-        if (!config) return { provider: 'gemini' };
+        if (!config) return { provider: 'free' };
 
         return {
             provider: model as any,

@@ -48,6 +48,11 @@ class LLMConfigManager:
         return {
             "default_provider": "gemini",
             "providers": {
+                "free": {
+                    "api_key": "",
+                    "endpoint": "https://www.dmxapi.cn/v1",
+                    "model": "GLM-4.7-Flash"
+                },
                 "gemini": {
                     "api_key": "",
                     "endpoint": "https://generativelanguage.googleapis.com/v1beta/models",
@@ -92,7 +97,10 @@ class LLMConfigManager:
             "gemini": ("GOOGLE", "GEMINI"),
             "openai": ("OPENAI",),
             "deepseek": ("DEEPSEEK",),
-            "aliyun": ("ALI",)
+            "aliyun": ("ALI",),
+            "free": ("FREE",),
+            "doubao": ("DOUBAO",),
+            "depocr": ("DEPOCR",)
         }
         
         env_prefixes = env_prefix_map.get(provider, ())

@@ -66,6 +66,8 @@ const ThoughtsInputModal = ({
                 <p>在整理笔记前，您可以输入任何相关的想法、问题或待办事项。AI 会将这些内容与您的笔记一并智能整理。</p>
                 <textarea
                     className="modal-textarea"
+                    id="thoughts-textarea"
+                    name="thoughts"
                     rows={5}
                     value={thoughts}
                     onChange={(e) => setThoughts(e.target.value)}
@@ -1579,7 +1581,7 @@ const App = () => {
     const [isProcessing, setIsProcessing] = useState(false);
     const [isThoughtsModalOpen, setIsThoughtsModalOpen] = useState(false);
 
-    const [selectedModel, setSelectedModel] = useState<ModelProvider>('gemini');
+    const [selectedModel, setSelectedModel] = useState<ModelProvider>('free');
     const [executionMode, setExecutionMode] = useState<ExecutionMode>('backend');
 
     const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBase[]>([]);
@@ -1662,7 +1664,9 @@ const App = () => {
             const responseText = await callGenerativeAi(selectedModel, executionMode, systemInstruction, userPrompt, true, 'notes');
             let result;
             try {
-                result = JSON.parse(responseText);
+                // Clean response text - remove markdown code blocks if present
+                const cleanText = responseText.replace(/^```json\s*/, '').replace(/\s*```$/, '').trim();
+                result = JSON.parse(cleanText);
             } catch (e: any) {
                 console.error('Error parsing note analysis from AI:', responseText);
                 throw new Error(`Failed to parse note analysis response: ${e.message}`);

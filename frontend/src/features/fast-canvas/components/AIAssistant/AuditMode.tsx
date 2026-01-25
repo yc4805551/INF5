@@ -10,6 +10,7 @@ interface AuditModeProps {
     onRunAudit: (agents?: string[]) => void;
     onApplySuggestion: (suggestion: AISuggestion) => void;
     onDismissSuggestion: (suggestionId: string) => void;
+    onSuggestionSelect?: (suggestion: AISuggestion) => void;
 }
 
 export const AuditMode: React.FC<AuditModeProps> = ({
@@ -17,7 +18,8 @@ export const AuditMode: React.FC<AuditModeProps> = ({
     isAnalyzing,
     onRunAudit,
     onApplySuggestion,
-    onDismissSuggestion
+    onDismissSuggestion,
+    onSuggestionSelect
 }) => {
     // Local state for selected agents
     const [selectedAgents, setSelectedAgents] = React.useState<string[]>(['proofread', 'logic', 'format', 'consistency']);
@@ -183,6 +185,7 @@ export const AuditMode: React.FC<AuditModeProps> = ({
                                 suggestion={issue}
                                 onApply={onApplySuggestion}
                                 onDismiss={onDismissSuggestion}
+                                onSelect={onSuggestionSelect}
                             />
                         )}
                     />
@@ -194,6 +197,7 @@ export const AuditMode: React.FC<AuditModeProps> = ({
                             suggestion={issue}
                             onApply={onApplySuggestion}
                             onDismiss={onDismissSuggestion}
+                            onSelect={onSuggestionSelect}
                         />
                     ))
                 )}

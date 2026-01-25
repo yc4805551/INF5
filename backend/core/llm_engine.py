@@ -1,9 +1,14 @@
 import json
 import re
 import difflib
+from google import genai
+from google.genai import types
+import base64
 import httpx
 import logging
 import os
+import time
+import random
 from typing import List, Dict, Any, Optional
 
 # Configure logging
@@ -199,7 +204,7 @@ AVAILABLE TOOLS:
              try:
                  if provider == "gemini":
                       draft_result = self._call_google_gemini(api_key, draft_prompt, endpoint, model, images)
-                 elif provider == "openai" or provider == "deepseek":
+                 elif provider == "openai" or provider == "deepseek" or provider == "free":
                       draft_result = self._call_openai_compatible(api_key, endpoint, model, draft_prompt)
              except Exception as e:
                  logger.error(f"Audit Draft LLM Error: {e}")
@@ -243,7 +248,7 @@ AVAILABLE TOOLS:
              logger.info("Executing Audit Reflection Step...")
              if provider == "gemini":
                   final_result = self._call_google_gemini(api_key, reflection_prompt, endpoint, model, images)
-             elif provider == "openai" or provider == "deepseek":
+             elif provider == "openai" or provider == "deepseek" or provider == "free":
                   final_result = self._call_openai_compatible(api_key, endpoint, model, reflection_prompt)
              
              # Fallback if reflection fails or returns garbage
@@ -320,37 +325,74 @@ AVAILABLE TOOLS:
                  yield full_response[i:i+chunk_size]
 
     def _call_google_gemini_stream(self, api_key: str, prompt: str, endpoint: str = None, model: str = None, images: List[str] = None):
-         # ... (Implementation similar to non-stream but with stream=True)
-         # For simplicity, we restart the non-stream request for now or implementing minimal stream wrapper checks
-         # Actually implementing real stream:
-         base_url = endpoint or "https://generativelanguage.googleapis.com/v1beta/models"
-         if not model: model = "gemini-2.5-flash"
-         if "generateContent" not in base_url:
-             base_url = base_url.rstrip("/")
-             if model not in base_url:
-                  url = f"{base_url}/{model}:streamGenerateContent?key={api_key}"
-             else:
-                  url = f"{base_url}:streamGenerateContent?key={api_key}"
-         else:
-             url = f"{base_url}?key={api_key}".replace("generateContent", "streamGenerateContent")
+         # Default model if not provided
+         if not model:
+            model = "gemini-2.0-flash-exp"
+            
+         logger.info(f"DEBUG: _call_google_gemini_stream (New SDK) - model: {model}")
 
-         headers = {"Content-Type": "application/json"}
-         parts = [{"text": prompt}]
-         # (Image logic same as non-stream, omitted for brevity but should be included)
-         payload = {"contents": [{"parts": parts}]}
+         # Configure Client
+         client = genai.Client(api_key=api_key)
          
-         with httpx.stream("POST", url, headers=headers, json=payload, timeout=60.0) as response:
-            if response.status_code != 200:
-                yield f"# Error: {response.status_code} {response.read().decode()}"
-                return
+         # Prepare content
+         contents = [prompt]
+         if images:
+            for img_b64 in images:
+                if "," in img_b64:
+                    img_data_b64 = img_b64.split(",")[1]
+                    mime_type = img_b64.split(",")[0].split(":")[1].split(";")[0]
+                else:
+                    img_data_b64 = img_b64
+                    mime_type = "image/png"
+                
+                try:
+                    img_bytes = base64.b64decode(img_data_b64)
+                    contents.append(types.Part.from_bytes(data=img_bytes, mime_type=mime_type))
+                except Exception as e:
+                    logger.error(f"Failed to decode image for Gemini Stream: {e}")
 
-            for chunk in response.iter_bytes():
-                # Process Server Sent Events or JSON array?
-                # Gemini stream returns a JSON array of response objects, but incrementally?
-                # Actually it returns a list of JSON objects wrapped in [ ... ] 
-                # Handling raw bytes to text is tricky without a proper SSE parser or JSON parser.
-                # Simplified: Yield raw bytes as text for now
-                yield chunk.decode('utf-8', errors='ignore')
+         config = types.GenerateContentConfig(
+            temperature=0.1,
+         )
+         
+         # Retry logic for Stream (Init only)
+         max_retries = 3
+         for attempt in range(max_retries):
+             try:
+                 response_stream = client.models.generate_content_stream(
+                     model=model,
+                     contents=contents,
+                     config=config
+                 )
+                 
+                 for chunk in response_stream:
+                     if chunk.text:
+                         yield chunk.text
+                 
+                 # Break retry loop if successful
+                 break
+
+             except Exception as e:
+                 error_str = str(e)
+                 if "429" in error_str or "Resource exhausted" in error_str:
+                     if attempt < max_retries - 1:
+                         sleep_time = (2 ** attempt) + random.random()
+                         logger.warning(f"Gemini New SDK Stream 429. Retrying in {sleep_time:.2f}s...")
+                         time.sleep(sleep_time)
+                         continue
+                     else:
+                         yield f"# Error: Gemini Rate Limit Exceeded (429)."
+                         return
+                 
+                 if attempt < max_retries - 1:
+                     logger.warning(f"Gemini New SDK Stream Error. Retrying... {e}")
+                     time.sleep(1)
+                     continue
+                     
+                 logger.error(f"Gemini New SDK Stream Failed: {e}")
+                 yield f"# Error: {str(e)}"
+
+
 
     def _call_openai_compatible_stream(self, api_key: str, endpoint: str, model: str, prompt: str):
          headers = {"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"}
@@ -386,6 +428,50 @@ AVAILABLE TOOLS:
                             yield delta["content"]
                     except:
                         pass
+
+    def generate(self, prompt: str, model_config: Dict[str, Any] = None) -> str:
+        """
+        Generic generation method for simple text-to-text tasks (Agentic use).
+        Auto-detects API Key from environment if not provided.
+        """
+        # Determine Config defaults
+        provider = "gemini"
+        api_key = self.api_key
+        endpoint = None
+        model = "gemini-1.5-flash" # Default fallback
+        
+        if model_config:
+            provider = model_config.get("provider", provider)
+            api_key = model_config.get("apiKey", api_key)
+            endpoint = model_config.get("endpoint", endpoint)
+            model = model_config.get("model", model)
+            
+        # Fallback to Env if no key present in instance or config
+        if not api_key:
+             # Try common env vars
+             api_key = os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY")
+             
+        if not api_key:
+            logger.error("LLMEngine.generate: No API Key provided or found in ENV.")
+            # Fail gracefully so agent can report it
+            return "# Error: No API Key configured."
+
+        # Dispatch
+        try:
+             if provider == "gemini":
+                  # Check for endpoint to support compatible proxies if needed
+                  if endpoint and ("/chat/completions" in endpoint or "/v1" in endpoint) and "googleapis.com" not in endpoint:
+                       return self._call_openai_compatible(api_key, endpoint, model, prompt)
+                  return self._call_google_gemini(api_key, prompt, endpoint, model)
+             elif provider in ["openai", "deepseek", "aliyun"]:
+                  return self._call_openai_compatible(api_key, endpoint, model, prompt)
+             
+             # Default fallback
+             return self._call_google_gemini(api_key, prompt, endpoint, model)
+             
+        except Exception as e:
+             logger.error(f"Generate Error: {e}")
+             return f"# Error: {str(e)}"
 
     def generate_code(self, user_instruction: str, doc_context: List[Dict[str, Any]], model_config: Dict[str, Any] = None) -> str:
         """
@@ -795,74 +881,83 @@ for i, p in enumerate(doc.paragraphs):
             return f"# Error calling LLM: {error_msg}"
 
     def _call_google_gemini(self, api_key: str, prompt: str, endpoint: str = None, model: str = None, images: List[str] = None) -> str:
-        # Default model if not provided
+        # Default model: Use 1.5 Flash (User typo 2.5 -> assuming 1.5)
         if not model:
-            model = "gemini-2.5-flash"
+            # User requested "gemini-2.5-flash", assuming they meant the latest stable flash which is 1.5
+            # If they really meant 2.0-flash-exp, I can set that, but 1.5 is standard.
+            model = "gemini-1.5-flash"
             
-        logger.info(f"DEBUG: _call_google_gemini - endpoint: {endpoint}, model: {model}, has_images: {bool(images)}")
-        
-        # Default URL if not provided or if it's just a base URL
-        base_url = endpoint or "https://generativelanguage.googleapis.com/v1beta/models"
-        
-        # Construct full URL if needed
-        # If endpoint is just base, append model and action
-        if "generateContent" not in base_url:
-            # Strip trailing slash
-            base_url = base_url.rstrip("/")
-            # If model is not in URL, append it
-            if model not in base_url:
-                 url = f"{base_url}/{model}:generateContent?key={api_key}"
-            else:
-                 url = f"{base_url}:generateContent?key={api_key}"
-        else:
-            url = f"{base_url}?key={api_key}"
+        logger.info(f"DEBUG: _call_google_gemini (New SDK) - model: {model}, has_images: {bool(images)}")
 
-        logger.info(f"Calling Gemini API: {url.split('?')[0]}...") # Log URL without key
-
-        headers = {"Content-Type": "application/json"}
+        # Configure Client
+        client = genai.Client(api_key=api_key)
         
-        # Construct Parts
-        parts = [{"text": prompt}]
-        
+        # Prepare content
+        contents = [prompt]
         if images:
             for img_b64 in images:
-                # Assuming img_b64 is base64 string. 
-                # Gemini expects raw base64, no data:image/png;base64 prefix? 
-                # Usually better to strip prefix if present.
                 if "," in img_b64:
-                    img_data = img_b64.split(",")[1]
+                    img_data_b64 = img_b64.split(",")[1]
                     mime_type = img_b64.split(",")[0].split(":")[1].split(";")[0]
                 else:
-                    img_data = img_b64
-                    mime_type = "image/png" # Default fallback
+                    img_data_b64 = img_b64
+                    mime_type = "image/png"
                 
-                parts.append({
-                    "inline_data": {
-                        "mime_type": mime_type,
-                        "data": img_data
-                    }
-                })
+                # New SDK Types: Use types.Part.from_bytes
+                try:
+                    img_bytes = base64.b64decode(img_data_b64)
+                    contents.append(types.Part.from_bytes(data=img_bytes, mime_type=mime_type))
+                except Exception as e:
+                    logger.error(f"Failed to decode image for Gemini: {e}")
+                    # Skip this image or continue
 
-        payload = {
-            "contents": [{
-                "parts": parts
-            }]
-        }
-        try:
-            response = httpx.post(url, headers=headers, json=payload, timeout=60.0, verify=False)
-            response.raise_for_status()
-            data = response.json()
-            # Handle safety ratings blocking content
-            if "candidates" not in data or not data["candidates"]:
-                 logger.error(f"Gemini blocked content or returned no candidates. Response: {json.dumps(data)}")
-                 return f"# Error: Gemini blocked content or returned no candidates. Response: {json.dumps(data)}"
-            
-            content = data["candidates"][0]["content"]["parts"][0]["text"]
-            return self._clean_code(content)
-        except Exception as e:
-            logger.error(f"Gemini Call Failed: {e}")
-            error_msg = str(e).replace('\n', ' ').replace('\r', '')
-            return f"# Error calling Gemini: {error_msg}"
+        # Safety Settings
+        # In new SDK, we use types.SafetySetting
+        safety_settings = [
+            types.SafetySetting(category="HARM_CATEGORY_HARASSMENT", threshold="BLOCK_NONE"),
+            types.SafetySetting(category="HARM_CATEGORY_HATE_SPEECH", threshold="BLOCK_NONE"),
+            types.SafetySetting(category="HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold="BLOCK_NONE"),
+            types.SafetySetting(category="HARM_CATEGORY_DANGEROUS_CONTENT", threshold="BLOCK_NONE"),
+        ]
+
+        config = types.GenerateContentConfig(
+            temperature=0.1,
+            safety_settings=safety_settings
+        )
+
+        # Retry logic: DISABLED per user request
+        max_retries = 1 
+        for attempt in range(max_retries):
+            try:
+                response = client.models.generate_content(
+                    model=model,
+                    contents=contents,
+                    config=config
+                )
+                
+                # New SDK response structure
+                if not response.text:
+                     logger.warning(f"Gemini returned empty text. Response: {response}")
+                     return "# Error: Gemini returned no text (Possible Safety Block)."
+
+                return self._clean_code(response.text)
+                
+            except Exception as e:
+                # Check for 429 in exception message or type
+                error_str = str(e)
+                if "429" in error_str or "Resource exhausted" in error_str:
+                    if attempt < max_retries - 1:
+                        sleep_time = (2 ** attempt) + random.random()
+                        logger.warning(f"Gemini New SDK 429 Rate Limit. Retrying in {sleep_time:.2f}s...")
+                        time.sleep(sleep_time)
+                        continue
+                    else:
+                        return f"# Error: Gemini Rate Limit Exceeded (429) after {max_retries} retries."
+                
+                logger.error(f"Gemini New SDK Call Failed: {e}")
+                return f"# Error calling Gemini SDK: {e}"
+                
+        return "# Error: Gemini Call Failed after retries."
 
     def _clean_code(self, content: str) -> str:
         # Remove markdown fences

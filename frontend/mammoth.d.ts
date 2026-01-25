@@ -28,6 +28,10 @@ interface ImportMetaEnv {
   readonly VITE_DOUBAO_API_KEY?: string;
   readonly VITE_DOUBAO_ENDPOINT?: string;
   readonly VITE_DOUBAO_MODEL?: string;
+  readonly VITE_FREE_API_KEY?: string;
+  readonly VITE_FREE_ENDPOINT?: string;
+  readonly VITE_FREE_TARGET_URL?: string;
+  readonly VITE_FREE_MODEL?: string;
 }
 
 interface ImportMeta {

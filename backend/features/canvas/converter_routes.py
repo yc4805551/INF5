@@ -46,6 +46,31 @@ def export_to_docx():
         logger.error(f"Export to DOCX failed: {e}")
         return jsonify({"error": str(e)}), 500
 
+@canvas_converter_bp.route('/export-smart-docx', methods=['POST'])
+def export_smart_docx():
+    """
+    智能公文格式导出 (Smart Gov Doc Export)
+    """
+    from features.canvas_converter import tiptap_to_smart_docx
+    
+    try:
+        data = request.get_json()
+        if not data or 'content' not in data:
+            return jsonify({"error": "Missing 'content' field"}), 400
+            
+        tiptap_json = data['content']
+        docx_buffer = tiptap_to_smart_docx(tiptap_json)
+        
+        return send_file(
+            docx_buffer,
+            mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            as_attachment=True,
+            download_name='smart_export.docx'
+        )
+    except Exception as e:
+        logger.error(f"Smart Export failed: {e}")
+        return jsonify({"error": str(e)}), 500
+
 @canvas_converter_bp.route('/import-from-docx', methods=['POST'])
 def import_from_docx():
     """

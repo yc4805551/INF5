@@ -15,3 +15,21 @@ def get_suggestions():
         return jsonify({"status": "success", "suggestions": suggestions})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+
+@advisor_bp.route('/copilot', methods=['POST'])
+def chat_copilot():
+    """
+    Unified Copilot Endpoint.
+    Handles Chat & Audit Triggers.
+    """
+    from .copilot import copilot_service
+    import asyncio
+    
+    data = request.json or {}
+    
+    try:
+        # Run async service method in sync route
+        result = asyncio.run(copilot_service.handle_request(data))
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"type": "error", "content": str(e)}), 500

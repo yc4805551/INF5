@@ -1,5 +1,7 @@
 import { useState, useCallback, useRef } from 'react';
 import { AISuggestion, AssistantMode, AuditResult } from '../types';
+import { performRealtimeCheck, performFullAudit } from '../../../services/auditService';
+import { getModelConfig } from '../../../services/configService';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5179/api';
 
@@ -11,7 +13,7 @@ const hashRequest = (content: string, agents: string[]): string => {
 /**
  * 统一智能助手Hook - 整合实时建议和审核功能
  */
-export const useUnifiedAssistant = (modelProvider: string = 'openai') => {
+export const useUnifiedAssistant = (modelProvider: string = 'free') => {
     const [mode, setMode] = useState<AssistantMode>('realtime');
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [suggestions, setSuggestions] = useState<AISuggestion[]>([]);
@@ -46,10 +48,11 @@ export const useUnifiedAssistant = (modelProvider: string = 'openai') => {
                 id: `realtime-${Date.now()}-${idx}`,
                 blockId: '',
                 type: issue.type || 'proofread',
-                severity: 'high',
+                severity: issue.severity || 'high',
                 original: issue.original || issue.problematicText,
                 suggestion: issue.suggestion,
-                reason: issue.reason || issue.explanation
+                reason: issue.reason || issue.explanation,
+                confidence: issue.confidence
             })) || [];
             setSuggestions(formattedSuggestions);
             return;
@@ -59,39 +62,27 @@ export const useUnifiedAssistant = (modelProvider: string = 'openai') => {
         setSuggestions([]);
 
         try {
-            // 使用 /audit/analyze 接口，复用 "proofread" 智能体
-            // 这样可以使用强大的 "离线规则库" + "AI 纠错"
-            const response = await fetch(`${API_BASE}/audit/analyze`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    content: selectedText, // 实时分析针对当前选段或全段
-                    source: contextText,   // 上下文作为参考
-                    agents: ['proofread'], // 指定只运行纠错代理
-                    model_config: { provider: modelProvider, ...modelConfig } // Pass model provider
-                })
-            });
+            // Get complete config using unified service
+            const completeModelConfig = getModelConfig(modelProvider, modelConfig);
 
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`Failed to get suggestions: ${response.status} ${response.statusText} - ${errorText}`);
-            }
-
-            const data = await response.json();
+            // 使用 Service 层调用
+            // 这种方式更整洁，且 API 定义统一
+            const result = await performRealtimeCheck(selectedText, contextText, completeModelConfig);
 
             // Store in cache
-            cacheRef.current.set(cacheKey, { result: data, timestamp: now });
+            cacheRef.current.set(cacheKey, { result, timestamp: now });
 
-            if (data.issues) {
+            if (result.issues) {
                 // 转换为统一格式 (AISuggestion)
-                const formattedSuggestions: AISuggestion[] = data.issues.map((issue: any, idx: number) => ({
+                const formattedSuggestions: AISuggestion[] = result.issues.map((issue: any, idx: number) => ({
                     id: `realtime-${Date.now()}-${idx}`,
                     blockId: '',
                     type: issue.type || 'proofread',
-                    severity: 'high', // 实时建议通常值得注意
+                    severity: issue.severity || 'high', // 使用后端返回的 severity
                     original: issue.original || issue.problematicText,
                     suggestion: issue.suggestion,
-                    reason: issue.reason || issue.explanation
+                    reason: issue.reason || issue.explanation,
+                    confidence: issue.confidence // 传递反思机制的信心等级
                 }));
 
                 setSuggestions(formattedSuggestions);
@@ -103,9 +94,6 @@ export const useUnifiedAssistant = (modelProvider: string = 'openai') => {
         }
     }, [modelProvider]);
 
-    /**
-     * 审核分析 - 完整检查（使用全部6个代理）
-     */
     /**
      * 审核分析 - 完整检查（使用全部6个代理，支持NDJSON流式）
      */
@@ -119,100 +107,44 @@ export const useUnifiedAssistant = (modelProvider: string = 'openai') => {
         setAuditResult(null);
 
         try {
-            const response = await fetch(`${API_BASE}/audit/analyze`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    content: documentText,
-                    rules: rules || [
-                        '全文错别字',
-                        '逻辑一致性',
-                        '格式规范性',
-                        '专业术语',
-                        '风格统一性',
-                        '禁用词检查'
-                    ],
-                    model_config: { provider: modelProvider, ...modelConfig }, // Pass model provider
-                    agents: agents || [],
-                    stream: true // Enable NDJSON Streaming
-                })
-            });
+            // Get complete config using unified service
+            const completeModelConfig = getModelConfig(modelProvider, modelConfig);
 
-            if (!response.ok) {
-                throw new Error('Audit failed');
-            }
+            const currentIssues: AISuggestion[] = [];
 
-            // NDJSON Stream Reader
-            const reader = response.body?.getReader();
-            const decoder = new TextDecoder();
-            let buffer = '';
-            const issues: any[] = [];
-            let summaryData: any = null;
-
-            if (reader) {
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
-
-                    // 追加到缓冲区
-                    buffer += decoder.decode(value, { stream: true });
-
-                    // 按行分割
-                    const lines = buffer.split('\n');
-                    buffer = lines.pop() || ''; // 保留不完整的最后一行
-
-                    // 解析每一行NDJSON
-                    for (const line of lines) {
-                        if (!line.trim()) continue;
-
-                        try {
-                            const obj = JSON.parse(line);
-
-                            if (obj.type === 'issue') {
-                                // 立即追加到UI
-                                const formattedIssue: AISuggestion = {
-                                    id: `audit-${Date.now()}-${issues.length}`,
-                                    blockId: '',
-                                    type: obj.data.type || 'proofread',
-                                    severity: obj.data.severity || 'medium',
-                                    original: obj.data.problematicText || obj.data.original,
-                                    suggestion: obj.data.suggestion,
-                                    reason: obj.data.explanation || obj.data.reason
-                                };
-                                issues.push(formattedIssue);
-
-                                // 增量更新UI（实时显示）
-                                setAuditResult(prev => ({
-                                    status: 'WARNING',
-                                    score: prev?.score || 0,
-                                    issues: [...issues],
-                                    summary: prev?.summary || '正在审核...',
-                                    timestamp: Date.now()
-                                }));
-                            }
-                            else if (obj.type === 'summary') {
-                                summaryData = obj.data;
-                            }
-                            else if (obj.type === 'error') {
-                                throw new Error(obj.data.message || 'Unknown error');
-                            }
-                        } catch (parseErr) {
-                            console.warn('[NDJSON Parse Error]', line, parseErr);
-                        }
-                    }
+            // 使用 Service 层处理流式响应
+            await performFullAudit(
+                documentText,
+                '', // source currently not passed in this signature/UI but service supports it
+                rules || [],
+                completeModelConfig,
+                agents || [],
+                (issue: AISuggestion) => {
+                    // On Chunk
+                    currentIssues.push(issue);
+                    setAuditResult(prev => ({
+                        status: 'WARNING',
+                        score: prev?.score || 100,
+                        issues: [...currentIssues],
+                        summary: prev?.summary || '正在审核...',
+                        timestamp: Date.now()
+                    }));
+                },
+                (summary: any) => {
+                    // On Summary
+                    setAuditResult(prev => ({
+                        status: summary.status || 'WARNING',
+                        score: summary.score || 0,
+                        issues: [...currentIssues],
+                        summary: summary.summary || '审核完毕',
+                        timestamp: Date.now()
+                    }));
+                },
+                (errorMsg: string) => {
+                    // On Error
+                    throw new Error(errorMsg);
                 }
-            } else {
-                throw new Error('Stream not supported');
-            }
-
-            // 最终更新summary
-            setAuditResult({
-                status: summaryData?.status || 'WARNING',
-                score: summaryData?.score || 0,
-                issues: issues,
-                summary: summaryData?.summary || '审核完毕',
-                timestamp: Date.now()
-            });
+            );
 
         } catch (error) {
             console.error('Audit error:', error);
@@ -264,67 +196,61 @@ export const useUnifiedAssistant = (modelProvider: string = 'openai') => {
     //    setChatHistory([{ role: 'model', parts: [{ text: '您好！我是您的智能写作顾问。' }] }]);
     // }, []);
 
-    const sendChatMessage = useCallback(async (text: string, context?: string) => {
+    const sendChatMessage = useCallback(async (text: string, context?: string, triggerAudit: boolean = false) => {
         // Add user message
         const userMsg = { role: 'user', parts: [{ text }] };
         setChatHistory(prev => [...prev, userMsg]);
         setIsAnalyzing(true);
 
-        // Prepare context prompt if provided
-        let finalPrompt = text;
-        if (context) {
-            finalPrompt = `Current Document Content:\n"""\n${context}\n"""\n\nUser Question: ${text}`;
-        }
-
-
         try {
-            // Import dynamically or use fetch directly? 
-            // We use the common service 
-            // Assume we can import callGenerativeAi from services/ai
-            // But we need to handle streaming separately or simplified request.
-            // For now, let's use the simple fetch to backend or re-implement simple stream.
+            // Get complete config using unified service
+            const completeModelConfig = getModelConfig(modelProvider);
 
-            // Actually, we should use the existing service.
-            // But since this file is already long, let's implement a simple fetch for now
-            // or modify imports at top.
-
-            // Let's use the Advisor Service endpoint for chat as well? 
-            // Or just reuse the /api/advisor/suggestions? No, that's specific.
-            // We can use the generic /api/common/chat or similar?
-
-            // To be safe and quick, let's use the 'callGenerativeAi' from global services.
-            // But imports are tricky with replace_content.
-            // I will use fetch to /api/advisor (AdvisorService) if I add a chat endpoint there?
-            // Or use /api/generate (Common).
-
-            const response = await fetch(`${API_BASE}/generate`, {
+            const response = await fetch(`${API_BASE}/advisor/copilot`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    provider: modelProvider, // Use dynamic model provider
-                    userPrompt: finalPrompt,
-                    systemInstruction: "You are a helpful writing assistant. Answer concisely.",
+                    message: text,
+                    context: context || '',
+                    trigger_audit: triggerAudit,
                     history: chatHistory,
-                    executionMode: 'backend' // Prefer backend for proxy
+                    model_config: completeModelConfig
                 })
             });
 
-            if (!response.ok) throw new Error('Chat failed');
+            if (!response.ok) {
+                const errText = await response.text();
+                throw new Error(`Copilot call failed: ${errText}`);
+            }
 
-            const data = await response.json(); // Parse JSON to get actual string (decodes Unicode)
-            // If backend returns raw text
+            const data = await response.json();
+            // Expect { type: 'text' | 'audit_report' | 'error', content: ..., data: ... }
 
-            const modelMsg = { role: 'model', parts: [{ text: data }] };
+            let resultText = '';
+            if (data.type === 'text') {
+                resultText = data.content;
+            } else if (data.type === 'audit_report') {
+                // Pass structured data via a specially formatted JSON string
+                // CopilotChat will detect this signature {"type":"audit_report"} and render the Card
+                resultText = JSON.stringify({
+                    type: 'audit_report',
+                    data: data.data // Contains { score, issues, summary }
+                });
+            } else if (data.type === 'error') {
+                resultText = `Error: ${data.content}`;
+            }
+
+            const modelMsg = { role: 'model', parts: [{ text: resultText }] };
             setChatHistory(prev => [...prev, modelMsg]);
 
         } catch (error) {
             console.error('Chat error:', error);
-            const errorMsg = { role: 'model', parts: [{ text: `Error: ${error}` }] };
+            const errorMsg = { role: 'model', parts: [{ text: `Connection Error: ${error}` }] };
             setChatHistory(prev => [...prev, errorMsg]);
         } finally {
             setIsAnalyzing(false);
         }
-    }, [chatHistory]);
+    }, [chatHistory, modelProvider]);
 
     return {
         mode,

@@ -73,7 +73,7 @@ def create_app():
 
     # Initialize Milvus Connection
     try:
-        connections.connect("default", host=os.getenv("MILVUS_HOST", "127.00.1"), port=os.getenv("MILVUS_PORT", "19530"))
+        connections.connect("default", host=os.getenv("MILVUS_HOST", "127.0.0.1"), port=os.getenv("MILVUS_PORT", "19530"))
         logging.info("Connected to Milvus.")
     except Exception as e:
         logging.error(f"Failed to connect to Milvus on startup: {e}")

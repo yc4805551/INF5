@@ -1,0 +1,30 @@
+/* Error (Proofread) - Red Wave */
+.audit-error-proofread {
+    text-decoration: underline;
+    text-decoration-style: wavy;
+    text-decoration-color: #ef4444;
+    text-decoration-thickness: 2px;
+    background-color: rgba(239, 68, 68, 0.1);
+    /* Light red bg */
+    cursor: pointer;
+}
+
+/* Suggestion (Polish) - Yellow Dashed */
+.audit-error-polish {
+    text-decoration: underline;
+    text-decoration-style: dashed;
+    text-decoration-color: #f59e0b;
+    text-decoration-thickness: 2px;
+    background-color: rgba(245, 158, 11, 0.1);
+    /* Light orange bg */
+    cursor: pointer;
+}
+
+/* Hover effects */
+.audit-error-proofread:hover {
+    background-color: rgba(239, 68, 68, 0.2);
+}
+
+.audit-error-polish:hover {
+    background-color: rgba(245, 158, 11, 0.2);
+}

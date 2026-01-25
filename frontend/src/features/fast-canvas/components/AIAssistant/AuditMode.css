@@ -323,3 +323,20 @@
     color: var(--color-text-secondary);
     margin: 0;
 }
+
+/* Fix: Missing container styles for AuditMode */
+.audit-mode-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+}
+
+.audit-issues-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}

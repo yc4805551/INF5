@@ -9,6 +9,7 @@ interface RealtimeModeProps {
     isAnalyzing: boolean;
     onApplySuggestion: (suggestion: AISuggestion) => void;
     onDismissSuggestion: (suggestionId: string) => void;
+    onSuggestionSelect?: (suggestion: AISuggestion) => void;
     selectedText?: string;
 }
 
@@ -17,6 +18,7 @@ export const RealtimeMode: React.FC<RealtimeModeProps> = ({
     isAnalyzing,
     onApplySuggestion,
     onDismissSuggestion,
+    onSuggestionSelect,
     selectedText
 }) => {
     if (isAnalyzing) {
@@ -37,10 +39,14 @@ export const RealtimeMode: React.FC<RealtimeModeProps> = ({
         return (
             <div className="realtime-empty">
                 <Sparkles size={32} color="#10b981" />
-                <p>AI实时分析已启用</p>
+                <p>AI实时监控中</p>
                 <div className="hint-text">
                     <span>💡 停止输入3秒后自动分析</span>
-                    <span>📋 分析：语法、错别字、搭配、逻辑</span>
+                    <span>✅ 已清理所有建议，正在持续监测...</span>
+                </div>
+                {/* Copilot Teaser */}
+                <div style={{ marginTop: 20, fontSize: 12, color: '#3b82f6', cursor: 'pointer', opacity: 0.8 }}>
+                    需要从头梳理思路？点击右上角切换到对话模式 ↗
                 </div>
             </div>
         );
@@ -60,6 +66,7 @@ export const RealtimeMode: React.FC<RealtimeModeProps> = ({
                         suggestion={suggestion}
                         onApply={onApplySuggestion}
                         onDismiss={onDismissSuggestion}
+                        onSelect={onSuggestionSelect}
                     />
                 ))}
             </div>

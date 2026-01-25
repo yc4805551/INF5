@@ -143,6 +143,8 @@ export const HomeInputView: React.FC<HomeInputViewProps> = ({
                     <h2>工作区</h2>
                     <textarea
                         className="text-area"
+                        id="main-input-area"
+                        name="mainInput"
                         value={inputText}
                         onChange={(e) => setInputText(e.target.value)}
                         onDragOver={handleDragOver}
@@ -154,6 +156,8 @@ export const HomeInputView: React.FC<HomeInputViewProps> = ({
                     />
                     <input
                         type="file"
+                        id="hidden-file-input"
+                        name="hiddenFileInput"
                         ref={fileInputRef}
                         style={{ display: 'none' }}
                         accept=".txt,.md,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -179,6 +183,8 @@ export const HomeInputView: React.FC<HomeInputViewProps> = ({
                         <h4>选择模型</h4>
                         <select
                             className="home-select"
+                            id="model-selector"
+                            name="modelSelect"
                             value={selectedModel}
                             onChange={(e) => setSelectedModel(e.target.value as ModelProvider)}
                             disabled={isProcessing}
@@ -198,6 +204,8 @@ export const HomeInputView: React.FC<HomeInputViewProps> = ({
                             knowledgeBases.length > 0 ? (
                                 <select
                                     className="home-select"
+                                    id="kb-selector"
+                                    name="kbSelect"
                                     value={selectedKnowledgeBase || ''}
                                     onChange={(e) => setSelectedKnowledgeBase(e.target.value)}
                                     disabled={isProcessing}

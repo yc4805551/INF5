@@ -30,3 +30,23 @@ def audit_analyze():
     except Exception as e:
         logging.error(f"Audit Internal Error: {e}")
         return jsonify({"error": str(e)}), 500
+
+@audit_bp.route('/realtime', methods=['POST'])
+def audit_realtime():
+    """
+    API Endpoint for Lightweight Realtime Proofreading.
+    Payload: { "content": "...", "source": "...", "model_config": {...} }
+    """
+    import asyncio
+    from .services import perform_realtime_check
+    try:
+        data = request.get_json() or {}
+        # logging.info(f"Received Realtime Check Request (len={len(data.get('content',''))})")
+        
+        # Directly call lightweight service
+        result = asyncio.run(perform_realtime_check(data))
+        
+        return jsonify(result)
+    except Exception as e:
+        logging.error(f"Realtime Check Error: {e}")
+        return jsonify({"error": str(e)}), 500

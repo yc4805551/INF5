@@ -2,38 +2,53 @@
     display: flex;
     flex-direction: column;
     height: 100%;
-    background: #ffffff;
+    background: var(--background-color);
 }
 
 .tiptap-menu-bar {
     padding: 8px 16px;
-    border-bottom: 1px solid #e5e7eb;
-    background: #f9fafb;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--surface-color);
     display: flex;
     gap: 8px;
     flex-wrap: wrap;
+    z-index: 10;
+    position: relative;
+    /* Ensure menu stays on top */
+    flex-shrink: 0;
+}
+
+.editor-scroll-area {
+    flex: 1;
+    overflow-y: auto;
+    /* Enable scrolling for content */
+    display: flex;
+    flex-direction: column;
+    /* Ensure ProseMirror can take height */
+    position: relative;
 }
 
 .tiptap-menu-bar button {
     padding: 4px 8px;
-    border: 1px solid #d1d5db;
-    background: white;
+    border: 1px solid var(--border-color);
+    background: var(--background-color);
     border-radius: 4px;
     cursor: pointer;
     font-size: 13px;
-    color: #374151;
+    color: var(--text-color);
     transition: all 0.2s;
 }
 
 .tiptap-menu-bar button:hover {
-    background: #f3f4f6;
+    background: #2a2a2a;
+    border-color: var(--accent-color);
 }
 
 .tiptap-menu-bar button.is-active {
-    background: #e5e7eb;
-    color: #000;
+    background: var(--accent-color);
+    color: white;
     font-weight: 600;
-    border-color: #9ca3af;
+    border-color: var(--accent-hover-color);
 }
 
 .ProseMirror {
@@ -42,8 +57,8 @@
     min-height: 100%;
     font-size: 16px;
     line-height: 1.75;
-    color: #1f2937 !important;
-    /* Force dark text */
+    color: var(--text-color) !important;
+    /* Force theme text color */
     max-width: 800px;
     /* Readability width */
     margin: 0 auto;
@@ -60,7 +75,7 @@
     margin-top: 1em;
     margin-bottom: 0.5em;
     line-height: 1.2;
-    color: #111827;
+    color: var(--text-color);
 }
 
 .ProseMirror h2 {
@@ -68,7 +83,7 @@
     font-weight: bold;
     margin-top: 1em;
     margin-bottom: 0.5em;
-    color: #111827;
+    color: var(--text-color);
 }
 
 .ProseMirror ul,
@@ -82,8 +97,8 @@
 }
 
 .ProseMirror blockquote {
-    border-left: 3px solid #e5e7eb;
+    border-left: 3px solid var(--border-color);
     padding-left: 1em;
-    color: #6b7280;
+    color: #a0a0a0;
     font-style: italic;
 }

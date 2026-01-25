@@ -1,9 +1,8 @@
 import React from 'react';
 import { RealtimeMode } from './RealtimeMode';
-import { AuditMode } from './AuditMode';
-import { ChatMode } from './ChatMode';
+import { CopilotChat } from './CopilotChat';
 import { AssistantMode, AISuggestion, AuditResult, ChatMessage } from '../../types';
-import { Sparkles, Shield, MessageSquare } from 'lucide-react';
+import { Sparkles, MessageSquare } from 'lucide-react';
 import './UnifiedAssistant.css';
 
 // Import ChatMessage type
@@ -18,6 +17,7 @@ interface UnifiedAssistantProps {
     onApplySuggestion: (suggestion: AISuggestion) => void;
     onDismissSuggestion: (suggestionId: string) => void;
     onRunAudit?: (agents?: string[]) => void;
+    onSuggestionSelect?: (suggestion: AISuggestion) => void;
     selectedText?: string;
     // Chat Props
     chatHistory?: ChatMessage[];
@@ -35,66 +35,65 @@ export const UnifiedAssistant: React.FC<UnifiedAssistantProps> = ({
     onRunAudit,
     selectedText,
     chatHistory = [],
-    onSendMessage
+    onSendMessage,
+    onSuggestionSelect
 }) => {
+    // State for View Mode: 'monitor' (default) or 'chat'
+    const [viewMode, setViewMode] = React.useState<'monitor' | 'chat'>('monitor');
+
+    // Toggle function
+    const toggleViewMode = () => {
+        setViewMode(prev => prev === 'monitor' ? 'chat' : 'monitor');
+    };
+
     return (
         <div className="unified-assistant">
-            {/* Mode Tabs */}
-            <div className="assistant-tabs">
+            {/* Header / Title Bar (Optional, simpler now) */}
+            <div className="assistant-header-bar">
+                <div className="agent-identity">
+                    {viewMode === 'monitor' ? (
+                        <>
+                            <Sparkles size={16} className="text-blue-500" />
+                            <span className="font-semibold">实时监察中</span>
+                        </>
+                    ) : (
+                        <>
+                            <MessageSquare size={16} className="text-purple-500" />
+                            <span className="font-semibold">AI 写作伙伴</span>
+                        </>
+                    )}
+                </div>
+                {/* Switcher Button */}
                 <button
-                    className={`tab ${mode === 'realtime' ? 'active' : ''}`}
-                    onClick={() => onModeChange('realtime')}
-                    title="实时建议"
+                    onClick={toggleViewMode}
+                    className="mode-switch-btn"
+                    title={viewMode === 'monitor' ? "进入对话模式" : "返回实时模式"}
                 >
-                    <Sparkles size={16} />
-                    <span>实时</span>
-                </button>
-                <button
-                    className={`tab ${mode === 'chat' ? 'active' : ''}`}
-                    onClick={() => onModeChange('chat')}
-                    title="顾问对话"
-                >
-                    <MessageSquare size={16} />
-                    <span>顾问</span>
-                </button>
-                <button
-                    className={`tab ${mode === 'audit' ? 'active' : ''}`}
-                    onClick={() => onModeChange('audit')}
-                    title="全 文 审 核"
-                >
-                    <Shield size={16} />
-                    <span>审核</span>
+                    {viewMode === 'monitor' ? <MessageSquare size={14} /> : <Sparkles size={14} />}
+                    {viewMode === 'monitor' ? "提问" : "监控"}
                 </button>
             </div>
 
-            {/* Content */}
+            {/* Content Area */}
             <div className="assistant-content">
-                {mode === 'realtime' && (
+                {viewMode === 'monitor' ? (
                     <RealtimeMode
                         suggestions={suggestions}
                         isAnalyzing={isAnalyzing}
                         onApplySuggestion={onApplySuggestion}
                         onDismissSuggestion={onDismissSuggestion}
+                        onSuggestionSelect={onSuggestionSelect}
                         selectedText={selectedText}
                     />
-                )}
-
-                {mode === 'chat' && (
-                    <ChatMode
+                ) : (
+                    <CopilotChat
                         history={chatHistory}
                         onSendMessage={onSendMessage || (async () => { })}
                         isLoading={isAnalyzing}
                         selectedText={selectedText}
-                    />
-                )}
-
-                {mode === 'audit' && (
-                    <AuditMode
-                        auditResult={auditResult}
-                        isAnalyzing={isAnalyzing}
-                        onRunAudit={onRunAudit || (() => { })}
-                        onApplySuggestion={onApplySuggestion}
-                        onDismissSuggestion={onDismissSuggestion}
+                        onRunFullAudit={() => {
+                            if (onRunAudit) onRunAudit(['proofread', 'logic', 'format', 'consistency', 'terminology']);
+                        }}
                     />
                 )}
             </div>

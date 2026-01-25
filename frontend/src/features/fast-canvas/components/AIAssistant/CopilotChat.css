@@ -1,0 +1,352 @@
+/* CopilotChat.css */
+
+.copilot-chat-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background-color: #f8fafc;
+    /* Slate-50 */
+    position: relative;
+    overflow: hidden;
+}
+
+/* --- Styled Scrollbar --- */
+.chat-messages::-webkit-scrollbar {
+    width: 6px;
+}
+
+.chat-messages::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.chat-messages::-webkit-scrollbar-thumb {
+    background-color: #cbd5e1;
+    border-radius: 10px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+}
+
+.chat-messages::-webkit-scrollbar-thumb:hover {
+    background-color: #94a3b8;
+}
+
+/* --- Toolbar --- */
+.copilot-toolbar {
+    padding: 10px 16px;
+    background: white;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+}
+
+.action-btn {
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid #e2e8f0;
+    background: white;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    color: #475569;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+.action-btn:hover {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.action-btn.audit-btn {
+    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+    color: #2563eb;
+    border-color: #bfdbfe;
+}
+
+.action-btn.audit-btn:hover {
+    background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+    box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.15);
+}
+
+.action-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+/* --- Messages Area --- */
+.chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.chat-welcome {
+    text-align: center;
+    margin-top: 60px;
+    color: #64748b;
+    animation: fadeIn 0.5s ease-out;
+}
+
+.chat-welcome h3 {
+    font-size: 20px;
+    margin-bottom: 10px;
+    color: #1e293b;
+    font-weight: 600;
+}
+
+.chat-welcome p {
+    font-size: 14px;
+    margin-bottom: 32px;
+    color: #64748b;
+    line-height: 1.6;
+}
+
+.quick-starters {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+    max-width: 320px;
+    margin: 0 auto;
+}
+
+.quick-starters button {
+    background: white;
+    border: 1px solid #e2e8f0;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 13px;
+    color: #475569;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.quick-starters button:hover {
+    border-color: #3b82f6;
+    color: #2563eb;
+    background: #eff6ff;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+/* --- Bubbles --- */
+.chat-bubble {
+    display: flex;
+    flex-direction: column;
+    max-width: 85%;
+    animation: fadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.chat-bubble.user {
+    align-self: flex-end;
+}
+
+.chat-bubble.model {
+    align-self: flex-start;
+}
+
+/* Special full-width for audit report cards */
+.chat-bubble.model.audit-message {
+    width: 100%;
+    max-width: 100%;
+}
+
+.bubble-content {
+    padding: 12px 16px;
+    border-radius: 16px;
+    font-size: 14px;
+    line-height: 1.6;
+    position: relative;
+    word-break: break-word;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.chat-bubble.user .bubble-content {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    color: white;
+    border-bottom-right-radius: 4px;
+    box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);
+}
+
+.chat-bubble.model .bubble-content {
+    background: white;
+    border: 1px solid #e2e8f0;
+    color: #334155;
+    /* Slate-700 for better contrast */
+    border-bottom-left-radius: 4px;
+}
+
+/* Remove padding/bg for Audit Message wrapper since the Card has its own style */
+.chat-bubble.model.audit-message .bubble-content {
+    background: transparent;
+    border: none;
+    padding: 0;
+    box-shadow: none;
+}
+
+
+/* --- Loading Indicator --- */
+.chat-bubble.loading .bubble-content {
+    display: flex;
+    gap: 6px;
+    padding: 16px 20px;
+    min-width: 80px;
+    justify-content: center;
+    background: #f1f5f9;
+    border: none;
+}
+
+.typing-dot {
+    width: 8px;
+    height: 8px;
+    background: #94a3b8;
+    border-radius: 50%;
+    animation: typingBounce 1.4s infinite ease-in-out both;
+}
+
+.typing-dot:nth-child(1) {
+    animation-delay: -0.32s;
+}
+
+.typing-dot:nth-child(2) {
+    animation-delay: -0.16s;
+}
+
+@keyframes typingBounce {
+
+    0%,
+    80%,
+    100% {
+        transform: scale(0);
+    }
+
+    40% {
+        transform: scale(1);
+    }
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* --- Input Area --- */
+.chat-input-area {
+    padding: 16px;
+    background: white;
+    border-top: 1px solid #e2e8f0;
+    flex-shrink: 0;
+    box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.01);
+}
+
+.selected-context-preview {
+    font-size: 12px;
+    margin-bottom: 8px;
+    padding: 6px 10px;
+    background: #eff6ff;
+    border-radius: 6px;
+    border-left: 3px solid #3b82f6;
+    color: #475569;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    animation: fadeIn 0.2s ease-out;
+}
+
+.sc-label {
+    font-weight: 600;
+    color: #2563eb;
+}
+
+.input-wrapper {
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 10px 14px;
+    transition: all 0.2s ease;
+}
+
+.input-wrapper:focus-within {
+    border-color: #3b82f6;
+    background: white;
+    box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.1);
+}
+
+.input-wrapper textarea {
+    flex: 1;
+    border: none;
+    background: transparent;
+    resize: none;
+    height: 24px;
+    max-height: 120px;
+    padding: 2px 0;
+    font-family: inherit;
+    font-size: 14px;
+    line-height: 1.5;
+    color: #1e293b;
+}
+
+.input-wrapper textarea::placeholder {
+    color: #94a3b8;
+}
+
+.input-wrapper textarea:focus {
+    outline: none;
+}
+
+/* Auto-grow height usually handled by JS, but for CSS-only we can set min-height */
+.input-wrapper textarea {
+    min-height: 24px;
+}
+
+.send-btn {
+    border: none;
+    background: #3b82f6;
+    color: white;
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
+}
+
+.send-btn:hover:not(:disabled) {
+    background: #2563eb;
+    transform: scale(1.05);
+    box-shadow: 0 4px 6px rgba(37, 99, 235, 0.3);
+}
+
+.send-btn:disabled {
+    background: #e2e8f0;
+    color: #94a3b8;
+    cursor: not-allowed;
+    box-shadow: none;
+    transform: none;
+}

@@ -18,7 +18,7 @@ def handle_generate():
         
         if provider == 'gemini': 
             return call_gemini_openai_proxy(data)
-        elif provider == 'openai': 
+        elif provider in ['openai', 'free', 'depOCR', 'doubao']: 
             return call_openai_proxy(data) 
         elif provider == 'deepseek': 
             return call_deepseek_proxy(data) 
@@ -38,18 +38,20 @@ def handle_generate_stream():
         sys_inst = data.get('systemInstruction') 
         user_prompt = data.get('userPrompt') 
         history = data.get('history', []) 
+        model_config = data.get('modelConfig', {})  # Extract model config from request
         
         logging.info(f"Received stream generation request, Provider: {provider}") 
 
         if provider == 'gemini': 
-            return Response(stream_with_context(stream_gemini_openai_proxy(user_prompt, sys_inst, history)), content_type='text/plain') 
-        elif provider == 'openai': 
-            return Response(stream_with_context(stream_openai_proxy(user_prompt, sys_inst, history)), content_type='text/plain') 
+            return Response(stream_with_context(stream_gemini_openai_proxy(user_prompt, sys_inst, history, model_config)), content_type='text/plain') 
+        elif provider in ['openai', 'free', 'depOCR', 'doubao']: 
+            return Response(stream_with_context(stream_openai_proxy(user_prompt, sys_inst, history, model_config)), content_type='text/plain') 
         elif provider == 'deepseek': 
-            return Response(stream_with_context(stream_deepseek_proxy(user_prompt, sys_inst, history)), content_type='text/plain') 
+            return Response(stream_with_context(stream_deepseek_proxy(user_prompt, sys_inst, history, model_config)), content_type='text/plain') 
         elif provider == 'ali': 
-            return Response(stream_with_context(stream_ali_proxy(user_prompt, sys_inst, history)), content_type='text/plain') 
+            return Response(stream_with_context(stream_ali_proxy(user_prompt, sys_inst, history, model_config)), content_type='text/plain') 
         else: 
             return Response(stream_with_context([f"[Error: Unsupported provider: {provider}]"]), content_type='text/plain') 
     except Exception as e: 
         return Response(stream_with_context([f"[Internal Error: {str(e)}]"]), content_type='text/plain')
+

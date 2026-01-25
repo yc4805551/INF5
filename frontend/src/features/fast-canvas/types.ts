@@ -52,10 +52,11 @@ export interface AISuggestion {
     id: string;
     blockId: string;
     type: 'proofread' | 'polish' | 'logic' | 'format' | 'style' | 'terminology';
-    severity: 'high' | 'medium' | 'low';
+    severity: 'critical' | 'high' | 'medium' | 'low';
     original: string;
     suggestion: string;
     reason: string;
+    confidence?: 'high' | 'medium' | 'low'; // AI 反思机制：对修改建议的信心等级
     position?: {
         start: number;
         end: number;
