@@ -204,7 +204,10 @@ AVAILABLE TOOLS:
              try:
                  if provider == "gemini":
                       draft_result = self._call_google_gemini(api_key, draft_prompt, endpoint, model, images)
-                 elif provider == "openai" or provider == "deepseek" or provider == "free":
+                 elif provider in ["openai", "deepseek", "free", "aliyun", "ali", "doubao", "depOCR"]:
+                      draft_result = self._call_openai_compatible(api_key, endpoint, model, draft_prompt)
+                 else:
+                      logger.warning(f"Unknown provider '{provider}', attempting OpenAI-compatible call")
                       draft_result = self._call_openai_compatible(api_key, endpoint, model, draft_prompt)
              except Exception as e:
                  logger.error(f"Audit Draft LLM Error: {e}")
@@ -248,7 +251,10 @@ AVAILABLE TOOLS:
              logger.info("Executing Audit Reflection Step...")
              if provider == "gemini":
                   final_result = self._call_google_gemini(api_key, reflection_prompt, endpoint, model, images)
-             elif provider == "openai" or provider == "deepseek" or provider == "free":
+             elif provider in ["openai", "deepseek", "free", "aliyun", "ali", "doubao", "depOCR"]:
+                  final_result = self._call_openai_compatible(api_key, endpoint, model, reflection_prompt)
+             else:
+                  logger.warning(f"Unknown provider '{provider}', attempting OpenAI-compatible call")
                   final_result = self._call_openai_compatible(api_key, endpoint, model, reflection_prompt)
              
              # Fallback if reflection fails or returns garbage
@@ -312,7 +318,10 @@ AVAILABLE TOOLS:
              try:
                  if provider == "gemini":
                       yield from self._call_google_gemini_stream(api_key, draft_prompt, endpoint, model, images)
-                 elif provider == "openai" or provider == "deepseek":
+                 elif provider in ["openai", "deepseek", "free", "aliyun", "ali", "doubao", "depOCR"]:
+                      yield from self._call_openai_compatible_stream(api_key, endpoint, model, draft_prompt)
+                 else:
+                      logger.warning(f"Unknown provider '{provider}', attempting OpenAI-compatible stream")
                       yield from self._call_openai_compatible_stream(api_key, endpoint, model, draft_prompt)
              except Exception as e:
                  logger.error(f"Audit Stream Error: {e}")
@@ -463,11 +472,12 @@ AVAILABLE TOOLS:
                   if endpoint and ("/chat/completions" in endpoint or "/v1" in endpoint) and "googleapis.com" not in endpoint:
                        return self._call_openai_compatible(api_key, endpoint, model, prompt)
                   return self._call_google_gemini(api_key, prompt, endpoint, model)
-             elif provider in ["openai", "deepseek", "aliyun"]:
+             elif provider in ["openai", "deepseek", "aliyun", "free", "ali", "doubao", "depOCR"]:
                   return self._call_openai_compatible(api_key, endpoint, model, prompt)
-             
-             # Default fallback
-             return self._call_google_gemini(api_key, prompt, endpoint, model)
+             else:
+                  # Fallback to OpenAI-compatible for unknown providers
+                  logger.warning(f"Unknown provider '{provider}', attempting OpenAI-compatible call")
+                  return self._call_openai_compatible(api_key, endpoint, model, prompt)
              
         except Exception as e:
              logger.error(f"Generate Error: {e}")

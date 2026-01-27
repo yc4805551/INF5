@@ -43,7 +43,8 @@ export const FastCanvasView: React.FC<FastCanvasViewProps> = ({
         clearSuggestions,
         removeSuggestion,
         chatHistory,
-        sendChatMessage
+        sendChatMessage,
+        lastCheckResult
     } = useUnifiedAssistant(modelProvider);
 
     const {
@@ -53,6 +54,7 @@ export const FastCanvasView: React.FC<FastCanvasViewProps> = ({
         createDocument,
         loadDocument,
         updateBlock,
+        updateTitle,
         saveDocument,
         exportSmartDocx
     } = useFastCanvas();
@@ -139,7 +141,7 @@ export const FastCanvasView: React.FC<FastCanvasViewProps> = ({
 
         const timer = setTimeout(() => {
             analyzeRealtime(editorText, editorText);
-        }, 3000);
+        }, 3000); // 3\u79d2\u9632\u6296\uff0c\u7528\u6237\u8981\u6c42\u505c\u987f\u540e\u518d\u68c0\u67e5
 
         return () => clearTimeout(timer);
     }, [editorText, assistantMode, analyzeRealtime, clearSuggestions, suggestions.length]);
@@ -173,7 +175,7 @@ export const FastCanvasView: React.FC<FastCanvasViewProps> = ({
 
     const handleSuggestionClick = useCallback((id: string) => {
         // Find the card in the sidebar
-        const element = document.getElementById(`suggestion-${id}`);
+        const element = window.document.getElementById(`suggestion-${id}`);
         if (element) {
             element.scrollIntoView({ behavior: 'smooth', block: 'center' });
             // Add a temporary highlight class
@@ -211,7 +213,7 @@ export const FastCanvasView: React.FC<FastCanvasViewProps> = ({
                         type="text"
                         className="document-title"
                         value={document.title}
-                        onChange={(e) => updateBlock(document.content[0]?.id, { text: e.target.value })}
+                        onChange={(e) => updateTitle(e.target.value)}
                         placeholder="无标题文档"
                     />
                 </div>
@@ -276,6 +278,7 @@ export const FastCanvasView: React.FC<FastCanvasViewProps> = ({
                         selectedText={selectedText}
                         chatHistory={chatHistory}
                         onSendMessage={(text) => sendChatMessage(text, editorText)}
+                        lastCheckResult={lastCheckResult}
                     />
                 </div>
             </div>

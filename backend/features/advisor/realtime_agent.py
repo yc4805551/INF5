@@ -34,7 +34,7 @@ class RealtimeAgent:
         # This one-shot prompt simulates the reflection loop for speed (REALTIME constraint < 3s).
         prompt = f"""
         你是一位严格的中文文案编辑（实时智能体）。
-        你的任务是：找出文本中的【错别字】、【语病】、【逻辑错误】和【搭配不当】。
+        你的任务是：找出文本中的【错别字】、【中文语病】、【逻辑错误】、【重复】、【句式结构混乱】和【搭配不当】。
 
         输入文本："{text}"
 
@@ -43,8 +43,6 @@ class RealtimeAgent:
         2. **初稿生成 (Draft)**：快速标记所有可能的错误点。
         3. **深度反思 (Reflect)**：
            - 这个“错误”真的是错误吗？还是特殊用法？
-           - “原文”是否能在输入文本中精确找到？
-           - “建议”是否真的比原文更好？
         4. **过滤筛选 (Filter)**：剔除吹毛求疵的风格建议，只保留确定的硬伤或重大改进。
 
         输出格式：JSON 对象列表

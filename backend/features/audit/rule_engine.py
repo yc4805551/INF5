@@ -4,19 +4,21 @@ from typing import List, Dict, Any, Tuple
 
 # Path to dictionaries
 DATA_DIR = os.path.join(os.path.dirname(__file__), 'data')
-TYPOS_FILE = os.path.join(DATA_DIR, 'typos.txt')
-FORBIDDEN_FILE = os.path.join(DATA_DIR, 'forbidden.txt')
+TYPOS_FILE = os.path.join(DATA_DIR, '易错词纠正.txt')
+FORBIDDEN_FILE = os.path.join(DATA_DIR, '禁词检查.txt')
+ABBREVIATIONS_FILE = os.path.join(DATA_DIR, '术语简称.txt')
 
 class RuleEngine:
     def __init__(self):
         self.typos_map = self._load_typos()
         self.custom_map = self._load_custom_corrections()
         self.forbidden_words = self._load_forbidden()
+        self.abbreviations_text = self._load_abbreviations_raw()
 
     def _load_typos(self) -> Dict[str, str]:
         typos = {}
         if os.path.exists(TYPOS_FILE):
-            with open(TYPOS_FILE, 'r', encoding='utf-8') as f:
+             with open(TYPOS_FILE, 'r', encoding='utf-8') as f:
                 for line in f:
                     parts = line.strip().split(',')
                     if len(parts) == 2:
@@ -54,10 +56,21 @@ class RuleEngine:
                         words.append(word)
         return words
 
+    def _load_abbreviations_raw(self) -> str:
+        """Loads the content of the abbreviations file as a single string for LLM context."""
+        if os.path.exists(ABBREVIATIONS_FILE):
+             try:
+                with open(ABBREVIATIONS_FILE, 'r', encoding='utf-8') as f:
+                    # Read all, maybe limit length if it gets huge, but for now just read.
+                    return f.read()
+             except Exception:
+                 pass
+        return ""
+
     def run_checks(self, text: str) -> List[Dict[str, Any]]:
         issues = []
         
-        # 1. Check Typos
+        # 1. Check Typos (易错词纠正.txt)
         for wrong, correct in self.typos_map.items():
             if wrong in text:
                 issues.append({
@@ -69,7 +82,7 @@ class RuleEngine:
                     "reason": f"监测到易错词：'{wrong}' 应为 '{correct}'"
                 })
 
-        # 1.5 Check Custom Corrections
+        # 2. Check Custom Corrections (常见错误修改.txt)
         for wrong, correct in self.custom_map.items():
             if wrong in text:
                 issues.append({
@@ -81,7 +94,7 @@ class RuleEngine:
                     "reason": f"监测到自定义纠错：'{wrong}' 应为 '{correct}'"
                 })
 
-        # 2. Check Forbidden Words
+        # 3. Check Forbidden Words (禁词检查.txt)
         for word in self.forbidden_words:
             if word in text:
                 issues.append({
@@ -93,25 +106,13 @@ class RuleEngine:
                     "reason": f"监测到敏感词/禁词：'{word}'，请移除。"
                 })
 
-        # 3. Check for Mixed Digits in Chinese (e.g., 测1试)
-        import re
-        # Pattern: Chinese char + 1 or more digits + Chinese char
-        mixed_digit_matches = re.finditer(r'([\u4e00-\u9fa5])(\d+)([\u4e00-\u9fa5])', text)
-        for match in mixed_digit_matches:
-            detected = match.group(0)
-            correction = match.group(1) + match.group(3) # Remove digit
-            issues.append({
-                "id": str(uuid.uuid4())[:8],
-                "type": "proofread",
-                "severity": "high",
-                "original": detected.strip(), # Ensure no whitespace
-                "problematicText": detected.strip(), # Explicit for replacement
-                "suggestion": correction,
-                "reason": "监测到中文词语中夹杂数字，可能是OCR或输入错误。"
-            })
-        
+
         # Note: 搭配不当等复杂语法问题交由 AI (Proofread Agent) 处理
         # 规则引擎只负责简单的模式匹配，避免过度硬编码
+        # 
+        # 已移除：中文夹杂数字检测规则（第96-111行）
+        # 原因：会误报合理表达如"24小时"、"开通了24h时咨询热线"
+        # 此类问题应交由 AI Agent 智能判断
         
         return issues
 
@@ -127,3 +128,7 @@ class RuleEngine:
         if not self.forbidden_words:
             return ""
         return ", ".join(self.forbidden_words)
+
+    def get_abbreviations_text(self) -> str:
+        """Returns a string representation of abbreviations for LLM prompt context."""
+        return self.abbreviations_text

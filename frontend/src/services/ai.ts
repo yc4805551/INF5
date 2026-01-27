@@ -62,9 +62,9 @@ export const MODEL_DISPLAY_NAMES: Record<string, string> = {
     gemini: 'Gemini',
     openai: 'OpenAI',
     deepseek: 'DeepSeek',
-    ali: '3PRO',
-    depOCR: 'DepOCR',
-    doubao: 'Doubao'
+    ali: 'Ali (Qwen)',
+    depOCR: 'DeepSeek OCR',
+    doubao: 'Doubao (Gemini-3)'
 };
 
 export const getAvailableModels = (): ModelProvider[] => {

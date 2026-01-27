@@ -64,6 +64,19 @@ export const useFastCanvas = () => {
         setIsDirty(true);
     }, []);
 
+    // 更新标题
+    const updateTitle = useCallback((newTitle: string) => {
+        setDocument(prev => {
+            if (!prev) return null;
+            return {
+                ...prev,
+                title: newTitle,
+                updated: Date.now()
+            };
+        });
+        setIsDirty(true);
+    }, []);
+
     // 添加新块
     const addBlock = useCallback((afterBlockId?: string, type: BlockType = 'paragraph') => {
         setDocument(prev => {
@@ -261,6 +274,7 @@ export const useFastCanvas = () => {
         createDocument,
         loadDocument,
         updateBlock,
+        updateTitle,
         addBlock,
         deleteBlock,
         saveDocument,

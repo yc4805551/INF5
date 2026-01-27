@@ -7,9 +7,10 @@ import { AuditPanel } from '../audit/AuditPanel';
 import { useAudit } from '../audit/useAudit';
 import { FillerPanel } from '../smart-filler/FillerPanel';
 import { ArrowLeft, FileText, RotateCcw, FilePlus, Download, Target, Trash2, PanelLeft } from 'lucide-react';
+import { ModelProvider } from '../../types';
 import './canvas.css'; // Reuse styles
 
-export const WordCanvas: React.FC<{ onBack: () => void, initialContent?: string }> = ({ onBack, initialContent }) => {
+export const WordCanvas: React.FC<{ onBack: () => void, initialContent?: string, modelProvider?: ModelProvider }> = ({ onBack, initialContent, modelProvider = 'free' }) => {
     const { state, handleFileUpload, loadFromText, handleReferenceUpload, handleSendMessage, handleSelection, clearSelection, reset, handleDownload, loadPage, toggleScope, handleRemoveReference, handleConfirm, handleDiscard, handleFormat } = useWordCanvas();
     const previewRef = useRef<HTMLDivElement>(null);
     const chatPaneRef = useRef<ChatPaneHandle>(null);
@@ -18,7 +19,7 @@ export const WordCanvas: React.FC<{ onBack: () => void, initialContent?: string 
     const [popupStyle, setPopupStyle] = useState<{ left: number, top: number } | null>(null);
     const [showToc, setShowToc] = useState(false); // Default hidden as per user feedback
     const [activeTab, setActiveTab] = useState<'chat' | 'audit' | 'filler'>('chat');
-    const [auditModel, setAuditModel] = useState<string>('free');
+    const [auditModel, setAuditModel] = useState<string>(modelProvider);
 
     // Advisor Hook
     const { suggestions, isAdvising, getSuggestions, clearSuggestions } = useAdvisor();
@@ -27,20 +28,20 @@ export const WordCanvas: React.FC<{ onBack: () => void, initialContent?: string 
     useEffect(() => {
         if (state.selectionContext && state.selectionContext.text.length > 5 && activeTab === 'chat') {
             const timer = setTimeout(() => {
-                // Determine model config (default to gemini or use state if moved)
-                const config = { provider: 'free', apiKey: '', endpoint: '', model: '' };
+                // Use global model provider
+                const config = { provider: modelProvider, apiKey: '', endpoint: '', model: '' };
                 getSuggestions(state.selectionContext!.text, state.htmlPreview, config);
             }, 800); // 800ms debounce
             return () => clearTimeout(timer);
         } else {
             clearSuggestions();
         }
-    }, [state.selectionContext, activeTab]);
+    }, [state.selectionContext, activeTab, modelProvider]);
 
     const handleApplyAdvisorSuggestion = (text: string) => {
         // Use Chat flow to apply change: "Replace selection with [text]"
         // This ensures it goes through the Diff/Confirm flow
-        handleSendMessage(`请将选中的内容修改为：\n${text}`, { provider: 'free' });
+        handleSendMessage(`请将选中的内容修改为：\n${text}`, { provider: modelProvider });
     };
 
     // Audit Hook

@@ -33,8 +33,34 @@ export const getModelConfig = (provider: string, overrides?: Partial<ModelConfig
 export const getAvailableProviders = (): string[] => {
     return Object.keys(frontendApiConfig).filter(key => {
         const config = frontendApiConfig[key];
-        if (key === 'gemini') return !!config.apiKey;
-        return !!config.model;
+
+        // Skip 'anything' - backend-only
+        if (key === 'anything') return false;
+
+        // Gemini only needs API key
+        if (key === 'gemini') {
+            const isValid = !!config.apiKey;
+            if (!isValid) {
+                console.debug(`[Config] Provider '${key}' excluded: missing apiKey`);
+            }
+            return isValid;
+        }
+
+        // OpenAI-compatible: need apiKey, endpoint, and model
+        const hasApiKey = !!config.apiKey;
+        const hasEndpoint = !!config.endpoint;
+        const hasModel = !!config.model;
+        const isValid = hasApiKey && hasEndpoint && hasModel;
+
+        if (!isValid) {
+            const missing = [];
+            if (!hasApiKey) missing.push('apiKey');
+            if (!hasEndpoint) missing.push('endpoint');
+            if (!hasModel) missing.push('model');
+            console.debug(`[Config] Provider '${key}' excluded: missing ${missing.join(', ')}`);
+        }
+
+        return isValid;
     });
 };
 

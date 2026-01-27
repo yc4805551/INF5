@@ -109,15 +109,7 @@ export const CopilotChat: React.FC<CopilotChatProps> = ({
             {/* Messages Area */}
             <div className="chat-messages">
                 {history.length === 0 ? (
-                    <div className="chat-welcome">
-                        <h3>👋 我是您的写作 Copilot</h3>
-                        <p>我可以帮您润色文字、检查逻辑，或者进行全文审核。</p>
-                        <div className="quick-starters">
-                            <button onClick={() => onSendMessage("帮我还原子弹笔记风格")}>🎭 风格模仿</button>
-                            <button onClick={() => onSendMessage("这段话逻辑通顺吗？")}>🧠 逻辑检查</button>
-                            <button onClick={() => onSendMessage("使语言更正式")}>👔 润色语气</button>
-                        </div>
-                    </div>
+                    <div className="chat-welcome" style={{ display: 'none' }}></div>
                 ) : (
                     history.map((msg, idx) => (
                         <div key={idx} className={`chat-bubble ${msg.role} ${msg.role === 'model' && msg.parts[0].text.includes('audit_report') ? 'audit-message' : ''}`}>

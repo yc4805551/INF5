@@ -22,6 +22,8 @@ interface UnifiedAssistantProps {
     // Chat Props
     chatHistory?: ChatMessage[];
     onSendMessage?: (text: string) => Promise<void>;
+    // Status feedback
+    lastCheckResult?: { message: string; timestamp: string; issueCount: number } | null;
 }
 
 export const UnifiedAssistant: React.FC<UnifiedAssistantProps> = ({
@@ -36,7 +38,8 @@ export const UnifiedAssistant: React.FC<UnifiedAssistantProps> = ({
     selectedText,
     chatHistory = [],
     onSendMessage,
-    onSuggestionSelect
+    onSuggestionSelect,
+    lastCheckResult
 }) => {
     // State for View Mode: 'monitor' (default) or 'chat'
     const [viewMode, setViewMode] = React.useState<'monitor' | 'chat'>('monitor');
@@ -73,6 +76,34 @@ export const UnifiedAssistant: React.FC<UnifiedAssistantProps> = ({
                     {viewMode === 'monitor' ? "提问" : "监控"}
                 </button>
             </div>
+
+            {/* Status Display - Only in monitor mode */}
+            {viewMode === 'monitor' && (
+                <div className="check-status-banner" style={{
+                    padding: '10px 16px',
+                    margin: '12px',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    fontWeight: '500',
+                    textAlign: 'center',
+                    background: isAnalyzing ? '#fef3c7' : (lastCheckResult?.issueCount === 0 ? '#d1fae5' : '#dbeafe'),
+                    color: isAnalyzing ? '#78350f' : (lastCheckResult?.issueCount === 0 ? '#065f46' : '#1e40af'),
+                    transition: 'all 0.3s ease',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                }}>
+                    {isAnalyzing ? (
+                        <>⏳ 正在检查...</>
+                    ) : lastCheckResult ? (
+                        <>{lastCheckResult.message}</>
+                    ) : (
+                        <>💡 输入至少10个字后自动检查</>
+                    )}
+                </div>
+            )}
 
             {/* Content Area */}
             <div className="assistant-content">

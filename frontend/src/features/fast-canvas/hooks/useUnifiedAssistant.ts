@@ -19,6 +19,13 @@ export const useUnifiedAssistant = (modelProvider: string = 'free') => {
     const [suggestions, setSuggestions] = useState<AISuggestion[]>([]);
     const [auditResult, setAuditResult] = useState<AuditResult | null>(null);
 
+    // 新增：检查状态反馈
+    const [lastCheckResult, setLastCheckResult] = useState<{
+        message: string;
+        timestamp: string;
+        issueCount: number;
+    } | null>(null);
+
     // Smart Cache: Map<requestHash, {result, timestamp}>
     const cacheRef = useRef<Map<string, { result: any; timestamp: number }>>(new Map());
     const CACHE_TTL = 60000; // 60 seconds
@@ -66,11 +73,17 @@ export const useUnifiedAssistant = (modelProvider: string = 'free') => {
             const completeModelConfig = getModelConfig(modelProvider, modelConfig);
 
             // 使用 Service 层调用
-            // 这种方式更整洁，且 API 定义统一
             const result = await performRealtimeCheck(selectedText, contextText, completeModelConfig);
 
             // Store in cache
             cacheRef.current.set(cacheKey, { result, timestamp: now });
+
+            // 设置检查结果反馈
+            setLastCheckResult({
+                message: result.message || '检查完成',
+                timestamp: result.checked_at || new Date().toISOString(),
+                issueCount: result.issues?.length || 0
+            });
 
             if (result.issues) {
                 // 转换为统一格式 (AISuggestion)
@@ -78,17 +91,24 @@ export const useUnifiedAssistant = (modelProvider: string = 'free') => {
                     id: `realtime-${Date.now()}-${idx}`,
                     blockId: '',
                     type: issue.type || 'proofread',
-                    severity: issue.severity || 'high', // 使用后端返回的 severity
+                    severity: issue.severity || 'high',
                     original: issue.original || issue.problematicText,
                     suggestion: issue.suggestion,
                     reason: issue.reason || issue.explanation,
-                    confidence: issue.confidence // 传递反思机制的信心等级
+                    confidence: issue.confidence
                 }));
 
                 setSuggestions(formattedSuggestions);
+            } else {
+                setSuggestions([]);
             }
         } catch (error) {
             console.error('[UnifiedAssistant] Realtime analysis error:', error);
+            setLastCheckResult({
+                message: '检查失败',
+                timestamp: new Date().toISOString(),
+                issueCount: 0
+            });
         } finally {
             setIsAnalyzing(false);
         }
@@ -265,6 +285,7 @@ export const useUnifiedAssistant = (modelProvider: string = 'free') => {
         removeSuggestion,
         // Chat exports
         chatHistory,
-        sendChatMessage
+        sendChatMessage,
+        lastCheckResult
     };
 };

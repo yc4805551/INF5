@@ -4,6 +4,7 @@ import base64
 import os
 import json
 import asyncio
+from datetime import datetime
 from typing import Dict, Any, List
 
 # Core Services
@@ -98,16 +99,19 @@ async def perform_audit(data: Dict[str, Any]) -> Dict[str, Any]:
                     kwargs["user_typos"] = rule_engine.get_typos_text()
                 elif agent_type == "terminology":
                     kwargs["user_forbidden"] = rule_engine.get_forbidden_text()
+                    kwargs["user_abbreviations"] = rule_engine.get_abbreviations_text()
 
                 prompt = get_agent_prompt(agent_type, target_text, source_text, **kwargs)
                 
-                # Sync LLM call wrapper
                 def _call():
                     if provider == "gemini":
                         return llm_engine._call_google_gemini(api_key, prompt, endpoint, model, images)
-                    elif provider in ["openai", "deepseek", "aliyun", "free"]:
+                    elif provider in ["openai", "deepseek", "aliyun", "free", "doubao", "depOCR", "ali"]:
                         return llm_engine._call_openai_compatible(api_key, endpoint, model, prompt)
-                    return "{}"
+                    else:
+                        # Fallback for unknown providers
+                        logger.warning(f"Unknown provider '{provider}', attempting OpenAI-compatible call")
+                        return llm_engine._call_openai_compatible(api_key, endpoint, model, prompt)
                 
                 agent_result_str = await asyncio.to_thread(_call)
                 
@@ -219,15 +223,41 @@ async def perform_realtime_check(data: Dict[str, Any]) -> Dict[str, Any]:
     def _call_sync():
         if provider == "gemini":
             return llm_engine._call_google_gemini(api_key, prompt, endpoint, model, [])
-        elif provider in ["openai", "deepseek", "aliyun", "free"]:
+        elif provider in ["openai", "deepseek", "aliyun", "free", "doubao", "depOCR", "ali"]:
              return llm_engine._call_openai_compatible(api_key, endpoint, model, prompt)
-        return "{}"
+        else:
+            # Fallback for unknown providers - attempt OpenAI-compatible
+            logging.warning(f"[Realtime] Unknown provider '{provider}', attempting OpenAI-compatible call")
+            return llm_engine._call_openai_compatible(api_key, endpoint, model, prompt)
+
 
     try:
         raw_result = await asyncio.to_thread(_call_sync)
         parsed = _parse_llm_result(raw_result)
         ai_issues = parsed.get("issues", []) if isinstance(parsed, dict) else []
-        return {"issues": rule_issues + ai_issues, "status": "PASS"}
+        
+        # 合并所有问题
+        all_issues = rule_issues + ai_issues
+        total_issues = len(all_issues)
+        
+        # 添加正向反馈
+        if total_issues == 0:
+            status_message = "✓ 太棒了！未发现任何问题"
+            status = "PASS"
+        elif total_issues == 1:
+            status_message = "发现 1 个建议"
+            status = "INFO"
+        else:
+            status_message = f"发现 {total_issues} 个建议"
+            status = "INFO"
+        
+        return {
+            "issues": all_issues,
+            "status": status,
+            "message": status_message,
+            "checked_at": datetime.now().isoformat()
+        }
+
     except Exception as e:
         logging.error(f"[Realtime] Failed: {e}")
         return {"issues": rule_issues}

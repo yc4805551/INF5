@@ -98,9 +98,11 @@ class LLMConfigManager:
             "openai": ("OPENAI",),
             "deepseek": ("DEEPSEEK",),
             "aliyun": ("ALI",),
+            "ali": ("ALI",),
             "free": ("FREE",),
             "doubao": ("DOUBAO",),
-            "depocr": ("DEPOCR",)
+            "depocr": ("DEPOCR",),
+            "depOCR": ("DEPOCR",)
         }
         
         env_prefixes = env_prefix_map.get(provider, ())
