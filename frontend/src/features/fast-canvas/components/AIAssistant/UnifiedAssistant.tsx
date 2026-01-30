@@ -24,6 +24,8 @@ interface UnifiedAssistantProps {
     onSendMessage?: (text: string) => Promise<void>;
     // Status feedback
     lastCheckResult?: { message: string; timestamp: string; issueCount: number } | null;
+    smartWrite?: (prompt: string) => Promise<{ content: string, sources: any[] }>;
+    onInsert?: (text: string) => void;
 }
 
 export const UnifiedAssistant: React.FC<UnifiedAssistantProps> = ({
@@ -39,9 +41,12 @@ export const UnifiedAssistant: React.FC<UnifiedAssistantProps> = ({
     chatHistory = [],
     onSendMessage,
     onSuggestionSelect,
-    lastCheckResult
+    lastCheckResult,
+    smartWrite,
+    onInsert
 }) => {
-    // State for View Mode: 'monitor' (default) or 'chat'
+
+    // State for View Mode: 'monitor' (default) or 'chat'.
     const [viewMode, setViewMode] = React.useState<'monitor' | 'chat'>('monitor');
 
     // Toggle function
@@ -49,9 +54,11 @@ export const UnifiedAssistant: React.FC<UnifiedAssistantProps> = ({
         setViewMode(prev => prev === 'monitor' ? 'chat' : 'monitor');
     };
 
+    console.log('[UnifiedAssistant] render, viewMode:', viewMode, 'history:', chatHistory.length);
+
     return (
         <div className="unified-assistant">
-            {/* Header / Title Bar (Optional, simpler now) */}
+            {/* Header / Title Bar */}
             <div className="assistant-header-bar">
                 <div className="agent-identity">
                     {viewMode === 'monitor' ? (
@@ -62,19 +69,28 @@ export const UnifiedAssistant: React.FC<UnifiedAssistantProps> = ({
                     ) : (
                         <>
                             <MessageSquare size={16} className="text-purple-500" />
-                            <span className="font-semibold">AI 写作伙伴</span>
+                            <span className="font-semibold">助手对话</span>
                         </>
                     )}
                 </div>
-                {/* Switcher Button */}
-                <button
-                    onClick={toggleViewMode}
-                    className="mode-switch-btn"
-                    title={viewMode === 'monitor' ? "进入对话模式" : "返回实时模式"}
-                >
-                    {viewMode === 'monitor' ? <MessageSquare size={14} /> : <Sparkles size={14} />}
-                    {viewMode === 'monitor' ? "提问" : "监控"}
-                </button>
+                {/* Switcher Buttons */}
+                <div className="header-actions" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+
+                    {/* Simplified View Switcher */}
+                    <button
+                        onClick={toggleViewMode}
+                        className="mode-switch-btn"
+                        title={viewMode === 'monitor' ? "进入对话模式" : "返回实时模式"}
+                    >
+                        {viewMode === 'monitor' ? <MessageSquare size={14} /> : <Sparkles size={14} />}
+                        {viewMode === 'monitor' ? "提问" : "监控"}
+                    </button>
+
+                    {/* View Mode Indicator */}
+                    <span style={{ fontSize: '12px', color: '#6b7280' }}>
+                        {viewMode === 'monitor' ? '审核模式' : '问答模式'}
+                    </span>
+                </div>
             </div>
 
             {/* Status Display - Only in monitor mode */}
@@ -119,12 +135,25 @@ export const UnifiedAssistant: React.FC<UnifiedAssistantProps> = ({
                 ) : (
                     <CopilotChat
                         history={chatHistory}
-                        onSendMessage={onSendMessage || (async () => { })}
+                        onSend={async (text) => {
+                            // Keyword Trigger Logic: "根据知识库"
+                            if (text.includes('根据知识库') && smartWrite) {
+                                await smartWrite(text);
+                            } else if (onSendMessage) {
+                                await onSendMessage(text);
+                            }
+                        }}
                         isLoading={isAnalyzing}
                         selectedText={selectedText}
                         onRunFullAudit={() => {
                             if (onRunAudit) onRunAudit(['proofread', 'logic', 'format', 'consistency', 'terminology']);
                         }}
+                        onApplySuggestion={onApplySuggestion}
+                        onDismissSuggestion={onDismissSuggestion}
+                        // smartWrite prop removed from CopilotChat usage as it's handled here
+                        // isWriteMode removed
+                        // setIsWriteMode removed
+                        onInsert={onInsert}
                     />
                 )}
             </div>

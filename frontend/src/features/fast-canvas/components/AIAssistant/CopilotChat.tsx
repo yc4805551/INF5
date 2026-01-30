@@ -1,41 +1,43 @@
-import React from 'react';
-import { Send, Upload, Square } from 'lucide-react';
-import { ChatMessage, AISuggestion } from '../../types';
-import { AuditReportMessage } from './AuditReportMessage';
-import './CopilotChat.css';
+import React, { useRef, useEffect, useState } from 'react';
+import { Send, Square } from 'lucide-react';
+import { ChatMessage, AuditResult, AISuggestion } from '../../types';
+import './CopilotChat.css'; // We'll keep the CSS import but override with inline styles
 
 interface CopilotChatProps {
     history: ChatMessage[];
-    onSendMessage: (text: string) => Promise<void>;
+    onSend: (text: string) => void;
     isLoading: boolean;
-    selectedText?: string;
-    onRunFullAudit?: () => void;
-
-    // Suggestion Actions for Audit Cards
     onApplySuggestion: (suggestion: AISuggestion) => void;
-    onDismissSuggestion: (id: string) => void;
+    onDismissSuggestion: (suggestionId: string) => void;
+    onRunFullAudit?: () => void;
+    selectedText?: string;
+    onInsert?: (text: string) => void;
 }
 
 export const CopilotChat: React.FC<CopilotChatProps> = ({
     history,
-    onSendMessage,
+    onSend,
     isLoading,
-    selectedText,
-    onRunFullAudit,
     onApplySuggestion,
-    onDismissSuggestion
+    onDismissSuggestion,
+    onRunFullAudit,
+    selectedText,
+    onInsert
 }) => {
-    const [inputValue, setInputValue] = React.useState('');
-    const messagesEndRef = React.useRef<HTMLDivElement>(null);
+    const [inputValue, setInputValue] = useState('');
+    const messagesEndRef = useRef<HTMLDivElement>(null);
 
-    // Auto-scroll
-    React.useEffect(() => {
+    const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [history]);
+    };
+
+    useEffect(() => {
+        scrollToBottom();
+    }, [history, isLoading]);
 
     const handleSend = () => {
-        if (!inputValue.trim() || isLoading) return;
-        onSendMessage(inputValue);
+        if (!inputValue.trim()) return;
+        onSend(inputValue);
         setInputValue('');
     };
 
@@ -46,112 +48,147 @@ export const CopilotChat: React.FC<CopilotChatProps> = ({
         }
     };
 
+    // Robust Message Renderer
     const renderMessageContent = (msg: ChatMessage) => {
-        // Simple heuristic: check if content looks like our special audit report text
-        // In useUnifiedAssistant, we formatted it as text but also passed the raw data via state?
-        // Wait, standard ChatMessage structure (from Gemini SDK) is parts[{ text: "..." }]
-        // We need a way to detect Structured Data in the message history.
-        // Option 1: Try parsing the text part as JSON if it starts with { "type": "audit_report" }
-        // Option 2: Look for specific markers.
-
         return msg.parts.map((part, pIdx) => {
-            // Try to see if this part is a HIDDEN structured data payload
-            // Current backend behavior (from useUnifiedAssistant hook modification):
-            // It creates a text message: "✅ [审核完成] ... \n\n(详细...)"
-            // BUT we want to pass the DATA.
-
-            // Let's enhance the Hook to serialize the DATA into the text part 
-            // in a way we can detect, OR (better) use a custom property on ChatMessage if TypeScript allowed.
-            // Since TypeScript types for ChatMessage might be strict, let's try to parse text IF it looks like JSON.
-
-            let content = part.text;
-            let auditData = null;
-
-            // Hacky way to embed data: <StructuredData json="..." /> or just JSON string
-            // Let's assume the hook passed JSON string for audit report
-            if (content.trim().startsWith('{"type":"audit_report"')) {
+            // Check if it's our special JSON audit report
+            if (part.text.trim().startsWith('{"type":"audit_report"')) {
                 try {
-                    const parsed = JSON.parse(content);
+                    const parsed = JSON.parse(part.text);
                     if (parsed.type === 'audit_report') {
                         return (
-                            <AuditReportMessage
-                                key={pIdx}
-                                result={parsed.data}
-                                onApplySuggestion={onApplySuggestion}
-                                onDismissSuggestion={onDismissSuggestion}
-                            />
+                            <div key={pIdx} style={{ background: '#0f172a', padding: '10px', borderRadius: '8px', border: '1px solid #334155' }}>
+                                <div style={{ color: '#60a5fa', fontWeight: 'bold', marginBottom: '8px' }}>🔍 深度体检报告</div>
+                                <div style={{ color: '#cbd5e1', fontSize: '12px' }}>
+                                    (报告数据已接收，请查看详细建议)
+                                </div>
+                            </div>
                         );
                     }
-                } catch (e) {
-                    // Not valid JSON, render as text
-                }
+                } catch (e) { }
             }
-
-            // Render standard text
-            return <div key={pIdx} style={{ whiteSpace: 'pre-wrap' }}>{content}</div>;
+            return <div key={pIdx} style={{ whiteSpace: 'pre-wrap' }}>{part.text}</div>;
         });
     };
 
     return (
-        <div className="copilot-chat-container">
+        <div className="copilot-chat-container" style={{ background: '#09090b', display: 'flex', flexDirection: 'column', height: '100%', minHeight: '400px' }}>
             {/* Quick Actions Toolbar */}
-            <div className="copilot-toolbar">
+            <div className="copilot-toolbar" style={{ background: '#18181b', borderBottom: '1px solid #27272a', padding: '10px' }}>
                 <button
                     className="action-btn audit-btn"
                     onClick={onRunFullAudit}
                     title="运行全文深度体检"
                     disabled={isLoading}
+                    style={{ background: '#27272a', color: '#e4e4e7', border: '1px solid #3f3f46', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px' }}
                 >
-                    🔍 全文体检
+                    <span>🔍</span> 全文体检
                 </button>
             </div>
 
             {/* Messages Area */}
-            <div className="chat-messages">
+            <div className="chat-messages" style={{ padding: '20px', flex: 1, overflowY: 'auto' }}>
                 {history.length === 0 ? (
-                    <div className="chat-welcome" style={{ display: 'none' }}></div>
+                    <div className="chat-welcome" style={{ textAlign: 'center', marginTop: '60px', color: '#71717a' }}>
+                        <p>👋 我是您的 AI 助手，请告诉我有何指示。</p>
+                    </div>
                 ) : (
                     history.map((msg, idx) => (
-                        <div key={idx} className={`chat-bubble ${msg.role} ${msg.role === 'model' && msg.parts[0].text.includes('audit_report') ? 'audit-message' : ''}`}>
-                            <div className="bubble-content">
+                        <div key={idx} className={`chat-bubble ${msg.role}`} style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
+                            maxWidth: '85%',
+                            marginBottom: '16px'
+                        }}>
+                            <div className="bubble-content" style={{
+                                padding: '12px 16px',
+                                borderRadius: '12px',
+                                background: msg.role === 'user' ? '#3f3f46' : '#27272a', // Lighter Zinc for User, Darker for AI
+                                color: '#ffffff',
+                                border: 'none', // Removed Border
+                                boxShadow: '0 2px 4px rgba(0,0,0,0.3)', // Basic Shadow
+                                fontSize: '14px',
+                                lineHeight: '1.6',
+                                whiteSpace: 'pre-wrap'
+                            }}>
                                 {renderMessageContent(msg)}
                             </div>
+
+                            {/* Insert Button for Model Messages */}
+                            {msg.role === 'model' && onInsert && (
+                                <div style={{ marginTop: '6px' }}>
+                                    <button
+                                        onClick={() => onInsert(msg.parts[0].text)}
+                                        style={{
+                                            fontSize: '11px',
+                                            padding: '4px 8px',
+                                            background: '#18181b',
+                                            color: '#a1a1aa',
+                                            border: '1px solid #27272a', // Darker border, less noticeable
+                                            borderRadius: '6px',
+                                            cursor: 'pointer',
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: '4px'
+                                        }}
+                                        title="插入到文档"
+                                    >
+                                        📝 插入到文档
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     ))
                 )}
 
                 {isLoading && (
-                    <div className="chat-bubble model loading">
-                        <div className="typing-dot"></div>
-                        <div className="typing-dot"></div>
-                        <div className="typing-dot"></div>
+                    <div className="chat-bubble model" style={{ alignSelf: 'flex-start', background: 'transparent' }}>
+                        <div className="bubble-content" style={{ background: '#27272a', padding: '12px 20px', borderRadius: '12px', color: '#e4e4e7', boxShadow: '0 2px 4px rgba(0,0,0,0.3)', border: 'none' }}>
+                            <span>Thinking...</span>
+                        </div>
                     </div>
                 )}
                 <div ref={messagesEndRef} />
             </div>
 
             {/* Input Area */}
-            <div className="chat-input-area">
+            <div className="chat-input-area" style={{ background: '#18181b', borderTop: '1px solid #27272a', padding: '16px' }}>
                 {selectedText && (
-                    <div className="selected-context-preview">
-                        <span className="sc-label">针对选段:</span>
-                        <span className="sc-text">"{selectedText.slice(0, 30)}..."</span>
+                    <div className="selected-context-preview" style={{ background: '#09090b', color: '#a1a1aa', padding: '8px', borderRadius: '6px', marginBottom: '8px', fontSize: '12px', border: '1px solid #27272a' }}>
+                        <span className="sc-label" style={{ color: '#e4e4e7', fontWeight: 'bold', marginRight: '8px' }}>针对选段:</span>
+                        <span className="sc-text">"{selectedText?.slice(0, 30)}..."</span>
                     </div>
                 )}
-                <div className="input-wrapper">
+                <div className="input-wrapper" style={{ background: '#09090b', border: '1px solid #27272a', borderRadius: '12px', padding: '10px', display: 'flex', gap: '8px', alignItems: 'flex-end', boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.3)' }}>
                     <textarea
                         value={inputValue}
                         onChange={(e) => setInputValue(e.target.value)}
                         onKeyDown={handleKeyDown}
                         placeholder={selectedText ? "针对选中的文本在问..." : "输入问题或指令..."}
                         disabled={isLoading}
+                        style={{ color: '#fafafa', background: 'transparent', border: 'none', resize: 'none', flex: 1, outline: 'none', minHeight: '24px' }}
                     />
                     <button
                         className="send-btn"
                         onClick={handleSend}
                         disabled={!inputValue.trim() || isLoading}
+                        style={{
+                            background: !inputValue.trim() && !isLoading ? '#27272a' : '#fafafa', // Dark grey if disabled, White if active
+                            color: !inputValue.trim() && !isLoading ? '#52525b' : '#18181b',      // Dim grey icon if disabled, Black icon if active
+                            width: '32px',
+                            height: '32px',
+                            borderRadius: '8px',
+                            border: 'none',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: (!inputValue.trim() || isLoading) ? 'not-allowed' : 'pointer',
+                            transition: 'all 0.2s ease',
+                            opacity: 1 // Force full opacity to control colors manually
+                        }}
                     >
-                        {isLoading ? <Square size={16} /> : <Send size={16} />}
+                        {isLoading ? <Square size={16} className="animate-spin" /> : <Send size={18} strokeWidth={2.5} />}
                     </button>
                 </div>
             </div>

@@ -14,6 +14,7 @@ export interface SmartSearchResponse {
     success: boolean;
     query: string;
     intent?: string;
+    strategies_used?: string[];
     total_candidates?: number;
     results: SmartSearchResult[];
     ai_analysis?: string;

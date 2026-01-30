@@ -2,14 +2,18 @@
     background: var(--color-bg-white);
     border-radius: 8px;
     border-left: 3px solid;
-    padding: 12px;
-    margin-bottom: 12px;
+    padding: 8px;
+    /* Compact padding */
+    margin-bottom: 8px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     transition: all 0.2s;
+    position: relative;
+    border: 1px solid var(--border-color);
+    border-left-width: 3px;
 }
 
 .suggestion-card:hover {
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
     transform: translateY(-1px);
 }
 
@@ -17,92 +21,9 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 10px;
-}
-
-.suggestion-type {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 12px;
-    font-weight: 600;
-}
-
-.suggestion-severity {
-    font-size: 10px;
-    padding: 2px 8px;
-    border-radius: 10px;
-    font-weight: 500;
-}
-
-.suggestion-content {
-    margin-bottom: 10px;
-}
-
-.suggestion-original,
-.suggestion-new {
-    display: flex;
-    gap: 6px;
     margin-bottom: 4px;
-    font-size: 13px;
-}
-
-.suggestion-original .label,
-.suggestion-new .label {
-    font-weight: 600;
-    color: var(--color-text-secondary);
-    flex-shrink: 0;
-}
-
-.suggestion-original .text {
-    color: var(--color-text-secondary);
-    text-decoration: line-through;
-}
-
-.suggestion-new .text {
-    color: var(--color-text);
-    font-weight: 500;
-}
-
-.suggestion-arrow {
-    color: var(--color-border);
-    font-size: 12px;
-    margin: 2px 0;
-    padding-left: 40px;
-}
-
-.suggestion-reason {
-    font-size: 11px;
-    color: var(--color-text-secondary);
-    font-style: italic;
-    padding: 8px;
-    background: var(--color-bg-card);
-    border-radius: 4px;
-    margin-bottom: 10px;
-}
-
-.suggestion-card {
-    background: var(--color-bg-white);
-    border-radius: 8px;
-    border-left: 3px solid;
-    padding: 8px;
-    /* Compact padding */
-    margin-bottom: 8px;
-    /* Compact margin */
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    transition: all 0.2s;
-    position: relative;
-    /* Enable absolute positioning for actions */
-}
-
-/* ... existing hover ... */
-
-.suggestion-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 6px;
-    /* Compact margin from 10px */
+    /* Reduced header margin */
+    padding-right: 60px;
 }
 
 .suggestion-type {
@@ -114,40 +35,82 @@
     font-weight: 600;
 }
 
-/* ... severity ... */
-
 .suggestion-content {
-    margin-bottom: 6px;
-    /* Compact margin from 10px */
+    margin-bottom: 4px;
+    /* Reduced content margin */
 }
 
 .suggestion-original,
 .suggestion-new {
     display: flex;
-    gap: 4px;
-    /* Compact gap */
+    gap: 6px;
     margin-bottom: 2px;
-    /* Compact margin */
+    /* Minimal paragraph spacing */
+    font-size: 13px;
+    line-height: 1.4;
+    /* Tighter line height */
+    align-items: baseline;
+}
+
+.suggestion-original .label,
+.suggestion-new .label {
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    font-size: 11px;
+    /* Smaller label */
+    flex-shrink: 0;
+    width: 28px;
+    /* Narrower label width */
+}
+
+.suggestion-original .text {
+    color: var(--color-text-secondary);
+    text-decoration: line-through;
+    opacity: 0.7;
     font-size: 12px;
-    /* Smaller font from 13px */
+    /* Smaller original text */
+}
+
+.suggestion-new .text {
+    color: var(--color-text);
+    font-weight: 500;
+}
+
+/* Compact Arrow */
+.suggestion-arrow {
+    color: var(--color-border);
+    font-size: 12px;
+    margin: -2px 0 2px 36px;
+    /* Tighter arrow spacing */
+    line-height: 1;
+    opacity: 0.5;
+}
+
+.suggestion-reason {
+    font-size: 11px;
+    color: var(--color-text-secondary);
+    padding: 4px 8px;
+    background: var(--color-bg-subtle);
+    border-radius: 4px;
+    margin-top: 6px;
     line-height: 1.4;
 }
 
+/* Actions */
 .suggestion-actions {
     position: absolute;
-    top: 8px;
-    right: 8px;
+    top: 6px;
+    /* Adjusted top */
+    right: 6px;
+    /* Adjusted right */
     display: flex;
     gap: 4px;
-    margin-top: 0;
-    padding-top: 0;
-    border-top: none;
-    min-height: auto;
 }
 
 .suggestion-btn {
-    width: 24px;
-    height: 24px;
+    width: 22px;
+    /* Smaller buttons */
+    height: 22px;
     padding: 0;
     border-radius: 4px;
     background: transparent;
@@ -157,12 +120,17 @@
     justify-content: center;
     transition: all 0.2s;
     border: 1px solid transparent;
+    cursor: pointer;
+}
+
+.suggestion-btn span {
+    display: none;
+    /* FORCE HIDE TEXT */
 }
 
 .suggestion-btn:hover {
-    background: var(--color-bg-tab-hover);
+    background: var(--color-bg-hover);
     color: var(--color-text);
-    border-color: var(--color-border);
 }
 
 .suggestion-btn.apply:hover {
@@ -175,38 +143,4 @@
     background: #fef2f2;
     color: #ef4444;
     border-color: #fecaca;
-}
-
-.suggestion-btn span {
-    display: none;
-    /* Hide text, icon only */
-}
-
-border-radius: 4px;
-font-size: 12px;
-font-weight: 500;
-cursor: pointer;
-transition: all 0.2s;
-}
-
-.suggestion-btn.apply {
-    background: #dcfce7;
-    color: #166534;
-}
-
-.suggestion-btn.apply:hover {
-    background: #bbf7d0;
-}
-
-.suggestion-btn.dismiss {
-    background: var(--color-bg-card);
-    color: var(--color-text-secondary);
-}
-
-.suggestion-btn.dismiss:hover {
-    background: var(--color-bg-tab-hover);
-}
-
-.suggestion-btn:active {
-    transform: scale(0.98);
 }

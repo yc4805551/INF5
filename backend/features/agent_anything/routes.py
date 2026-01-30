@@ -1,5 +1,6 @@
-from flask import Blueprint, request, jsonify
-from .services import perform_anything_audit, get_anything_workspaces, chat_with_anything
+from flask import Blueprint, request, jsonify, Response
+import json
+from .services import perform_anything_audit, get_anything_workspaces, chat_with_anything, generate_content_with_knowledge
 
 agent_anything_bp = Blueprint('agent_anything', __name__)
 
@@ -56,3 +57,21 @@ def list_workspaces():
         return jsonify({'workspaces': formatted})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@agent_anything_bp.route('/smart-write', methods=['POST'])
+def smart_write():
+    """
+    Endpoint for Knowledge-Driven Smart Writing.
+    Expects: { "prompt": "..." }
+    """
+    data = request.json
+    prompt = data.get('prompt')
+    if not prompt:
+        return jsonify({"error": "Prompt is required"}), 400
+        
+    try:
+        result = generate_content_with_knowledge(prompt)
+        # Use simplejson/json dumps to avoiding escaping unicode
+        return Response(json.dumps(result, ensure_ascii=False), mimetype='application/json')
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500

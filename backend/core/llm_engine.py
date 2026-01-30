@@ -447,7 +447,7 @@ AVAILABLE TOOLS:
         provider = "gemini"
         api_key = self.api_key
         endpoint = None
-        model = "gemini-1.5-flash" # Default fallback
+        model = "gemini-2.5-flash" # Default fallback
         
         if model_config:
             provider = model_config.get("provider", provider)
@@ -895,7 +895,7 @@ for i, p in enumerate(doc.paragraphs):
         if not model:
             # User requested "gemini-2.5-flash", assuming they meant the latest stable flash which is 1.5
             # If they really meant 2.0-flash-exp, I can set that, but 1.5 is standard.
-            model = "gemini-1.5-flash"
+            model = "gemini-2.5-flash"
             
         logger.info(f"DEBUG: _call_google_gemini (New SDK) - model: {model}, has_images: {bool(images)}")
 

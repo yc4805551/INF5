@@ -35,10 +35,10 @@ FILE_SEARCH_TOOL = {
             },
             "max_results": {
                 "type": "integer",
-                "description": "最多返回多少个结果，默认 10",
-                "default": 10,
+                "description": "最多返回多少个结果，默认 20",
+                "default": 20,
                 "minimum": 1,
-                "maximum": 20
+                "maximum": 1000
             }
         },
         "required": ["query"]
@@ -46,7 +46,7 @@ FILE_SEARCH_TOOL = {
 }
 
 
-def execute(query: str, max_results: int = 10) -> str:
+def execute(query: str, max_results: int = 20) -> str:
     """
     执行文件搜索（供 Agent 调用）
     
@@ -71,7 +71,7 @@ def execute(query: str, max_results: int = 10) -> str:
         result = agent.smart_search(
             natural_language_query=query,
             everything_search_func=service.everything_client.search_with_filters,
-            max_candidates=100,
+            max_candidates=2000,
             top_k=max_results
         )
         

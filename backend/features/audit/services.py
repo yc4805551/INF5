@@ -106,11 +106,8 @@ async def perform_audit(data: Dict[str, Any]) -> Dict[str, Any]:
                 def _call():
                     if provider == "gemini":
                         return llm_engine._call_google_gemini(api_key, prompt, endpoint, model, images)
-                    elif provider in ["openai", "deepseek", "aliyun", "free", "doubao", "depOCR", "ali"]:
-                        return llm_engine._call_openai_compatible(api_key, endpoint, model, prompt)
                     else:
-                        # Fallback for unknown providers
-                        logger.warning(f"Unknown provider '{provider}', attempting OpenAI-compatible call")
+                        # Default to OpenAI-compatible for all other providers (openai, deepseek, ali, doubao, free, etc.)
                         return llm_engine._call_openai_compatible(api_key, endpoint, model, prompt)
                 
                 agent_result_str = await asyncio.to_thread(_call)
@@ -223,11 +220,8 @@ async def perform_realtime_check(data: Dict[str, Any]) -> Dict[str, Any]:
     def _call_sync():
         if provider == "gemini":
             return llm_engine._call_google_gemini(api_key, prompt, endpoint, model, [])
-        elif provider in ["openai", "deepseek", "aliyun", "free", "doubao", "depOCR", "ali"]:
-             return llm_engine._call_openai_compatible(api_key, endpoint, model, prompt)
         else:
-            # Fallback for unknown providers - attempt OpenAI-compatible
-            logging.warning(f"[Realtime] Unknown provider '{provider}', attempting OpenAI-compatible call")
+            # Default to OpenAI-compatible for all other providers
             return llm_engine._call_openai_compatible(api_key, endpoint, model, prompt)
 
 

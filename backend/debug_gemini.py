@@ -43,7 +43,7 @@ def test_gemini():
         print(f"[X] Failed: 'gemini-2.5-flash' does not appear to work.\n   Error: {e}")
 
     # 3. Test Known Good Models
-    known_models = ["gemini-2.0-flash-exp", "gemini-1.5-flash"]
+    known_models = ["gemini-2.0-flash-exp", "gemini-2.5-flash"]
     
     for model_name in known_models:
         print(f"\n--- Testing Model '{model_name}' ---")

@@ -2,49 +2,8 @@ import React, { useState } from 'react';
 import { smartSearch, openFileLocation, copyTextToClipboard, SmartSearchResult } from './smartSearchApi';
 import './SmartSearchPage.css';
 
-// 复制路径 (增强版: 服务器端复制)
-const handleCopyPath = async (path: string) => {
-    if (!path) return;
-
-    try {
-        // 优先尝试服务器端复制 (因为浏览器可能有安全限制)
-        const success = await copyTextToClipboard(path);
-        if (success) {
-            alert('✅ 路径已复制');
-            return;
-        }
-
-        // 如果服务器端失败 (比如网络问题)，降级到浏览器端
-        throw new Error('Server copy failed');
-    } catch (err) {
-        console.error('Server copy failed, trying local fallback', err);
-
-        // Fallback for non-secure contexts or older browsers
-        try {
-            // ... (keep existing fallback logic as last resort)
-            await navigator.clipboard.writeText(path);
-        } catch (fallbackErr) {
-            // ... (keep existing DOM fallback)
-            try {
-                const textArea = document.createElement("textarea");
-                textArea.value = path;
-                textArea.style.position = "fixed";
-                textArea.style.left = "-9999px";
-                textArea.style.top = "0";
-                document.body.appendChild(textArea);
-                textArea.focus();
-                textArea.select();
-                document.execCommand('copy');
-                document.body.removeChild(textArea);
-            } catch (domErr) {
-                alert('❌ 无法自动复制，请手动复制');
-            }
-        }
-    }
-};
-
 /**
- * AI 智能文件搜索页面 - 简洁版
+ * AI 智能文件搜索页面 - 增强版
  */
 interface SmartSearchPageProps {
     modelProvider?: string;
@@ -57,6 +16,7 @@ export const SmartSearchPage: React.FC<SmartSearchPageProps> = ({ modelProvider 
     const [error, setError] = useState<string | null>(null);
     const [aiAnalysis, setAiAnalysis] = useState<string>('');
     const [intent, setIntent] = useState<string>('');
+    const [strategies, setStrategies] = useState<string[]>([]);
 
     // 执行搜索
     const handleSearch = async (e?: React.FormEvent) => {
@@ -72,10 +32,12 @@ export const SmartSearchPage: React.FC<SmartSearchPageProps> = ({ modelProvider 
         setResults([]);
         setAiAnalysis('');
         setIntent('');
+        setStrategies([]);
 
         try {
+            // 模拟 AI 思考过程 (可选：实际 API 也不慢，但加一点延迟让用户感觉"在思考"体验更好？不，直接调)
             const response = await smartSearch(query, {
-                maxResults: 20,
+                maxResults: 100,
                 modelProvider: modelProvider
             });
 
@@ -83,6 +45,7 @@ export const SmartSearchPage: React.FC<SmartSearchPageProps> = ({ modelProvider 
                 setResults(response.results);
                 setAiAnalysis(response.ai_analysis || '');
                 setIntent(response.intent || '');
+                setStrategies(response.strategies_used || []);
             } else {
                 setError(response.error || '搜索失败');
             }
@@ -93,67 +56,47 @@ export const SmartSearchPage: React.FC<SmartSearchPageProps> = ({ modelProvider 
         }
     };
 
-    // 获取文件的完整路径 (兼容 Everything 返回 path 为目录的情况)
+    // 获取路径分隔符
+    const getSeparator = (path: string) => path.includes('/') ? '/' : '\\';
+
+    // 获取完整路径
     const getFullPath = (file: SmartSearchResult) => {
         if (!file.path) return '';
-        // 如果 path 已经包含 name (某些 API 变体)，则直接返回
         if (file.path.endsWith(file.name)) return file.path;
-
-        // 否则拼接 (简单处理 Windows 路径分隔符)
-        const separator = file.path.includes('/') ? '/' : '\\';
-        return file.path.endsWith(separator)
-            ? file.path + file.name
-            : file.path + separator + file.name;
+        const sep = getSeparator(file.path);
+        return file.path.endsWith(sep) ? file.path + file.name : file.path + sep + file.name;
     };
 
-    // 复制路径 (增强版: 支持 fallback)
-    const handleCopyPath = async (path: string) => {
-        if (!path) return;
-
+    // 打开文件/文件夹
+    const handleOpen = async (file: SmartSearchResult, type: 'folder' | 'open') => {
         try {
-            await navigator.clipboard.writeText(path);
-        } catch (err) {
-            console.error('Clipboard API failed, trying fallback', err);
-            // Fallback for non-secure contexts or older browsers
-            try {
-                const textArea = document.createElement("textarea");
-                textArea.value = path;
-
-                // Ensure it's not visible but part of DOM
-                textArea.style.position = "fixed";
-                textArea.style.left = "-9999px";
-                textArea.style.top = "0";
-                document.body.appendChild(textArea);
-
-                textArea.focus();
-                textArea.select();
-
-                document.execCommand('copy');
-                document.body.removeChild(textArea);
-            } catch (fallbackErr) {
-                console.error('Copy failed completely', fallbackErr);
-                alert('❌ 无法自动复制，请手动复制');
-            }
+            const fullPath = getFullPath(file);
+            // 如果是 openfolder，后端目前的 api 是 /open (select)
+            const success = await openFileLocation(fullPath);
+            if (!success) alert('无法打开位置');
+        } catch (e) {
+            console.error(e);
         }
     };
 
-    // 打开所在位置
-    const handleOpenFolder = async (path: string) => {
-        if (!path) return;
-        try {
-            const success = await openFileLocation(path);
-            if (!success) {
-                alert('无法打开文件夹，可能文件不存在');
+    // 复制路径
+    const handleCopy = async (file: SmartSearchResult) => {
+        const fullPath = getFullPath(file);
+        const success = await copyTextToClipboard(fullPath);
+        if (success) {
+            // 可以加一个 toast 提示，这里先忽略
+        } else {
+            try {
+                await navigator.clipboard.writeText(fullPath);
+            } catch (e) {
+                alert('复制失败，请手动复制');
             }
-        } catch (e) {
-            console.error(e);
-            alert('打开文件夹失败');
         }
     };
 
     // 格式化文件大小
-    const formatFileSize = (bytes?: number): string => {
-        if (!bytes) return '-';
+    const formatSize = (bytes?: number) => {
+        if (!bytes) return '';
         if (bytes < 1024) return `${bytes} B`;
         if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
         return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
@@ -161,126 +104,87 @@ export const SmartSearchPage: React.FC<SmartSearchPageProps> = ({ modelProvider 
 
     return (
         <div className="smart-search-page">
-            {/* 标题 */}
             <div className="search-header">
-                <h1>🤖 AI 文件搜索助手</h1>
-                <p className="subtitle">用自然语言描述您要找的文件</p>
+                <h1>AI 文件深度搜索</h1>
+                <p className="subtitle">多策略并行检索 · 智能语义理解 · 自动聚合结果</p>
             </div>
 
-            {/* 搜索框 */}
             <form onSubmit={handleSearch} className="search-box">
                 <input
                     type="text"
                     className="search-input"
-                    placeholder="例如：帮我找最近修改的关于吴军的课程PPT"
+                    placeholder="描述你要找的文件，例如：'找一下最近关于大模型落地的PPT'..."
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     disabled={isLoading}
+                    autoFocus
                 />
-                <button
-                    type="submit"
-                    className="search-button"
-                    disabled={isLoading || !query.trim()}
-                >
-                    {isLoading ? '搜索中...' : '🔍 搜索'}
+                <button type="submit" className="search-button" disabled={isLoading || !query.trim()}>
+                    {isLoading ? '搜索中...' : '开始搜索'}
                 </button>
             </form>
 
-            {/* AI 分析提示 */}
-            {aiAnalysis && (
-                <div className="ai-analysis">
-                    💡 {aiAnalysis}
-                    {intent && <span className="intent-tag">意图：{intent}</span>}
-                </div>
-            )}
-
-            {/* 错误提示 */}
-            {error && (
-                <div className="error-box">
-                    ⚠️ {error}
-                </div>
-            )}
-
-            {/* 加载状态 */}
-            {isLoading && (
-                <div className="loading-box">
-                    <div className="spinner"></div>
-                    <p>AI 正在分析并筛选文件...</p>
-                </div>
-            )}
-
-            {/* 结果列表 - 简化版 */}
-            {!isLoading && results.length > 0 && (
-                <div className="simple-results-list">
-                    {results.map((file, index) => (
-                        <div key={index} className="simple-result-card">
-                            <div className="result-main">
-                                <div className="result-header">
-                                    <span className="file-icon">📄</span>
-                                    <span className="file-name" title={file.name}>{file.name}</span>
-                                    {file.score !== undefined && file.score >= 80 && (
-                                        <span className="high-score-badge">推荐</span>
-                                    )}
-                                </div>
-                                <div className="result-path" title={file.path}>
-                                    📍 {file.path}
-                                </div>
-                                {file.reason && (
-                                    <div className="result-reason">
-                                        💡 {file.reason}
-                                    </div>
-                                )}
+            <div className="ai-analysis-container" style={{ display: (aiAnalysis || isLoading) ? 'block' : 'none' }}>
+                {isLoading ? (
+                    <div className="analysis-text">
+                        <div className="spinner" style={{ width: '20px', height: '20px', borderWidth: '2px', margin: 0 }}></div>
+                        <span>AI 正在分析您的意图并尝试不同搜索策略...</span>
+                    </div>
+                ) : (
+                    <>
+                        <div className="analysis-text">
+                            <span>💡 {aiAnalysis}</span>
+                        </div>
+                        {strategies.length > 0 && (
+                            <div className="strategies-tag">
+                                已尝试策略：{strategies.join('、')}
                             </div>
+                        )}
+                    </>
+                )}
+            </div>
 
-                            <div className="result-actions">
-                                <button
-                                    className="simple-action-btn"
-                                    onClick={() => {
-                                        const fullPath = getFullPath(file);
-                                        handleOpenFolder(fullPath);
-                                    }}
-                                    title="打开所在文件夹"
-                                >
-                                    📂
-                                </button>
-                                <button
-                                    className="simple-action-btn"
-                                    onClick={() => {
-                                        const fullPath = getFullPath(file);
-                                        handleCopyPath(fullPath);
-                                    }}
-                                    title="复制完整路径"
-                                >
-                                    📋
-                                </button>
+            {error && <div className="error-box">⚠️ {error}</div>}
+
+            <div className="results-grid">
+                {results.map((file, index) => (
+                    <div key={index} className="result-card">
+                        {file.score && file.score > 85 && <div className="score-badge">✨ 强相关</div>}
+
+                        <div className="card-header">
+                            <div className="file-icon">
+                                {file.name.endsWith('.ppt') || file.name.endsWith('.pptx') ? '📊' :
+                                    file.name.endsWith('.doc') || file.name.endsWith('.docx') ? '📝' :
+                                        file.name.endsWith('.pdf') ? '📕' :
+                                            file.name.endsWith('.xls') || file.name.endsWith('.xlsx') ? '📗' : '📄'}
+                            </div>
+                            <div className="file-info">
+                                <div className="file-name" title={file.name}>{file.name}</div>
+                                <div className="file-meta">
+                                    <span>{formatSize(file.size)}</span>
+                                    <span>•</span>
+                                    <span>{file.date_modified?.split(' ')[0]}</span>
+                                </div>
                             </div>
                         </div>
-                    ))}
-                </div>
-            )}
 
-            {/* 空状态 */}
-            {!isLoading && !error && results.length === 0 && query && (
-                <div className="empty-state">
-                    <p className="empty-icon">🔍</p>
-                    <p className="empty-text">未找到匹配的文件</p>
-                    <p className="empty-hint">试试调整您的描述或使用不同的关键词</p>
-                </div>
-            )}
+                        {file.reason && <div className="ai-reason">🎯 {file.reason}</div>}
 
-            {/* 初始提示 */}
-            {!isLoading && !query && results.length === 0 && (
-                <div className="tips-box">
-                    <h3>💡 搜索提示</h3>
-                    <ul>
-                        <li>使用自然语言描述您要找的文件，例如：<br />
-                            <code>"帮我找最近修改的期末作业"</code></li>
-                        <li>可以指定时间范围：<br />
-                            <code>"上周讨论的项目文档"</code></li>
-                        <li>可以指定文件类型：<br />
-                            <code>"关于机器学习的PPT"</code></li>
-                        <li>AI 会自动理解您的意图并筛选出最相关的文件</li>
-                    </ul>
+                        <div className="card-actions">
+                            <button className="action-btn primary" onClick={() => handleOpen(file, 'open')}>
+                                📂 打开位置
+                            </button>
+                            <button className="action-btn" onClick={() => handleCopy(file)}>
+                                📋 复制路径
+                            </button>
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            {!isLoading && results.length === 0 && query && !error && (
+                <div className="loading-box">
+                    <p>未找到相关文件，请尝试更换关键词。</p>
                 </div>
             )}
         </div>

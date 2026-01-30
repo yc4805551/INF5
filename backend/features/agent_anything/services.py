@@ -60,19 +60,42 @@ def chat_with_anything(message, history=[], workspace_slug=None):
     # but for standard chat, AnythingLLM manages context via the Workspace vector DB.
     payload = {
         "message": message,
-        "mode": "chat" # 'chat' uses RAG + LLM. 'query' only uses RAG.
+        "mode": "chat",
+        "stream": True # Use streaming for stability
     }
     
     try:
-        response = requests.post(url, headers=get_headers(), json=payload, timeout=60)
+        response = requests.post(url, headers=get_headers(), json=payload, stream=True, timeout=300)
         response.raise_for_status()
-        data = response.json()
         
-        # AnythingLLM response format: { "textResponse": "...", "sources": [...] }
-        # Return both response and sources
+        full_response_text = []
+        sources = []
+        
+        # Consuming the stream
+        for line in response.iter_lines():
+            if line:
+                try:
+                    decoded_line = line.decode('utf-8')
+                    # Parse JSON chunk
+                    chunk = json.loads(decoded_line)
+                    
+                    # Accumulate text
+                    if 'textResponse' in chunk:
+                        full_response_text.append(chunk['textResponse'])
+                        
+                    # Capture sources from the final chunk usually, or any chunk
+                    if 'sources' in chunk and chunk['sources']:
+                        sources = chunk['sources']
+                        
+                except Exception as parse_error:
+                    logging.warning(f"Error parsing chunk: {parse_error}")
+                    continue
+
+        final_text = "".join(full_response_text)
+        
         return {
-            'response': data.get('textResponse', 'No response text found.'),
-            'sources': data.get('sources', [])
+            'response': final_text if final_text else 'No content received.',
+            'sources': sources
         }
         
     except Exception as e:
@@ -160,3 +183,42 @@ def perform_anything_audit(target_text, source_context, rules):
     except Exception as e:
         logging.error(f"Audit Chain Failed: {e}")
         return {"status": "ERROR", "message": f"AnythingLLM Error: {str(e)}"}
+
+def generate_content_with_knowledge(prompt):
+    """
+    Generates content using AnythingLLM's RAG capabilities.
+    """
+    slug = resolve_workspace_slug()
+    if not slug:
+        return {
+            "content": "Error: Knowledge Base workspace not found.",
+            "sources": []
+        }
+
+    # Construct a strong instruction prompt
+    # Since AnythingLLM handles retrieval, we just need to tell it HOW to write.
+    full_message = f"""
+    [Instruction]
+    You are a professional document writer. 
+    Using the retrieved context from your knowledge base, write a comprehensive response to the following request.
+    
+    [User Request]
+    {prompt}
+    
+    [Requirements]
+    - Strict professional tone (Official Document style).
+    - No conversational filler (e.g., "Here is the summary").
+    - Use the facts from the knowledge base.
+    """
+
+    try:
+        result = chat_with_anything(full_message, workspace_slug=slug)
+        return {
+            "content": result['response'],
+            "sources": result['sources']
+        }
+    except Exception as e:
+        return {
+            "content": f"Error generating content: {str(e)}",
+            "sources": []
+        }

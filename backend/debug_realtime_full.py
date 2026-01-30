@@ -32,7 +32,7 @@ def test_advisor():
     # But usually frontend passes key. Let's try WITHOUT explicit key first (Env test)
     config = {
         "provider": "gemini",
-        "model": "gemini-1.5-flash"
+        "model": "gemini-2.5-flash"
         # "apiKey": "..." # Let it use Env
     }
     

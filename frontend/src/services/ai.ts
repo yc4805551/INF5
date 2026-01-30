@@ -28,7 +28,7 @@ export const frontendApiConfig: Record<string, {
     },
     gemini: {
         apiKey: cleanEnv(import.meta.env?.VITE_GEMINI_API_KEY),
-        model: 'gemini-1.5-flash',
+        model: cleanEnv(import.meta.env?.VITE_GEMINI_MODEL) || 'gemini-2.5-flash',
     },
     openai: {
         apiKey: cleanEnv(import.meta.env?.VITE_OPENAI_API_KEY),
@@ -57,14 +57,15 @@ export const frontendApiConfig: Record<string, {
     },
 };
 
-export const MODEL_DISPLAY_NAMES: Record<string, string> = {
-    free: 'FREE (GLM)',
-    gemini: 'Gemini',
-    openai: 'OpenAI',
-    deepseek: 'DeepSeek',
-    ali: 'Ali (Qwen)',
-    depOCR: 'DeepSeek OCR',
-    doubao: 'Doubao (Gemini-3)'
+export const MODEL_DISPLAY_NAMES: Record<ModelProvider, string> = {
+    gemini: frontendApiConfig.gemini.model || 'Gemini',
+    openai: frontendApiConfig.openai.model || 'OpenAI',
+    deepseek: frontendApiConfig.deepseek.model || 'DeepSeek',
+    ali: frontendApiConfig.ali.model || '通义千问',
+    depOCR: frontendApiConfig.depOCR.model || 'DeepSeek-OCR',
+    doubao: frontendApiConfig.doubao.model || '豆包',
+    free: frontendApiConfig.free.model || 'FREE',
+    anything: 'AnythingLLM'
 };
 
 export const getAvailableModels = (): ModelProvider[] => {
@@ -250,7 +251,7 @@ export const callGenerativeAi = async (
 
 
             const response = await ai.models.generateContent({
-                model: (images && images.length > 0) ? 'gemini-1.5-flash' : config.model, // Use vision model if image is present
+                model: (images && images.length > 0) ? 'gemini-2.5-flash' : config.model, // Use vision model if image is present
                 contents: fullContents as any, // Cast to any to align with SDK expectations
                 config: {
                     systemInstruction: systemInstruction,

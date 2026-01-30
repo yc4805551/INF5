@@ -272,6 +272,47 @@ export const useUnifiedAssistant = (modelProvider: string = 'free') => {
         }
     }, [chatHistory, modelProvider]);
 
+    const smartWrite = useCallback(async (prompt: string) => {
+        // 1. Add User Message immediately
+        setChatHistory(prev => [...prev, { role: 'user', parts: [{ text: `[写作指令] ${prompt}` }] }]);
+
+        setIsAnalyzing(true);
+        try {
+            const response = await fetch(`${API_BASE}/agent-anything/smart-write`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ prompt }),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const data = await response.json();
+
+            // 2. Add Model Response
+            const content = data.content || "生成失败 (无内容)";
+            // Optionally append sources?
+            let finalText = content;
+            if (data.sources && data.sources.length > 0) {
+                finalText += `\n\n--- 参考来源 ---\n` + data.sources.map((s: any) => `- ${s.title || s.name || 'Unknown'}`).join('\n');
+            }
+
+            setChatHistory(prev => [...prev, { role: 'model', parts: [{ text: finalText }] }]);
+
+            setIsAnalyzing(false);
+            return data;
+        } catch (error) {
+            console.error('Smart Write Error:', error);
+            setChatHistory(prev => [...prev, { role: 'model', parts: [{ text: `Error: ${error}` }] }]);
+            setIsAnalyzing(false);
+            return { content: "Error generating content.", sources: [] };
+        }
+    }, []);
+
     return {
         mode,
         setMode,
@@ -286,6 +327,7 @@ export const useUnifiedAssistant = (modelProvider: string = 'free') => {
         // Chat exports
         chatHistory,
         sendChatMessage,
-        lastCheckResult
+        lastCheckResult,
+        smartWrite
     };
 };

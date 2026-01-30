@@ -44,7 +44,8 @@ export const FastCanvasView: React.FC<FastCanvasViewProps> = ({
         removeSuggestion,
         chatHistory,
         sendChatMessage,
-        lastCheckResult
+        lastCheckResult,
+        smartWrite
     } = useUnifiedAssistant(modelProvider);
 
     const {
@@ -279,6 +280,14 @@ export const FastCanvasView: React.FC<FastCanvasViewProps> = ({
                         chatHistory={chatHistory}
                         onSendMessage={(text) => sendChatMessage(text, editorText)}
                         lastCheckResult={lastCheckResult}
+                        smartWrite={smartWrite}
+                        onInsert={(text) => {
+                            // Append text to editor
+                            const newText = editorText + '\n\n' + text;
+                            setEditorText(newText);
+                            setEditorHtml(newText.replace(/\n/g, '<br/>'));
+                            // Optional: notify success
+                        }}
                     />
                 </div>
             </div>

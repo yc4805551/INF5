@@ -145,6 +145,7 @@
     flex-direction: column;
     max-width: 85%;
     animation: fadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    /* border: 2px solid red; REMOVED DEBUG BORDER */
 }
 
 .chat-bubble.user {
