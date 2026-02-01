@@ -13,7 +13,7 @@ interface ChatPaneProps {
     isPendingConfirmation?: boolean;
     onConfirm?: () => void;
     onDiscard?: () => void;
-    onFormat?: (modelConfig: ModelConfig, scope?: 'all' | 'layout' | 'body', processor?: 'local' | 'ai') => void;
+    onFormat?: (modelConfig: ModelConfig, scope?: 'all' | 'layout' | 'body', processor?: 'local' | 'ai', forceUnbold?: boolean) => void;
     showBodyFormatDialog?: boolean;
     onBodyFormatConfirm?: () => void;
     onBodyFormatCancel?: () => void;
@@ -193,9 +193,12 @@ export const ChatPane = forwardRef<ChatPaneHandle, ChatPaneProps>(({
                                 onChange={(e) => {
                                     const value = e.target.value;
                                     if (value === 'local') {
-                                        onFormat && onFormat(getModelConfig(selectedModel), 'layout', 'local');
+                                        // Ask user about bold preference
+                                        const shouldUnbold = confirm("是否强制清除正文中的所有加粗格式？\n点击【确定】清除，点击【取消】保留原有加粗。");
+                                        onFormat && onFormat(getModelConfig(selectedModel), 'layout', 'local', shouldUnbold);
                                     } else if (value === 'ai') {
-                                        onFormat && onFormat(getModelConfig(selectedModel), 'layout', 'ai');
+                                        const shouldUnbold = confirm("是否强制清除正文中的所有加粗格式？\n点击【确定】清除，点击【取消】保留原有加粗。");
+                                        onFormat && onFormat(getModelConfig(selectedModel), 'layout', 'ai', shouldUnbold);
                                     }
                                     e.target.value = ''; // Reset selection
                                 }}

@@ -10,6 +10,7 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml.ns import qn
 from core.services import current_engine, llm_engine
 from core.win32_engine import WordAppEngine
+from features.canvas.agent_flow import CanvasAgent
 
 canvas_bp = Blueprint('canvas', __name__)
 
@@ -109,7 +110,7 @@ def create_with_text():
     try:
         data = request.json
         text = data.get("text", "")
-        preserve_refs = data.get("preserve_references", False)  # 新参数，默认False保持向后兼容
+        preserve_refs = data.get("preserve_references", False)  # 鏂板弬鏁帮紝榛樿False淇濇寔鍚戝悗鍏煎
         
         # Use current_engine to create doc from text
         current_engine.load_from_text(text, preserve_references=preserve_refs)
@@ -259,7 +260,7 @@ def canvas_chat():
             # STRATEGY A: Small Doc -> Full Context Injection
             logging.info(f"Adaptive Strategy: Small Doc ({total_paras} paras). Injecting FULL text.")
             full_text = current_engine.get_all_content()
-            main_doc_context = f"【当前编辑文档（全文）】:\n{full_text}\n"
+            main_doc_context = f"銆愬綋鍓嶇紪杈戞枃妗ｏ紙鍏ㄦ枃锛夈:\n{full_text}\n"
         else:
             # STRATEGY B: Large Doc -> Coarse-to-Fine Retrieval
             logging.info(f"Adaptive Strategy: Large Doc ({total_paras} paras). Using Retrieval.")
@@ -273,7 +274,7 @@ def canvas_chat():
                 if relevant_indices:
                     retrieved_content = current_engine.get_content_by_indices(relevant_indices)
                     if retrieved_content:
-                        main_doc_context = f"【文档相关章节（智能检索）】:\n{retrieved_content}\n"
+                        main_doc_context = f"銆愭枃妗ｇ浉鍏崇珷鑺傦紙鏅鸿兘妫绱級銆:\n{retrieved_content}\n"
 
         # Ref Context (Already Adaptive via docx_engine.get_relevant_reference_context upgrades)
         # We still need to call it.
@@ -296,12 +297,12 @@ def canvas_chat():
         ref_toc_summary = ""
         if ref_structure:
             # Re-implement inline for safety
-            ref_toc_summary = "\n【参考文档目录结构】:\n"
+            ref_toc_summary = "\n銆愬弬鑰冩枃妗ｇ洰褰曠粨鏋勩:\n"
             current_doc_idx = -1
             for item in ref_structure:
                 if item.get('doc_idx') != current_doc_idx:
                     current_doc_idx = item.get('doc_idx')
-                    ref_toc_summary += f"[文档: {item.get('filename')}]\n"
+                    ref_toc_summary += f"[鏂囨。: {item.get('filename')}]\n"
                 indent = "  " * (item.get('level', 1) - 1)
                 ref_toc_summary += f"{indent}- {item.get('title')}\n"
 
@@ -319,7 +320,7 @@ def canvas_chat():
         # Combine Contexts
         final_ref_context = (ref_toc_summary + "\n" + ref_context_str) if ref_context_str else ref_toc_summary
         if len(final_ref_context) > 25000:
-             final_ref_context = final_ref_context[:25000] + "\n...[参考资料截断]..."
+             final_ref_context = final_ref_context[:25000] + "\n...[鍙傝冭祫鏂欐埅鏂璢..."
 
         # Get Global Context (Meta-Summary) if not full doc
         global_context = ""
@@ -331,12 +332,12 @@ def canvas_chat():
         
         augmented_user_text = ""
         if global_context:
-            augmented_user_text += f"【全书脉络】:\n{global_context}\n\n"
+            augmented_user_text += f"銆愬叏涔﹁剦缁溿:\n{global_context}\n\n"
         
         if main_doc_context:
             augmented_user_text += main_doc_context + "\n\n"
             
-        augmented_user_text += f"【当前可视区域】:\n(见 doc_context)\n\n【用户指令】:\n{user_text}"
+        augmented_user_text += f"銆愬綋鍓嶅彲瑙嗗尯鍩熴:\n(瑙 doc_context)\n\n銆愮敤鎴锋寚浠ゃ:\n{user_text}"
 
         # Call LLM
         response = llm_engine.chat_with_doc(
@@ -356,13 +357,25 @@ def canvas_chat():
         
         if intent == "MODIFY":
             if code:
-                # Execute Code
-                success, error_msg = current_engine.execute_code(code)
-                if not success:
-                     reply = f"{reply}\n\n(Error executing changes: {error_msg})"
-                     intent = "CHAT"
+                # --- AGENTIC LOOP ---
+                # Instead of running once, we use the Agent to ensure success (Self-Correction)
+                agent = CanvasAgent(llm_engine, current_engine)
+                
+                # Pass the initial code (Draft) to the agent
+                result = agent.run_modification_loop(
+                    instruction=user_text,
+                    doc_context=context,
+                    model_config=model_config,
+                    initial_code=code
+                )
+                
+                if result["success"]:
+                    is_staging = True
+                    reply = result.get("reply", reply)
+                    # Preview is already updated in engine by execution
                 else:
-                     is_staging = True
+                    intent = "CHAT" # Fallback
+                    reply = f"{reply}\n\n(Agent failed to execute changes: {result.get('error')})"
             else:
                 intent = "CHAT"
         
@@ -506,7 +519,8 @@ def canvas_format_official():
             current_engine.create_staging_copy()
 
         context = current_engine.get_preview_data()
-        code = llm_engine.generate_formatting_code(context, model_config, scope, processor)
+        force_unbold = data.get("force_unbold", False)
+        code = llm_engine.generate_formatting_code(context, model_config, scope, processor, force_unbold)
         
         success, error_msg = current_engine.execute_code(code)
         
@@ -598,9 +612,9 @@ def export_docs():
                             last_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
                         except Exception as img_err:
                             logging.error(f"Failed to add image {img_path}: {img_err}")
-                            p = doc.add_paragraph(f"[图片加载失败: {filename}]")
+                            p = doc.add_paragraph(f"[鍥剧墖鍔犺浇澶辫触: {filename}]")
                     else:
-                        p = doc.add_paragraph(f"[图片丢失: {filename}]")
+                        p = doc.add_paragraph(f"[鍥剧墖涓㈠け: {filename}]")
                 continue
 
             clean_text = stripped_line.replace('*', '').replace('#', '').strip()
@@ -612,24 +626,24 @@ def export_docs():
                 # TITLE
                 p.alignment = WD_ALIGN_PARAGRAPH.CENTER
                 run = p.add_run(clean_text)
-                set_font(run, '小标宋体', 22, bold=False)
+                set_font(run, '灏忔爣瀹嬩綋', 22, bold=False)
                 first_line_processed = True
             else:
                 p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
                 
-                is_l1 = re.match(r'^[一二三四五六七八九十]+、', clean_text)
-                is_l2 = re.match(r'^（[一二三四五六七八九十]+）', clean_text)
+                is_l1 = re.match(r'^[涓浜屼笁鍥涗簲鍏竷鍏節鍗乚+銆', clean_text)
+                is_l2 = re.match(r'^锛圼涓浜屼笁鍥涗簲鍏竷鍏節鍗乚+锛', clean_text)
                 
                 if is_l1:
                     run = p.add_run(clean_text)
-                    set_font(run, '黑体', 16)
+                    set_font(run, '榛戜綋', 16)
                 elif is_l2:
                     run = p.add_run(clean_text)
-                    set_font(run, '楷体_GB2312', 16)
+                    set_font(run, '妤蜂綋_GB2312', 16)
                 else:
                     p.paragraph_format.first_line_indent = Cm(1.1) 
                     run = p.add_run(clean_text)
-                    set_font(run, '仿宋_GB2312', 16)
+                    set_font(run, '浠垮畫_GB2312', 16)
 
         f = io.BytesIO()
         doc.save(f)
@@ -668,3 +682,99 @@ def debug_state():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+
+@canvas_bp.route('/export-smart-docx', methods=['POST'])
+def export_smart_docx():
+    try:
+        data = request.json
+        content = data.get('content', [])
+        # Content is a list of Tiptap nodes: { type, attrs, content: [{type:text, text: ...}] }
+        
+        doc = Document()
+        # Setup Page Margins
+        section = doc.sections[0]
+        section.top_margin = Cm(3.7)
+        section.bottom_margin = Cm(3.5)
+        section.left_margin = Cm(2.8)
+        section.right_margin = Cm(2.6)
+
+        def set_font(run, font_name, size_pt, bold=False):
+            run.font.name = font_name
+            run.font.size = Pt(size_pt)
+            run._element.rPr.rFonts.set(qn('w:eastAsia'), font_name)
+            run.bold = bold
+
+        # Helper to extract text from a node
+        def get_text(node):
+            if 'content' in node:
+                return "".join([c.get('text', '') for c in node['content']])
+            return ""
+
+        title_count = 0
+        body_started = False
+
+        for i, block in enumerate(content.get('content', [])):
+             text = get_text(block)
+             if not text.strip():
+                 continue
+             
+             block_type = block.get('type')
+             attrs = block.get('attrs', {})
+             level = attrs.get('level')
+             
+             # Heuristic Detection
+             is_h1_text = re.match(r"^[一二三四五六七八九十]+、", text.strip())
+             is_h2_text = re.match(r"^（[一二三四五六七八九十]+）", text.strip())
+             ends_with_punct = re.search(r"[。：；]$", text.strip())
+             is_long_text = len(text.strip()) > 50
+
+             # Determine if Body has started
+             # If we hit a Heading or Body-like text, the Title block ends
+             if is_h1_text or is_h2_text or ends_with_punct or is_long_text or title_count >= 3:
+                 body_started = True
+             
+             p = doc.add_paragraph()
+             p.paragraph_format.line_spacing = Pt(29) 
+             
+             # Logic Priority:
+             # 1. Title Block (Before body starts)
+             # 2. H1 (Explicit or Regex)
+             # 3. H2 (Explicit or Regex)
+             # 4. Body
+             
+             if not body_started:
+                 # TITLE
+                 p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                 run = p.add_run(text)
+                 set_font(run, '方正小标宋简体', 22, bold=False)
+                 title_count += 1
+             elif (block_type == 'heading' and level == 1) or is_h1_text:
+                 # H1
+                 p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+                 run = p.add_run(text)
+                 set_font(run, '黑体', 16, bold=False)
+             elif (block_type == 'heading' and level == 2) or is_h2_text:
+                 # H2
+                 p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+                 run = p.add_run(text)
+                 set_font(run, '方正楷体_GBK', 16, bold=False)
+             else:
+                 # Body
+                 p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+                 p.paragraph_format.first_line_indent = Cm(1.1)
+                 run = p.add_run(text)
+                 set_font(run, '方正仿宋_GBK', 16, bold=False)
+
+        f = io.BytesIO()
+        doc.save(f)
+        f.seek(0)
+        
+        return send_file(
+            f, 
+            mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            as_attachment=True,
+            download_name="smart_export.docx"
+        )
+    except Exception as e:
+        logging.error(f"Smart Export Error: {e}")
+        return jsonify({"error": str(e)}), 500

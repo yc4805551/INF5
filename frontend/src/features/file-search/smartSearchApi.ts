@@ -1,13 +1,19 @@
-// 使用相对路径导入配置
-const API_BASE_URL = 'http://localhost:5179';  // 默认后端地址
+import { FileSearchResult } from './fileSearchApi';
 
+// 基础 API URL
+const API_BASE_URL = 'http://localhost:5179/api';
+
+/**
+ * 智能搜索结果
+ */
 export interface SmartSearchResult {
     name: string;
     path: string;
-    score?: number;
-    reason?: string;
     size?: number;
     date_modified?: string;
+    score?: number;
+    reason?: string;
+    _strategy_desc?: string; // 内部用于调试
 }
 
 export interface SmartSearchResponse {
@@ -15,82 +21,170 @@ export interface SmartSearchResponse {
     query: string;
     intent?: string;
     strategies_used?: string[];
-    total_candidates?: number;
     results: SmartSearchResult[];
     ai_analysis?: string;
     error?: string;
 }
 
 /**
- * AI 智能搜索 - 支持自然语言
+ * 智能搜索 API (Deprecated: use stream instead)
  */
-export async function smartSearch(
+export const smartSearch = async (
     query: string,
-    options?: {
-        maxResults?: number;
-        modelProvider?: string;
-    }
-): Promise<SmartSearchResponse> {
-    const response = await fetch(`${API_BASE_URL}/api/file-search/smart`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            query,
-            maxResults: options?.maxResults || 10,
-            modelProvider: options?.modelProvider || 'openai',
-        }),
-    });
-
-    if (!response.ok) {
-        throw new Error(`Smart search failed: ${response.statusText}`);
-    }
-
-    return response.json();
-}
-
-/**
- * 复制文本到剪贴板 (服务器端)
- */
-export async function copyTextToClipboard(text: string): Promise<boolean> {
+    options: { maxResults?: number; modelProvider?: string } = {}
+): Promise<SmartSearchResponse> => {
     try {
-        const response = await fetch(`${API_BASE_URL}/api/file-search/copy`, {
+        const response = await fetch(`${API_BASE_URL}/file-search/smart`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ text }),
+            body: JSON.stringify({
+                query,
+                maxResults: options.maxResults || 20,
+                modelProvider: options.modelProvider || 'gemini'
+            }),
         });
-        return response.ok;
-    } catch (e) {
-        console.error('Failed to copy text:', e);
-        return false;
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.error('Smart search error:', error);
+        return {
+            success: false,
+            query,
+            results: [],
+            error: error instanceof Error ? error.message : String(error)
+        };
     }
-}
+};
 
 /**
- * 打开文件所在位置
+ * Streaming Smart Search
+ * Callbacks for progressive updates
  */
-export async function openFileLocation(path: string): Promise<boolean> {
+export const smartSearchStream = async (
+    query: string,
+    callbacks: {
+        onIntent?: (data: any) => void;
+        onLog?: (message: string) => void;
+        onStatus?: (message: string, step: string) => void;
+        onResultChunk?: (results: SmartSearchResult[], strategy: string) => void;
+        onFinalResults?: (results: SmartSearchResult[]) => void;
+        onAnalysis?: (text: string) => void;
+        onError?: (error: string) => void;
+    },
+    options: { maxResults?: number; modelProvider?: string } = {}
+) => {
     try {
-        const response = await fetch(`${API_BASE_URL}/api/file-search/open`, {
+        const response = await fetch(`${API_BASE_URL}/file-search/smart`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                query,
+                maxResults: options.maxResults || 20,
+                maxCandidates: 3000,
+                modelProvider: options.modelProvider || 'gemini'
+            }),
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        if (!response.body) {
+            throw new Error('Response body is null');
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+
+            // 处理粘包 (lines)
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || ''; // 保留最后一行（如果不完整）
+
+            for (const line of lines) {
+                if (!line.trim()) continue;
+                try {
+                    const event = JSON.parse(line);
+
+                    switch (event.type) {
+                        case 'status':
+                            callbacks.onStatus?.(event.message, event.step);
+                            break;
+                        case 'log':
+                            callbacks.onLog?.(event.message);
+                            break;
+                        case 'intent':
+                            callbacks.onIntent?.(event.data);
+                            break;
+                        case 'result_chunk':
+                            callbacks.onResultChunk?.(event.data, event.strategy);
+                            break;
+                        case 'final_results':
+                            callbacks.onFinalResults?.(event.data);
+                            break;
+                        case 'analysis':
+                            callbacks.onAnalysis?.(event.data);
+                            break;
+                        case 'error':
+                            callbacks.onError?.(event.message);
+                            break;
+                    }
+                } catch (e) {
+                    console.warn("Failed to parse stream line:", line, e);
+                }
+            }
+        }
+
+    } catch (error) {
+        console.error('Stream search error:', error);
+        callbacks.onError?.(error instanceof Error ? error.message : String(error));
+    }
+};
+
+export const openFileLocation = async (path: string): Promise<boolean> => {
+    try {
+        const response = await fetch(`${API_BASE_URL}/file-search/open`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({ path }),
         });
-        return response.ok;
-    } catch (e) {
-        console.error('Failed to open file location:', e);
+        const data = await response.json();
+        return data.success;
+    } catch (error) {
+        console.error('Open file error:', error);
         return false;
     }
-}
+};
 
-/**
- * 获取文件下载链接
- */
-export function getDownloadUrl(path: string): string {
-    return `${API_BASE_URL}/api/file-search/download?path=${encodeURIComponent(path)}`;
-}
+export const copyTextToClipboard = async (text: string): Promise<boolean> => {
+    try {
+        const response = await fetch(`${API_BASE_URL}/file-search/copy`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ text }),
+        });
+        const data = await response.json();
+        return data.success;
+    } catch (error) {
+        console.error('Copy error:', error);
+        return false;
+    }
+};

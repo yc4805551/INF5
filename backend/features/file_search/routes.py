@@ -5,6 +5,7 @@
 import logging
 from flask import Blueprint, request, jsonify, send_file
 import os
+import json
 from features.file_search.services import FileSearchService
 from features.file_search.search_agent import FileSearchAgent
 
@@ -21,18 +22,13 @@ search_agent = FileSearchAgent()
 @file_search_bp.route('/smart', methods=['POST'])
 def smart_search():
     """
-    AI 智能搜索 - 支持自然语言查询
+    AI 智能搜索 - 支持自然语言查询 (Streaming)
     
-    请求体：
-    {
-        "query": "帮我找最近关于吴军的课程PPT",
-        "maxResults":  10,
-        "modelProvider": "gemini" 
-    }
+    Response:
+        NDJSON stream (application/x-ndjson)
     """
     try:
         data = request.get_json()
-        
         if not data:
             return jsonify({'success': False, 'error': '请求体不能为空'}), 400
         
@@ -40,27 +36,31 @@ def smart_search():
         if not query:
             return jsonify({'success': False, 'error': '查询不能为空'}), 400
         
-        max_results = min(data.get('maxResults', 10), 50)
+        max_results = min(data.get('maxResults', 10), 1000)
         model_provider = data.get('modelProvider', 'gemini')
-        max_candidates = min(data.get('maxCandidates', 100), 200)
+        max_candidates = min(data.get('maxCandidates', 2000), 10000)
         
-        logger.info(f"AI Smart search: query='{query}'")
+        logger.info(f"AI Smart search (Stream): query='{query}'")
         
-        # 使用 AI Agent 进行智能搜索
-        agent = FileSearchAgent(model_provider=model_provider)
+        def generate():
+            agent = FileSearchAgent(model_provider=model_provider)
+            try:
+                # 调用生成器
+                for event in agent.smart_search(
+                    natural_language_query=query,
+                    everything_search_func=search_service.everything_client.search_with_filters,
+                    max_candidates=max_candidates,
+                    top_k=max_results
+                ):
+                    # 将事件序列化为 JSON 行
+                    yield json.dumps(event, ensure_ascii=False) + '\n'
+            except Exception as e:
+                logger.error(f"Stream error: {e}")
+                yield json.dumps({"type": "error", "message": str(e)}, ensure_ascii=False) + '\n'
         
-        result = agent.smart_search(
-            natural_language_query=query,
-            everything_search_func=search_service.everything_client.search_with_filters,
-            max_candidates=max_candidates,
-            top_k=max_results
-        )
-        
-        if result['success']:
-            return jsonify(result), 200
-        else:
-            return jsonify(result), 500
-    
+        from flask import Response, stream_with_context
+        return Response(stream_with_context(generate()), mimetype='application/x-ndjson')
+
     except Exception as e:
         logger.error(f"Smart search error: {e}", exc_info=True)
         return jsonify({'success': False, 'error': f'智能搜索失败: {str(e)}'}), 500

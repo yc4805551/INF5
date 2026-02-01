@@ -55,13 +55,18 @@ export const AuditPanel: React.FC<AuditPanelProps> = ({ referenceFiles, onRunAud
         }
     };
 
+    // Safe accessors
+    const safeResults = results || { status: 'FAIL', issues: [], summary: '', error: '' };
+    const safeStatus = (safeResults.status || 'FAIL').toUpperCase();
+    const safeIssues = Array.isArray(safeResults.issues) ? safeResults.issues : [];
+
     return (
         <div className="audit-panel" style={{ padding: '12px', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             {/* Header & Model Selector */}
             <div className="audit-header" style={{ marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h3 style={{ display: 'flex', alignItems: 'center', gap: '6px', margin: 0, fontSize: '15px' }}>
                     <ShieldCheck size={18} color="#0284c7" />
-                    <span>智能审核</span>
+                    <span>审阅润色</span>
                 </h3>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     {/* Collapsed State Summary */}
@@ -185,27 +190,27 @@ export const AuditPanel: React.FC<AuditPanelProps> = ({ referenceFiles, onRunAud
                                 padding: '1px 6px',
                                 borderRadius: '8px',
                                 fontWeight: 'bold',
-                                background: results.status === 'PASS' ? '#dcfce7' : results.status === 'FAIL' ? '#fee2e2' : '#fef9c3',
-                                color: results.status === 'PASS' ? '#166534' : results.status === 'FAIL' ? '#991b1b' : '#854d0e'
+                                background: safeStatus === 'PASS' ? '#dcfce7' : safeStatus === 'FAIL' ? '#fee2e2' : '#fef9c3',
+                                color: safeStatus === 'PASS' ? '#166534' : safeStatus === 'FAIL' ? '#991b1b' : '#854d0e'
                             }}>
-                                {results.status}
+                                {safeStatus}
                             </span>
                         </div>
 
-                        {results.summary && (
+                        {safeResults.summary && (
                             <div style={{ fontSize: '11px', lineHeight: '1.4', color: '#444', marginBottom: '10px', background: '#f8fafc', padding: '6px 8px', borderRadius: '4px', border: '1px solid #f1f5f9' }}>
-                                {results.summary}
+                                {safeResults.summary}
                             </div>
                         )}
 
-                        {results.error && (
+                        {safeResults.error && (
                             <div style={{ fontSize: '11px', color: '#dc2626', marginBottom: '10px' }}>
-                                Error: {results.error}
+                                Error: {safeResults.error}
                             </div>
                         )}
 
                         <div className="issues-list" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                            {results.issues.map((issue, idx) => (
+                            {safeIssues.map((issue, idx) => (
                                 <div key={idx} className="audit-issue" style={{ border: '1px solid #eee', borderRadius: '4px', overflow: 'hidden' }}>
                                     <div
                                         onClick={() => setExpandedIssue(expandedIssue === idx ? null : idx)}

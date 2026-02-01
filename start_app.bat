@@ -5,6 +5,12 @@ echo ==========================================
 echo       INFV5 Application Launcher
 echo ==========================================
 
+REM 0. Cleanup Old Processes
+echo [INFO] Stopping existing Python (Backend) and Node (Frontend) processes...
+taskkill /F /IM python.exe >nul 2>&1
+taskkill /F /IM node.exe >nul 2>&1
+timeout /t 1 >nul
+
 REM 1. Environment Setup (Auto-Detection & Creation)
 if not exist "backend\venv" (
     echo [INFO] Virtual environment not found in backend\venv.

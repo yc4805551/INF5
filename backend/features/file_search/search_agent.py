@@ -14,19 +14,21 @@ class FileSearchAgent:
     """AI 文件搜索助手"""
     
     INTENT_UNDERSTANDING_PROMPT = """你是一个文件搜索专家。用户会用自然语言描述他们想找的文件。
-你的任务：分析用户意图，生成 **3-5组** 不同的搜索关键词策略，以通过 "Everything" 搜索引擎最大限度地找到目标文件。
+你的任务：分析用户意图，生成 **5-8组** 不同的搜索关键词策略，以通过 "Everything" 搜索引擎最大限度地找到目标文件。目标是**极大地提高召回率**，哪怕找偏了也没关系。
 
 ### 为什么需要多组策略？
 用户输入的词可能与文件名不完全匹配。你需要尝试：
-1.  **精确拆分**：将长句拆分为核心词 (AND 关系)。
-2.  **同义词/近义词**：例如用户搜 "大模型"，你要试 "LLM"、"Transformer"、"人工智能"。
-3.  **关联词**：例如用户搜 "合同"，你要试 "协议"、"签约"。
-4.  **宽泛匹配**：减少关键词数量，提高召回率。
+1.  **精确拆分**：将长句拆分为核心词 (AND 关系，用空格分隔)。
+2.  **暴力拆分**：如果核心词很长，尝试拆成单字或短词。
+3.  **通配符(*)**：**非常重要**！Everything 支持 `*`。例如搜 "报告" -> `*报告*`。对于英文，搜 "plan" -> `*plan*`。
+4.  **同义词/近义词**：例如 "大模型" -> "LLM", "GPT", "AI"。
+5.  **拼音/缩写**：例如 "工作日报" -> "日报", "周报", "report"。
+6.  **文件扩展名**：如果用户找 PPT，记得显式加上 .ppt .pptx。
 
 ### 关键规则：
-1.  **关键词**：Everything 默认是 AND 关系。
+1.  **关键词**：Everything 默认空格是 AND。如果要 OR，用 `|`。例如 `报告|总结`。
 2.  **停用词**：去除 "帮我找", "文档", "资料" 等无意义词。
-3.  **排序**：将最可能的策略放在前面。
+3.  **排序**：将最可能的策略放在前面，但也必须包含一些"宽泛"的策略以防漏网。
 
 请返回 JSON 格式结果：
 {
@@ -36,8 +38,8 @@ class FileSearchAgent:
       "desc": "策略描述，如 '精确匹配'"
     },
     {
-      "keywords": ["同义词1", "同义词2"],
-      "desc": "如同义词 '大模型' -> 'LLM'"
+       "keywords": ["*核心词*"],
+       "desc": "通配符模糊搜索"
     }
   ],
   "file_types": [".docx", ".pptx"],    // 推断的文件类型（可选）
@@ -245,23 +247,28 @@ class FileSearchAgent:
         everything_search_func,
         max_candidates: int = 2000,
         top_k: int = 10
-    ) -> Dict:
+    ):
         """
-        完整的智能搜索流程 (Multi-Strategy)
+        完整的智能搜索流程 (Streaming Generator)
+        Yields:
+            dict: Event data { type: str, data: any }
         """
         try:
-            # Step 1: 理解意图 & 生成多策略
+            # Step 1: 理解意图
+            yield {"type": "status", "message": "正在理解您的意图...", "step": "intent"}
+            
             intent_data = self.understand_query(natural_language_query)
             strategies = intent_data.get('strategies', [])
             file_types = intent_data.get('file_types', [])
             time_range = intent_data.get('time_range', '')
             
+            yield {"type": "intent", "data": intent_data}
+
             all_candidates = []
             seen_paths = set()
-            used_strategies = []
-
-            # Step 2: 并行/迭代执行所有策略
-            logger.info(f"Executing {len(strategies)} search strategies...")
+            
+            # Step 2: 执行搜索策略
+            yield {"type": "status", "message": "正在执行多策略并行搜索...", "step": "searching"}
             
             for strategy in strategies:
                 keywords_list = strategy.get('keywords', [])
@@ -269,74 +276,63 @@ class FileSearchAgent:
                 
                 if not keywords_str:
                     continue
-                    
-                logger.info(f"Strategy: {strategy.get('desc')} -> '{keywords_str}'")
                 
+                desc = strategy.get('desc')
+                yield {"type": "log", "message": f"尝试策略: {desc} -> 搜索 '{keywords_str}'"}
+                
+                # 执行搜索
                 results = everything_search_func(
                     keywords=keywords_str,
                     file_types=file_types if file_types else None,
                     date_range=time_range if time_range else None,
-                    max_results=1000  # 每个策略限制结果数，防止爆炸
+                    max_results=2000 
                 )
                 
-                # 收集结果并去重
-                added_count = 0
+                # DEBUG: Log exact params
+                yield {"type": "log", "message": f"DEBUG: Strategy='{desc}', Keywords='{keywords_str}', Filters={file_types}, Count={len(results)}"}
+
+                # 实时处理新发现的结果
+                new_items = []
                 for res in results:
                     path = res.get('path')
                     if path and path not in seen_paths:
-                        res['_strategy_desc'] = strategy.get('desc') # 标记来源
+                        res['_strategy_desc'] = desc
+                        res['score'] = 60 # 初始分
+                        res['reason'] = f"包括: {keywords_str}"
                         all_candidates.append(res)
                         seen_paths.add(path)
-                        added_count += 1
+                        new_items.append(res)
                 
-                if added_count > 0:
-                    used_strategies.append(f"{strategy.get('desc')} ('{keywords_str}')")
+                if new_items:
+                    # 分批 Streaming 回传候选结果，让前端立即展示
+                    yield {"type": "result_chunk", "data": new_items, "strategy": desc}
                 
                 if len(all_candidates) >= max_candidates:
                     break
             
-            logger.info(f"Total unique candidates found: {len(all_candidates)}")
+            if not all_candidates:
+                 yield {"type": "analysis", "data": "未找到匹配文件，请尝试更换关键词。"}
+                 return
+
+            # Step 3: AI 智能筛选
+            yield {"type": "status", "message": f"已找到 {len(all_candidates)} 个文件，正在进行 AI 智能筛选...", "step": "filtering"}
             
-            # Step 3: AI 智能筛选 (只筛选前 K 个，但保留其余结果)
             filtered_results = self.intelligent_filter(
                 query=natural_language_query,
                 candidates=all_candidates,
                 top_k=top_k
             )
             
-            # Step 4: 合并结果 (AI 排序 + 剩余结果)
-            ranked_paths = {res.get('path') for res in filtered_results}
-            final_results = list(filtered_results)
+            # Step 4: 返回最终精选结果
+            yield {"type": "final_results", "data": filtered_results}
             
-            for candidate in all_candidates:
-                if candidate.get('path') not in ranked_paths:
-                    candidate['score'] = 0
-                    candidate['reason'] = '关键词匹配'
-                    final_results.append(candidate)
-
-            # Step 5: 生成 AI 分析说明
-            if len(filtered_results) > 0:
-                strategy_text = "、".join(used_strategies[:2])
-                ai_analysis = f"已通过 {strategy_text} 等策略找到 {len(all_candidates)} 个文件，并为您精选了最相关的 {len(filtered_results)} 个置顶。"
-            else:
-                ai_analysis = "尝试了多种关键词组合，但未找到匹配文件。"
+            # Step 5: 生成总结
+            strategy_names = [s.get('desc') for s in strategies] 
+            strategy_text = "、".join(strategy_names[:2])
+            ai_analysis = f"已通过 {strategy_text} 等策略找到 {len(all_candidates)} 个文件，并在其中精选了最相关的 {len(filtered_results)} 个置顶。"
             
-            return {
-                'success': True,
-                'query': natural_language_query,
-                'intent': intent_data.get('intent', ''),
-                'strategies_used': used_strategies,
-                'total_candidates': len(all_candidates),
-                'results': final_results,
-                'ai_analysis': ai_analysis
-            }
-        
+            yield {"type": "analysis", "data": ai_analysis}
+            
         except Exception as e:
             logger.error(f"Smart search failed: {e}", exc_info=True)
-            return {
-                'success': False,
-                'query': natural_language_query,
-                'error': str(e),
-                'total_candidates': 0,
-                'results': []
-            }
+            yield {"type": "error", "message": str(e)}

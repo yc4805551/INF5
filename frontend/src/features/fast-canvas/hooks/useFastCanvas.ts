@@ -220,17 +220,44 @@ export const useFastCanvas = () => {
             // Check if text looks like HTML (starts with tag)
             if (block.text.trim().startsWith('<')) {
                 const doc = parser.parseFromString(block.text, 'text/html');
+                
+                // Iterate through top-level elements
+                doc.body.childNodes.forEach(node => {
+                    if (node.nodeType === Node.ELEMENT_NODE) {
+                         const el = node as Element;
+                         const tagName = el.tagName.toLowerCase();
+                         const textContent = el.textContent || "";
+                         
+                         if (!textContent.trim()) return;
 
-                // Use robust extraction
-                const rawText = _extractTextWithNewlines(doc.body);
-                // Split and clean
-                const lines = rawText.split('\n').map(l => l.trim()).filter(Boolean);
-
-                lines.forEach(line => {
-                    tiptapContent.push({
-                        type: 'paragraph',
-                        content: [{ type: 'text', text: line }]
-                    });
+                         if (tagName === 'h1') {
+                             tiptapContent.push({
+                                 type: 'heading',
+                                 attrs: { level: 1 },
+                                 content: [{ type: 'text', text: textContent }]
+                             });
+                         } else if (tagName === 'h2') {
+                             tiptapContent.push({
+                                 type: 'heading',
+                                 attrs: { level: 2 },
+                                 content: [{ type: 'text', text: textContent }]
+                             });
+                         } else {
+                             // Default to paragraph
+                             tiptapContent.push({
+                                 type: 'paragraph',
+                                 content: [{ type: 'text', text: textContent }]
+                             });
+                         }
+                    } else if (node.nodeType === Node.TEXT_NODE) {
+                         const text = node.textContent?.trim();
+                         if (text) {
+                             tiptapContent.push({
+                                 type: 'paragraph',
+                                 content: [{ type: 'text', text: text }]
+                             });
+                         }
+                    }
                 });
             } else {
                 // Plain text block

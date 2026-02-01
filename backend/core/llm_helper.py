@@ -47,6 +47,11 @@ def call_llm(
             api_key = os.getenv("DEEPSEEK_API_KEY") or os.getenv("VITE_DEEPSEEK_API_KEY")
             endpoint = os.getenv("DEEPSEEK_ENDPOINT") or os.getenv("VITE_DEEPSEEK_ENDPOINT") or "https://api.deepseek.com/v1"
             model = os.getenv("DEEPSEEK_MODEL") or os.getenv("VITE_DEEPSEEK_MODEL") or "deepseek-chat"
+        elif provider == "free":
+            # Support for custom 'free' provider defined in .env.local
+            api_key = os.getenv("FREE_API_KEY") or os.getenv("VITE_FREE_API_KEY")
+            endpoint = os.getenv("FREE_ENDPOINT") or os.getenv("VITE_FREE_ENDPOINT")
+            model = os.getenv("FREE_MODEL") or os.getenv("VITE_FREE_MODEL")
         
         if not api_key:
             raise ValueError(f"API key for {provider} not found in environment variables (checked standard and VITE_ prefix)")
@@ -69,7 +74,7 @@ def call_llm(
         # 根据提供商选择调用方法
         if provider == "gemini":
             response = engine._call_google_gemini(api_key, full_prompt, endpoint, model)
-        elif provider in ["openai", "deepseek"]:
+        elif provider in ["openai", "deepseek", "free"]:
             response = engine._call_openai_compatible(api_key, endpoint, model, full_prompt)
         else:
             raise ValueError(f"Unsupported provider: {provider}")

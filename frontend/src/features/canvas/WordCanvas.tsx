@@ -242,58 +242,60 @@ export const WordCanvas: React.FC<{ onBack: () => void, initialContent?: string,
                     }}
                 />
                 <div className="canvas-header">
-                    <div className="header-title-group">
-                        <button onClick={onBack} className="back-btn" title="返回主页">
-                            <ArrowLeft size={20} />
-                        </button>
-                        <button
-                            onClick={() => setShowToc(!showToc)}
-                            className={`action-btn ${showToc ? 'active' : ''}`}
-                            title={showToc ? "隐藏大纲" : "显示大纲"}
-                            style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '4px', marginLeft: '4px', color: showToc ? '#1890ff' : '#666' }}
-                        >
-                            <PanelLeft size={20} />
-                        </button>
-                        <h1 className="header-title">我的画布</h1>
-                    </div>
-                    <div className="header-actions" style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
-                        <button
-                            className="action-btn"
-                            onClick={reset}
-                            title="重置画布"
-                            style={{ padding: '4px 8px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}
-                        >
-                            <RotateCcw size={14} /> 重置
-                        </button>
-                        <button
-                            className="action-btn"
-                            onClick={handleDownload}
-                            title="下载 Docx"
-                            disabled={!state.hasFile}
-                            style={{ padding: '4px 8px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}
-                        >
-                            <Download size={14} /> 下载
-                        </button>
-                        <button
-                            className="action-btn"
-                            onClick={() => refFileInput.current?.click()}
-                            title={!state.hasFile ? "请先上传主文档" : "添加参考文件"}
-                            disabled={!state.hasFile}
-                            style={{ padding: '4px 8px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px', opacity: !state.hasFile ? 0.5 : 1 }}
-                        >
-                            <FilePlus size={14} /> 添加参考
-                        </button>
-                        <input
-                            type="file"
-                            ref={refFileInput}
-                            style={{ display: 'none' }}
-                            onChange={(e) => {
-                                if (e.target.files && e.target.files[0]) {
-                                    handleReferenceUpload(e.target.files[0]);
-                                    e.target.value = ''; // Reset
-                                }
-                            }}
-                        />
+                    <div className="header-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <div className="header-title-group" style={{ display: 'flex', alignItems: 'center' }}>
+                            <button onClick={onBack} className="back-btn" title="返回主页">
+                                <ArrowLeft size={20} />
+                            </button>
+                            <button
+                                onClick={() => setShowToc(!showToc)}
+                                className={`action-btn ${showToc ? 'active' : ''}`}
+                                title={showToc ? "隐藏大纲" : "显示大纲"}
+                                style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '4px', marginLeft: '4px', color: showToc ? '#1890ff' : '#666' }}
+                            >
+                                <PanelLeft size={20} />
+                            </button>
+                            <h1 className="header-title" style={{ margin: '0 0 0 8px', fontSize: '16px' }}>我的画布</h1>
+                        </div>
+                        <div className="header-actions" style={{ display: 'flex', gap: '8px' }}>
+                            <button
+                                className="action-btn"
+                                onClick={reset}
+                                title="重置画布"
+                                style={{ padding: '4px 8px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px', border: '1px solid #ddd', borderRadius: '4px', background: '#fff' }}
+                            >
+                                <RotateCcw size={14} /> 重置
+                            </button>
+                            <button
+                                className="action-btn"
+                                onClick={handleDownload}
+                                title="下载 Docx"
+                                disabled={!state.hasFile}
+                                style={{ padding: '4px 8px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px', border: '1px solid #ddd', borderRadius: '4px', background: '#fff' }}
+                            >
+                                <Download size={14} /> 下载
+                            </button>
+                            <button
+                                className="action-btn"
+                                onClick={() => refFileInput.current?.click()}
+                                title={!state.hasFile ? "请先上传主文档" : "添加参考文件"}
+                                disabled={!state.hasFile}
+                                style={{ padding: '4px 8px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px', opacity: !state.hasFile ? 0.5 : 1, border: '1px solid #ddd', borderRadius: '4px', background: '#fff' }}
+                            >
+                                <FilePlus size={14} /> 添加参考
+                            </button>
+                            <input
+                                type="file"
+                                ref={refFileInput}
+                                style={{ display: 'none' }}
+                                onChange={(e) => {
+                                    if (e.target.files && e.target.files[0]) {
+                                        handleReferenceUpload(e.target.files[0]);
+                                        e.target.value = ''; // Reset
+                                    }
+                                }}
+                            />
+                        </div>
                     </div>
                     {state.referenceFiles && state.referenceFiles.length > 0 && (
                         <div className="reference-list" style={{ marginTop: '8px', padding: '4px', borderTop: '1px solid #eee' }}>
@@ -342,7 +344,7 @@ export const WordCanvas: React.FC<{ onBack: () => void, initialContent?: string,
                                     cursor: 'pointer'
                                 }}
                             >
-                                智能审核
+                                审阅润色
                             </button>
                             <button
                                 onClick={() => setActiveTab('filler')}

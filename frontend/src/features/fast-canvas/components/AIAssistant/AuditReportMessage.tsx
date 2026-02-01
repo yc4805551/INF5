@@ -17,9 +17,13 @@ export const AuditReportMessage: React.FC<AuditReportMessageProps> = ({
 }) => {
     const [isExpanded, setIsExpanded] = useState(false);
 
+    // Safe checks
+    const safeIssues = Array.isArray(result.issues) ? result.issues : [];
+    const safeScore = typeof result.score === 'number' ? result.score : 0;
+
     // Calculate stats
-    const criticalCount = result.issues.filter(i => i.severity === 'high' || i.severity === 'critical').length;
-    const mediumCount = result.issues.filter(i => i.severity === 'medium').length;
+    const criticalCount = safeIssues.filter(i => i.severity === 'high' || i.severity === 'critical').length;
+    const mediumCount = safeIssues.filter(i => i.severity === 'medium').length;
 
     // Status color
     const getScoreColor = (score: number) => {
@@ -32,15 +36,15 @@ export const AuditReportMessage: React.FC<AuditReportMessageProps> = ({
         <div className="audit-report-card">
             {/* Header Section */}
             <div className="report-header">
-                <div className="score-badge" style={{ borderColor: getScoreColor(result.score), color: getScoreColor(result.score) }}>
-                    <span className="score-val">{result.score}</span>
+                <div className="score-badge" style={{ borderColor: getScoreColor(safeScore), color: getScoreColor(safeScore) }}>
+                    <span className="score-val">{safeScore}</span>
                     <span className="score-unit">分</span>
                 </div>
                 <div className="report-meta">
-                    <h4>全文档体检报告</h4>
+                    <h4>审阅润色报告</h4>
                     <div className="meta-stats">
                         {criticalCount > 0 && <span className="stat-tag critical">Found {criticalCount} Critical</span>}
-                        <span className="stat-tag">Total {result.issues.length} Issues</span>
+                        <span className="stat-tag">Total {safeIssues.length} Issues</span>
                     </div>
                 </div>
             </div>
@@ -64,13 +68,13 @@ export const AuditReportMessage: React.FC<AuditReportMessageProps> = ({
             {/* Expanded Details (Re-using SuggestionCard logic) */}
             {isExpanded && (
                 <div className="report-details-list">
-                    {result.issues.length === 0 ? (
+                    {safeIssues.length === 0 ? (
                         <div className="empty-issues">
                             <Shield size={24} color="#10b981" />
                             <p>文档很完美，无需修复！</p>
                         </div>
                     ) : (
-                        result.issues.map(issue => (
+                        safeIssues.map(issue => (
                             <SuggestionCard
                                 key={issue.id}
                                 suggestion={issue}

@@ -282,13 +282,14 @@ export const useWordCanvas = () => {
         }
     };
 
-    const handleFormat = async (modelConfig: ModelConfig, scope: 'all' | 'layout' | 'body' = 'all', processor: 'local' | 'ai' = 'local') => {
+    const handleFormat = async (modelConfig: ModelConfig, scope: 'all' | 'layout' | 'body' = 'all', processor: 'local' | 'ai' = 'local', forceUnbold: boolean = false) => {
         updateState({ isProcessing: true });
         try {
             const res = await axios.post(`${API_URL}/format_official`, {
                 model_config: modelConfig,
                 scope,
-                processor
+                processor,
+                force_unbold: forceUnbold
             });
 
             updateState({

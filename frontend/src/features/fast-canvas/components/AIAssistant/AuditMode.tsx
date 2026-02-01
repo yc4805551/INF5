@@ -58,7 +58,7 @@ export const AuditMode: React.FC<AuditModeProps> = ({
         return (
             <div className="assistant-placeholder">
                 <Shield size={48} color="#9ca3af" />
-                <h3>全文档智能审核</h3>
+                <h3>全文档审阅润色</h3>
                 <p>请选择要启用的AI专家代理：</p>
 
                 <div className="agent-selector">
@@ -140,21 +140,26 @@ export const AuditMode: React.FC<AuditModeProps> = ({
         );
     }
 
+    // Safety check for malformed result
+    const safeStatus = (auditResult.status || 'FAIL').toUpperCase();
+    const safeIssues = Array.isArray(auditResult.issues) ? auditResult.issues : [];
+    const safeScore = typeof auditResult.score === 'number' ? auditResult.score : 0;
+
     return (
         <div className="audit-mode-container">
             {/* Header / Summary */}
-            <div className={`audit-summary ${auditResult.status.toLowerCase()}`}>
+            <div className={`audit-summary ${safeStatus.toLowerCase()}`}>
                 <div className="audit-score">
                     <div className="score-circle">
-                        <span>{auditResult.score}</span>
+                        <span>{safeScore}</span>
                         <small>分</small>
                     </div>
                 </div>
                 <div className="audit-info">
                     <h4>
-                        {auditResult.status === 'PASS' && <span className="status-pass"><CheckCircle size={16} /> 审核通过</span>}
-                        {auditResult.status === 'WARNING' && <span className="status-warn"><AlertTriangle size={16} /> 发现问题</span>}
-                        {auditResult.status === 'FAIL' && <span className="status-fail"><AlertTriangle size={16} /> 审核未通过</span>}
+                        {safeStatus === 'PASS' && <span className="status-pass"><CheckCircle size={16} /> 审核通过</span>}
+                        {safeStatus === 'WARNING' && <span className="status-warn"><AlertTriangle size={16} /> 发现问题</span>}
+                        {safeStatus === 'FAIL' && <span className="status-fail"><AlertTriangle size={16} /> 审核未通过</span>}
                     </h4>
                     <p>{auditResult.summary || '未发现严重问题'}</p>
                 </div>
@@ -166,17 +171,17 @@ export const AuditMode: React.FC<AuditModeProps> = ({
             {/* Issues List with Virtual Scrolling */}
             <div className="audit-issues-list">
                 <div className="section-title">
-                    <span>待处理项 ({auditResult.issues.length})</span>
+                    <span>待处理项 ({safeIssues.length})</span>
                 </div>
-                {auditResult.issues.length === 0 ? (
+                {safeIssues.length === 0 ? (
                     <div className="audit-empty">
                         <CheckCircle size={32} color="#10b981" />
                         <p>文档看起来很棒！</p>
                     </div>
-                ) : auditResult.issues.length > 10 ? (
+                ) : safeIssues.length > 10 ? (
                     // Use VirtualScroll for long lists (>10 items)
                     <VirtualScroll
-                        items={auditResult.issues}
+                        items={safeIssues}
                         itemHeight={120} // Approximate height of SuggestionCard
                         containerHeight={500} // Max height of scrollable area
                         renderItem={(issue) => (
@@ -191,7 +196,7 @@ export const AuditMode: React.FC<AuditModeProps> = ({
                     />
                 ) : (
                     // Regular rendering for short lists
-                    auditResult.issues.map((issue) => (
+                    safeIssues.map((issue) => (
                         <SuggestionCard
                             key={issue.id}
                             suggestion={issue}
