@@ -5,7 +5,7 @@ import type { ModelConfig, CanvasState, ChatMessage } from '../types';
 // Reuse types from existing canvas if appropriate or define new ones
 
 const API_URL = import.meta.env.PROD
-    ? `${(import.meta.env.VITE_API_BASE_URL || '').trim().replace(/\/+$/, '')}/api/canvas` // Assuming same base URL for now
+    ? (import.meta.env.VITE_API_BASE_URL ? `${import.meta.env.VITE_API_BASE_URL.replace(/\/+$/, '')}/api/canvas` : '/api/canvas')
     : '/proxy-api/canvas';
 
 export const useWordCanvas = () => {

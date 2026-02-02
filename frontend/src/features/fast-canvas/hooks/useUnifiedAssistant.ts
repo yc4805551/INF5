@@ -3,7 +3,7 @@ import { AISuggestion, AssistantMode, AuditResult } from '../types';
 import { performRealtimeCheck, performFullAudit } from '../../../services/auditService';
 import { getModelConfig } from '../../../services/configService';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5179/api';
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
 
 // Simple hash function for cache keys
 const hashRequest = (content: string, agents: string[]): string => {
