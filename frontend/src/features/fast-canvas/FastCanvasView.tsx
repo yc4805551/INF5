@@ -166,8 +166,11 @@ export const FastCanvasView: React.FC<FastCanvasViewProps> = ({
             const jsonContent = await importDocxService(file);
             console.log("Imported JSON:", jsonContent);
 
-            if (jsonContent.content && jsonContent.content.length === 0) {
-                alert("导入成功，但这篇文档似乎没有可识别的段落内容（可能是纯表格或图片？目前暂不支持）。");
+            if (jsonContent.content && jsonContent.content.length > 0) {
+                // Success case
+                // alert(`成功导入 ${jsonContent.content.length} 个段落`);
+            } else {
+                alert("导入警告：文档似乎是空的，或者内容无法被识别（如纯图片文档）。");
             }
 
             if (editorRef.current) {

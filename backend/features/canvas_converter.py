@@ -185,7 +185,26 @@ def docx_to_tiptap(file_stream: io.BytesIO) -> Dict[str, Any]:
                     })
     
     print(f"[DEBUG] DOCX Import: {count_para} paragraphs, {count_table} tables parsed.")
-    print(f"[DEBUG] Tiptap Content Nodes: {len(content)}")
+    
+    # Fallback: If content is still empty (e.g. text boxes, weird formatting), extract raw text
+    if not content:
+        print("[DEBUG] Content empty after structural parse. Attempting raw text fallback.")
+        full_text = []
+        for element in document.element.body.iter():
+            if element.tag.endswith('t'):
+                if element.text:
+                    full_text.append(element.text)
+        
+        if full_text:
+            joined_text = "".join(full_text)
+            # Create a single paragraph with all text
+            content.append({
+                "type": "paragraph",
+                "content": [{"type": "text", "text": joined_text}]
+            })
+            print(f"[DEBUG] Fallback: Extracted {len(joined_text)} chars of raw text.")
+
+    print(f"[DEBUG] Final Tiptap Content Nodes: {len(content)}")
 
     return {
         "type": "doc",
