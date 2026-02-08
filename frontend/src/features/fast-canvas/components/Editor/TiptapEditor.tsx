@@ -20,6 +20,7 @@ interface TiptapEditorProps {
 export interface TiptapEditorRef {
     replaceText: (original: string, replacement: string) => boolean;
     selectText: (text: string) => boolean;
+    setContent: (content: any) => boolean;
 }
 
 export const TiptapEditor = React.forwardRef<TiptapEditorRef, TiptapEditorProps>(({
@@ -152,6 +153,13 @@ export const TiptapEditor = React.forwardRef<TiptapEditorRef, TiptapEditorProps>
                     .setTextSelection({ from: foundPos, to: foundPos + text.length })
                     .scrollIntoView()
                     .run();
+                return true;
+            }
+            return false;
+        },
+        setContent: (content: any) => {
+            if (editor) {
+                editor.commands.setContent(content);
                 return true;
             }
             return false;

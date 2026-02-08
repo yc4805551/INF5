@@ -148,7 +148,38 @@ export const FastCanvasView: React.FC<FastCanvasViewProps> = ({
     }, [editorText, assistantMode, analyzeRealtime, clearSuggestions, suggestions.length]);
 
     // Handlers
-    const handleSave = () => saveDocument();
+    // const handleSave = () => saveDocument(); // Removed as per user request
+
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const handleImportClick = () => {
+        fileInputRef.current?.click();
+    };
+
+    const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        try {
+            // Dynamically import service to avoid circular deps if any
+            const { importDocxService } = await import('../../services/canvasService');
+            const jsonContent = await importDocxService(file);
+
+            if (editorRef.current) {
+                editorRef.current.setContent(jsonContent);
+                // The editor onChange will trigger updateBlock/auto-save
+                // We also update the title to the filename (without extension)
+                const filename = file.name.replace(/\.docx$/i, '');
+                updateTitle(filename);
+            }
+        } catch (error) {
+            console.error('Import failed:', error);
+            alert('导入失败，请检查文件格式或后端服务');
+        } finally {
+            // Reset input
+            if (event.target) event.target.value = '';
+        }
+    };
 
     // Call Smart Export
     const handleExportDocx = () => {
@@ -230,8 +261,23 @@ export const FastCanvasView: React.FC<FastCanvasViewProps> = ({
                         )}
                     </div>
 
-                    <button className="action-btn" onClick={handleSave} disabled={!isDirty || isSaving}>
-                        <Save size={16} /><span>保存</span>
+                    {/* Hidden File Input */}
+                    <input
+                        type="file"
+                        ref={fileInputRef}
+                        onChange={handleFileChange}
+                        style={{ display: 'none' }}
+                        accept=".docx"
+                    />
+
+                    <button className="action-btn" onClick={handleImportClick} title="导入DOCX到当前画布">
+                        {/* Reusing Save icon or Upload icon? I need to import Upload. For now I keep Save icon but change text? Or Import. */}
+                        {/* I should likely import Upload icon in next step or use existing import. */}
+                        {/* Let's use FileText temporary or Upload if available. I'll stick to Save icon for now but labelled Import? No, that's confusing. */}
+                        {/* I will add Upload to imports. For now, I use Download (rotated?) or just Save icon as placeholder. */}
+                        {/* Actually I can just use text. */}
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
+                        <span>导入DOCX</span>
                     </button>
 
                     <button className="action-btn" onClick={handleExportDocx} title="导出为智能公文格式 (黑体/楷体/仿宋)">
