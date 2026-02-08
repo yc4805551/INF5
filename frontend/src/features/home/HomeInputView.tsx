@@ -170,6 +170,7 @@ export const HomeInputView: React.FC<HomeInputViewProps> = ({
                         style={{ display: 'none' }}
                         accept=".txt,.md,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                         onChange={handleFileChange}
+                        title="Upload File"
                     />
                     <div className="utility-btn-group">
                         <button className="btn btn-secondary" onClick={() => setInputText('')} disabled={!inputText || isProcessing}>
@@ -196,6 +197,7 @@ export const HomeInputView: React.FC<HomeInputViewProps> = ({
                             value={selectedModel}
                             onChange={(e) => setSelectedModel(e.target.value as ModelProvider)}
                             disabled={isProcessing}
+                            title="选择模型"
                         >
                             {availableModels.map(modelKey => (
                                 <option key={modelKey} value={modelKey}>
@@ -235,6 +237,7 @@ export const HomeInputView: React.FC<HomeInputViewProps> = ({
                             value={selectedKnowledgeBase || ''}
                             onChange={(e) => setSelectedKnowledgeBase(e.target.value)}
                             disabled={isProcessing || knowledgeBases.length === 0}
+                            title="选择知识库"
                         >
                             <option value="" disabled>-- 请选择知识库 --</option>
                             {knowledgeBases.map(kb => (
