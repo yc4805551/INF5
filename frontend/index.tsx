@@ -1589,7 +1589,7 @@ const App = () => {
     // knowledgeBases is now derived from the two sources
     const knowledgeBases: KnowledgeBase[] = [...anythingWorkspaces, ...milvusCollections];
 
-    const [isKbLoading, setIsKbLoading] = useState(true);
+    const [isKbLoading, setIsKbLoading] = useState(false);
     const [kbError, setKbError] = useState<string | null>(null);
     const [selectedKnowledgeBase, setSelectedKnowledgeBase] = useState<string | null>(null);
     const [initialKnowledgeChatQuestion, setInitialKnowledgeChatQuestion] = useState<string | undefined>();
