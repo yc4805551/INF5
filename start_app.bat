@@ -17,12 +17,9 @@ if not exist "backend\venv" (
     echo [INFO] Creating virtual environment...
     cd backend
     python -m venv venv
-    
-    echo [INFO] Installing dependencies...
-    venv\Scripts\python.exe -m pip install -r requirements.txt
-    
     cd ..
-    echo [SUCCESS] Environment setup complete.
+    echo [SUCCESS] Virtual environment created.
+    echo [INFO] Please run 'install_deps.bat' to install dependencies for the first time!
 ) else (
     echo [INFO] Virtual environment found in backend\venv.
 )
