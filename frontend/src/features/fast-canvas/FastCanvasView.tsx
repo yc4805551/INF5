@@ -273,6 +273,7 @@ export const FastCanvasView: React.FC<FastCanvasViewProps> = ({
                         onChange={handleFileChange}
                         style={{ display: 'none' }}
                         accept=".docx"
+                        title="Import DOCX"
                     />
 
                     <button className="action-btn" onClick={handleImportClick} title="导入DOCX到当前画布">
