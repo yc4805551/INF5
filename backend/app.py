@@ -30,6 +30,7 @@ from features.smart_filler.routes import smart_filler_bp
 from features.advisor.routes import advisor_bp
 from features.agent_anything.routes import agent_anything_bp # AnythingLLM Agent
 from features.file_search.routes import file_search_bp  # 智能文件搜索
+from features.remote_control.routes import remote_control_bp  # OpenClaw Remote Control
 
 # ⚠️ 知识库CLI命令（独立文件，请勿随意修改）
 from features.knowledge.cli import register_knowledge_commands
@@ -70,6 +71,7 @@ def create_app():
     app.register_blueprint(advisor_bp, url_prefix='/api/advisor') # /suggestions - Fixed from /api/agent
     app.register_blueprint(agent_anything_bp, url_prefix='/api/agent-anything') # /audit
     app.register_blueprint(file_search_bp, url_prefix='/api/file-search') # 智能文件搜索
+    app.register_blueprint(remote_control_bp, url_prefix='/api/remote-control')  # OpenClaw Remote Control
 
     # Initialize Milvus Connection (Disabled for manual connection preference)
     # try:
