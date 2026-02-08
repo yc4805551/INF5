@@ -216,6 +216,10 @@ def _para_to_tiptap(para) -> Dict:
     text_content = []
     
     for run in para.runs:
+        # Filter out empty text runs which cause ProseMirror errors
+        if not run.text:
+            continue
+            
         text_node = {"type": "text", "text": run.text}
         
         # 提取marks
@@ -234,9 +238,13 @@ def _para_to_tiptap(para) -> Dict:
         
         text_content.append(text_node)
     
+    # If paragraph is empty, return it without content (ProseMirror handles this as empty block)
+    if not text_content:
+        return {"type": "paragraph"}
+        
     return {
         "type": "paragraph",
-        "content": text_content if text_content else [{"type": "text", "text": ""}]
+        "content": text_content
     }
 
 # ==================== Smart Gov Export ====================
