@@ -1589,22 +1589,24 @@ const App = () => {
     // knowledgeBases is now derived from the two sources
     const knowledgeBases: KnowledgeBase[] = [...anythingWorkspaces, ...milvusCollections];
 
-    const [isKbLoading, setIsKbLoading] = useState(false);
+    const [isAnythingLoading, setIsAnythingLoading] = useState(false); // Separate loading state
+    const [isMilvusLoading, setIsMilvusLoading] = useState(false);   // Separate loading state
+
+    // Legacy isKbLoading for compatibility with other components if needed, or derived
+    const isKbLoading = isAnythingLoading || isMilvusLoading;
+
     const [kbError, setKbError] = useState<string | null>(null);
     const [selectedKnowledgeBase, setSelectedKnowledgeBase] = useState<string | null>(null);
     const [initialKnowledgeChatQuestion, setInitialKnowledgeChatQuestion] = useState<string | undefined>();
 
     useEffect(() => {
         if (executionMode === 'frontend' && selectedModel !== 'gemini') {
-            // If switching to frontend and a non-Gemini model was selected,
-            // default back to Gemini to avoid issues before this refactor.
-            // With the refactor, this line is less critical but good for safety.
-            // setSelectedModel('gemini'); // This logic is now removed to allow other models
+            // ...
         }
     }, [executionMode, selectedModel]);
 
     const fetchAnythingWorkspaces = async () => {
-        setIsKbLoading(true);
+        setIsAnythingLoading(true);
         setKbError(null);
         try {
             const anythingResponse = await fetch(`${API_BASE_URL}/agent-anything/workspaces`);
@@ -1620,12 +1622,12 @@ const App = () => {
             console.warn("AnythingLLM connection failed, skipping...", error);
             setKbError(`AnythingLLM 连接错误: ${error.message}`);
         } finally {
-            setIsKbLoading(false);
+            setIsAnythingLoading(false);
         }
     };
 
     const fetchMilvusCollections = async () => {
-        setIsKbLoading(true);
+        setIsMilvusLoading(true);
         setKbError(null);
         try {
             const response = await fetch(`${API_BASE_URL}/list-collections`);
@@ -1641,7 +1643,7 @@ const App = () => {
             console.warn("Milvus connection failed, skipping...", error);
             setKbError(`Milvus 连接错误: ${error.message}`);
         } finally {
-            setIsKbLoading(false);
+            setIsMilvusLoading(false);
         }
     };
 
@@ -1653,9 +1655,6 @@ const App = () => {
                 setSelectedKnowledgeBase(knowledgeBases[0].id);
             }
         } else if (!isKbLoading) {
-            // Only clear if not loading (to avoid clearing during refresh if momentary empty)
-            // But actually we are appending, so maybe fine. 
-            // If completely empty and not loading, clear selection.
             if (selectedKnowledgeBase) {
                 setSelectedKnowledgeBase(null);
             }
@@ -1822,6 +1821,8 @@ const App = () => {
                         onFileSearch={handleFileSearch}
                         onConnectAnythingLLM={handleConnectAnythingLLM}
                         onConnectMilvus={handleConnectMilvus}
+                        isAnythingLoading={isAnythingLoading}
+                        isMilvusLoading={isMilvusLoading}
                         executionMode={executionMode}
                         setExecutionMode={setExecutionMode}
                     />

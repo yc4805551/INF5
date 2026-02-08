@@ -22,6 +22,8 @@ interface HomeInputViewProps {
     onFileSearch: () => void;
     onConnectAnythingLLM: () => void;
     onConnectMilvus: () => void;
+    isAnythingLoading?: boolean;
+    isMilvusLoading?: boolean;
     executionMode: ExecutionMode;
     setExecutionMode: (mode: ExecutionMode) => void;
 }
@@ -45,6 +47,8 @@ export const HomeInputView: React.FC<HomeInputViewProps> = ({
     onFileSearch,
     onConnectAnythingLLM,
     onConnectMilvus,
+    isAnythingLoading,
+    isMilvusLoading,
     executionMode,
     setExecutionMode,
 }) => {
@@ -206,18 +210,18 @@ export const HomeInputView: React.FC<HomeInputViewProps> = ({
                             <button
                                 className="btn btn-secondary"
                                 onClick={onConnectMilvus}
-                                disabled={isKbLoading}
+                                disabled={isMilvusLoading || isKbLoading}
                                 style={{ flex: 1 }}
                             >
-                                🗄️ 连接 Milvus
+                                {isMilvusLoading ? '⏳ 连接中...' : '🗄️ 连接 Milvus'}
                             </button>
                             <button
                                 className="btn btn-primary"
                                 onClick={onConnectAnythingLLM}
-                                disabled={isKbLoading}
+                                disabled={isAnythingLoading || isKbLoading}
                                 style={{ flex: 1 }}
                             >
-                                🔌 连接 AnythingLLM
+                                {isAnythingLoading ? '⏳ 连接中...' : '🔌 连接 AnythingLLM'}
                             </button>
                         </div>
 
