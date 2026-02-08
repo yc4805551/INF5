@@ -117,28 +117,75 @@ def docx_to_tiptap(file_stream: io.BytesIO) -> Dict[str, Any]:
         "content": [...]
     }
     """
-    doc = Document(file_stream)
+    document = Document(file_stream)
     content = []
     
-    print(f"[DEBUG] Reading DOCX: {len(doc.paragraphs)} paragraphs found.")
-    
-    for para in doc.paragraphs:
-        # 检测标题
-        if para.style.name.startswith('Heading'):
-            try:
-                level = int(para.style.name[-1])
-                content.append({
-                    "type": "heading",
-                    "attrs": {"level": level},
-                    "content": [{"type": "text", "text": para.text}]
-                })
-            except ValueError:
-                # 无法解析标题级别，按段落处理
-                content.append(_para_to_tiptap(para))
+    # Helper to iterate elements in order
+    from docx.document import Document as _Document
+    from docx.oxml.text.paragraph import CT_P
+    from docx.oxml.table import CT_Tbl
+    from docx.table import _Cell, Table
+    from docx.text.paragraph import Paragraph
+
+    def iter_block_items(parent):
+        """
+        Yield each paragraph and table child within *parent*, in document order.
+        Each returned value is an instance of either Table or Paragraph.
+        """
+        if isinstance(parent, _Document):
+            parent_elm = parent.element.body
+        elif isinstance(parent, _Cell):
+            parent_elm = parent._tc
         else:
-            content.append(_para_to_tiptap(para))
+            raise ValueError("something's not right")
+
+        for child in parent_elm.iterchildren():
+            if isinstance(child, CT_P):
+                yield Paragraph(child, parent)
+            elif isinstance(child, CT_Tbl):
+                yield Table(child, parent)
+
+    count_para = 0
+    count_table = 0
+
+    for block in iter_block_items(document):
+        if isinstance(block, Paragraph):
+            count_para += 1
+            # Check style mainly for headings
+            if block.style.name.startswith('Heading'):
+                try:
+                    level = int(block.style.name[-1])
+                    content.append({
+                        "type": "heading",
+                        "attrs": {"level": level},
+                        "content": [{"type": "text", "text": block.text}]
+                    })
+                except ValueError:
+                    content.append(_para_to_tiptap(block))
+            else:
+                content.append(_para_to_tiptap(block))
+        
+        elif isinstance(block, Table):
+            count_table += 1
+            # Simple table extraction: convert rows to paragraphs
+            # TODO: Future support for actual Tiptap tables
+            for row in block.rows:
+                row_text = []
+                for cell in row.cells:
+                    cell_text = cell.text.strip()
+                    if cell_text:
+                        row_text.append(cell_text)
+                
+                if row_text:
+                    # Join cell text with separator
+                    line = " | ".join(row_text)
+                    content.append({
+                        "type": "paragraph",
+                        "content": [{"type": "text", "text": line}]
+                    })
     
-    print(f"[DEBUG] Parsed Tiptap content nodes: {len(content)}")
+    print(f"[DEBUG] DOCX Import: {count_para} paragraphs, {count_table} tables parsed.")
+    print(f"[DEBUG] Tiptap Content Nodes: {len(content)}")
 
     return {
         "type": "doc",
