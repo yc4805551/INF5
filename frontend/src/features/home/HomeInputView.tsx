@@ -21,6 +21,7 @@ interface HomeInputViewProps {
     onFastCanvas: () => void;
     onFileSearch: () => void;
     onConnectAnythingLLM: () => void;
+    onConnectMilvus: () => void;
     executionMode: ExecutionMode;
     setExecutionMode: (mode: ExecutionMode) => void;
 }
@@ -43,6 +44,7 @@ export const HomeInputView: React.FC<HomeInputViewProps> = ({
     onFastCanvas,
     onFileSearch,
     onConnectAnythingLLM,
+    onConnectMilvus,
     executionMode,
     setExecutionMode,
 }) => {
@@ -202,12 +204,20 @@ export const HomeInputView: React.FC<HomeInputViewProps> = ({
                         <h4>知识库连接</h4>
                         <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '10px' }}>
                             <button
+                                className="btn btn-secondary"
+                                onClick={onConnectMilvus}
+                                disabled={isKbLoading}
+                                style={{ flex: 1 }}
+                            >
+                                🗄️ 连接 Milvus
+                            </button>
+                            <button
                                 className="btn btn-primary"
                                 onClick={onConnectAnythingLLM}
                                 disabled={isKbLoading}
-                                style={{ width: '100%' }}
+                                style={{ flex: 1 }}
                             >
-                                {isKbLoading ? '连接中...' : '🔌 连接 AnythingLLM / 刷新'}
+                                🔌 连接 AnythingLLM
                             </button>
                         </div>
 

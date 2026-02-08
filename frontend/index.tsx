@@ -1584,7 +1584,11 @@ const App = () => {
     const [selectedModel, setSelectedModel] = useState<ModelProvider>('free');
     const [executionMode, setExecutionMode] = useState<ExecutionMode>('backend');
 
-    const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBase[]>([]);
+    const [anythingWorkspaces, setAnythingWorkspaces] = useState<KnowledgeBase[]>([]);
+    const [milvusCollections, setMilvusCollections] = useState<KnowledgeBase[]>([]);
+    // knowledgeBases is now derived from the two sources
+    const knowledgeBases: KnowledgeBase[] = [...anythingWorkspaces, ...milvusCollections];
+
     const [isKbLoading, setIsKbLoading] = useState(true);
     const [kbError, setKbError] = useState<string | null>(null);
     const [selectedKnowledgeBase, setSelectedKnowledgeBase] = useState<string | null>(null);
@@ -1599,77 +1603,77 @@ const App = () => {
         }
     }, [executionMode, selectedModel]);
 
-    const fetchKnowledgeBases = async (includeAnythingLLM: boolean) => {
+    const fetchAnythingWorkspaces = async () => {
         setIsKbLoading(true);
         setKbError(null);
-
-        let formattedKbs: KnowledgeBase[] = [];
-
-        // 1. Try to fetch AnythingLLM Workspaces (Conditional)
-        if (includeAnythingLLM) {
-            try {
-                const anythingResponse = await fetch(`${API_BASE_URL}/agent-anything/workspaces`);
-                if (anythingResponse.ok) {
-                    const data = await anythingResponse.json();
-                    const workspaces: KnowledgeBase[] = data.workspaces || [];
-                    formattedKbs = [...workspaces]; // Add AnythingLLM workspaces first
-                } else {
-                    console.warn("AnythingLLM connection returned non-OK status");
-                    // Only show error if explicitly requested
-                    if (includeAnythingLLM) {
-                        // Optional: could set a specific error here or just log it
-                    }
-                }
-            } catch (error: any) {
-                console.warn("AnythingLLM connection failed, skipping...", error);
+        try {
+            const anythingResponse = await fetch(`${API_BASE_URL}/agent-anything/workspaces`);
+            if (anythingResponse.ok) {
+                const data = await anythingResponse.json();
+                const workspaces: KnowledgeBase[] = data.workspaces || [];
+                setAnythingWorkspaces(workspaces);
+            } else {
+                console.warn("AnythingLLM connection returned non-OK status");
+                setKbError("AnythingLLM 连接失败，请检查服务状态。");
             }
+        } catch (error: any) {
+            console.warn("AnythingLLM connection failed, skipping...", error);
+            setKbError(`AnythingLLM 连接错误: ${error.message}`);
+        } finally {
+            setIsKbLoading(false);
         }
+    };
 
-        // 2. Try to fetch Milvus Collections (Always)
+    const fetchMilvusCollections = async () => {
+        setIsKbLoading(true);
+        setKbError(null);
         try {
             const response = await fetch(`${API_BASE_URL}/list-collections`);
             if (response.ok) {
                 const data = await response.json();
                 const collections: string[] = data.collections || [];
                 const milvusKbs = collections.map(name => ({ id: name, name }));
-                formattedKbs = [...formattedKbs, ...milvusKbs]; // Append Milvus collections
+                setMilvusCollections(milvusKbs);
+            } else {
+                setKbError("Milvus 连接失败，请检查服务状态。");
             }
         } catch (error: any) {
             console.warn("Milvus connection failed, skipping...", error);
+            setKbError(`Milvus 连接错误: ${error.message}`);
+        } finally {
+            setIsKbLoading(false);
         }
-
-        // Update state
-        setKnowledgeBases(formattedKbs);
-
-        // Auto-select first knowledge base if available
-        if (formattedKbs.length > 0) {
-            const existingIds = formattedKbs.map(kb => kb.id);
-            if (!selectedKnowledgeBase || !existingIds.includes(selectedKnowledgeBase)) {
-                setSelectedKnowledgeBase(formattedKbs[0].id);
-            }
-        } else {
-            // Only clear selected if we have NO kbs
-            if (!selectedKnowledgeBase) {
-                setSelectedKnowledgeBase(null);
-            }
-
-            if (includeAnythingLLM && formattedKbs.length === 0) {
-                setKbError("无法连接到任何知识库服务（AnythingLLM 或 Milvus）。请检查后端配置。");
-            } else if (formattedKbs.length === 0) {
-                // Initial load silent failure is okay, user can click connect
-                setKbError(null);
-            }
-        }
-
-        setIsKbLoading(false);
     };
 
+    // Auto-select logic when knowledge bases change
     useEffect(() => {
-        fetchKnowledgeBases(false); // Initial load: Skip AnythingLLM
+        if (knowledgeBases.length > 0) {
+            const existingIds = knowledgeBases.map(kb => kb.id);
+            if (!selectedKnowledgeBase || !existingIds.includes(selectedKnowledgeBase)) {
+                setSelectedKnowledgeBase(knowledgeBases[0].id);
+            }
+        } else if (!isKbLoading) {
+            // Only clear if not loading (to avoid clearing during refresh if momentary empty)
+            // But actually we are appending, so maybe fine. 
+            // If completely empty and not loading, clear selection.
+            if (selectedKnowledgeBase) {
+                setSelectedKnowledgeBase(null);
+            }
+        }
+    }, [knowledgeBases, isKbLoading, selectedKnowledgeBase]);
+
+
+    // Initial load: Only Milvus
+    useEffect(() => {
+        fetchMilvusCollections();
     }, []);
 
     const handleConnectAnythingLLM = () => {
-        fetchKnowledgeBases(true);
+        fetchAnythingWorkspaces();
+    };
+
+    const handleConnectMilvus = () => {
+        fetchMilvusCollections();
     };
 
 
@@ -1817,6 +1821,7 @@ const App = () => {
                         onFastCanvas={handleFastCanvas}
                         onFileSearch={handleFileSearch}
                         onConnectAnythingLLM={handleConnectAnythingLLM}
+                        onConnectMilvus={handleConnectMilvus}
                         executionMode={executionMode}
                         setExecutionMode={setExecutionMode}
                     />
