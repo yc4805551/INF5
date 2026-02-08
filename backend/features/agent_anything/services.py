@@ -11,8 +11,15 @@ ANYTHING_API_KEY = os.getenv("ANYTHING_LLM_API_KEY", "")
 DEFAULT_WORKSPACE = "inf_knowledge"
 
 def get_headers():
+    key = ANYTHING_API_KEY
+    if not key:
+        logging.error("⚠️ AnythingLLM API Key is MISSING or EMPTY!")
+    else:
+        # Log first 4 chars for verification
+        logging.info(f"Using anythingLLM API Key: {key[:4]}*** (Length: {len(key)})")
+        
     return {
-        "Authorization": f"Bearer {ANYTHING_API_KEY}",
+        "Authorization": f"Bearer {key}",
         "Content-Type": "application/json",
         "Accept": "application/json"
     }
