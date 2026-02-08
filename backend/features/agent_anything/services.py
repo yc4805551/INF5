@@ -39,13 +39,40 @@ def get_anything_workspaces():
 def resolve_workspace_slug(target_name=DEFAULT_WORKSPACE):
     """Find the slug for the target workspace name"""
     workspaces = get_anything_workspaces()
+    
+    if not workspaces:
+        logging.warning("No workspaces found in AnythingLLM")
+        return None
+    
+    # Log all available workspaces for debugging
+    logging.info(f"[Workspace Resolution] Looking for: '{target_name}'")
+    logging.info(f"[Workspace Resolution] Available workspaces:")
     for ws in workspaces:
-        if ws.get('name').lower() == target_name.lower():
-            return ws.get('slug')
+        ws_name = ws.get('name', 'N/A')
+        ws_slug = ws.get('slug', 'N/A')
+        logging.info(f"  - Name: '{ws_name}', Slug: '{ws_slug}'")
+    
+    # Try to match by name (case-insensitive)
+    for ws in workspaces:
+        ws_name = ws.get('name', '')
+        ws_slug = ws.get('slug', '')
+        
+        # Match against name or slug
+        if ws_name.lower() == target_name.lower() or ws_slug.lower() == target_name.lower():
+            logging.info(f"[Workspace Resolution] ✓ Matched workspace: '{ws_name}' (slug: '{ws_slug}')")
+            return ws_slug
+    
+    # No match found
+    logging.warning(f"[Workspace Resolution] ✗ No workspace matching '{target_name}'")
+    logging.warning(f"[Workspace Resolution] Defaulting to first workspace if available")
     
     # Fallback: return the first one if found
     if workspaces:
-        return workspaces[0].get('slug')
+        fallback_ws = workspaces[0]
+        fallback_name = fallback_ws.get('name', 'N/A')
+        fallback_slug = fallback_ws.get('slug', 'N/A')
+        logging.warning(f"[Workspace Resolution] Using fallback: '{fallback_name}' (slug: '{fallback_slug}')")
+        return fallback_slug
     
     return None
 
