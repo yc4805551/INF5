@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-DOCX 导入功能 - 一键部署和诊断脚本
+新增加的功能 - 一键部署和诊断脚本
 运行此脚本将自动完成部署并测试 DOCX 导入功能
 所有输出将同时显示在控制台和保存到 diagnose_log.txt
 """
@@ -387,8 +387,8 @@ def main():
         
         # 检查后端服务
         results['backend'] = check_backend_service()
-    if not results['backend']:
-        Logger.error("后端服务检查失败")
+        if not results['backend']:
+            Logger.error("后端服务检查失败")
             return 1
         
         # 验证前端文件
