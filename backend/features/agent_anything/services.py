@@ -8,7 +8,8 @@ ANYTHING_API_BASE = os.getenv("ANYTHING_LLM_API_BASE", "http://localhost:3001/ap
 ANYTHING_API_KEY = os.getenv("ANYTHING_LLM_API_KEY", "")
 
 # Default Workspace (User should have created this)
-DEFAULT_WORKSPACE = "inf_knowledge"
+# Default Workspace (User should have created this)
+DEFAULT_WORKSPACE = os.getenv("ANYTHING_LLM_WORKSPACE", "inf_work")
 
 def get_headers():
     key = ANYTHING_API_KEY
