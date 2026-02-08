@@ -1663,10 +1663,10 @@ const App = () => {
     }, [knowledgeBases, isKbLoading, selectedKnowledgeBase]);
 
 
-    // Initial load: Only Milvus
-    useEffect(() => {
-        fetchMilvusCollections();
-    }, []);
+    // Initial load: NONE (Manual connection only)
+    // useEffect(() => {
+    //    fetchMilvusCollections(); 
+    // }, []);
 
     const handleConnectAnythingLLM = () => {
         fetchAnythingWorkspaces();
