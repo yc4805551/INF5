@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 DOCX 导入功能 - 一键部署和诊断脚本
 运行此脚本将自动完成部署并测试 DOCX 导入功能
@@ -9,6 +10,7 @@ import sys
 import subprocess
 import requests
 import json
+import platform
 from datetime import datetime
 from pathlib import Path
 
@@ -16,17 +18,35 @@ from pathlib import Path
 BACKEND_URL = "http://localhost:5000"
 PROJECT_ROOT = Path(__file__).parent.absolute()
 
+# Windows 环境检测
+IS_WINDOWS = platform.system() == 'Windows'
+
+# 设置 Windows 控制台编码
+if IS_WINDOWS:
+    try:
+        # 尝试设置为 UTF-8
+        os.system('chcp 65001 > nul 2>&1')
+    except:
+        pass
+
 class Logger:
-    """彩色日志输出"""
-    COLORS = {
-        'HEADER': '\033[95m',
-        'BLUE': '\033[94m',
-        'GREEN': '\033[92m',
-        'YELLOW': '\033[93m',
-        'RED': '\033[91m',
-        'END': '\033[0m',
-        'BOLD': '\033[1m',
-    }
+    """日志输出（Windows 兼容版）"""
+    
+    # Windows 使用纯文本，Linux/Mac 使用 ANSI 颜色和 emoji
+    if IS_WINDOWS:
+        COLORS = {'HEADER': '', 'BLUE': '', 'GREEN': '', 'YELLOW': '', 'RED': '', 'END': '', 'BOLD': ''}
+        ICONS = {'INFO': '[INFO]', 'SUCCESS': '[OK]', 'WARNING': '[WARN]', 'ERROR': '[ERROR]'}
+    else:
+        COLORS = {
+            'HEADER': '\033[95m',
+            'BLUE': '\033[94m',
+            'GREEN': '\033[92m',
+            'YELLOW': '\033[93m',
+            'RED': '\033[91m',
+            'END': '\033[0m',
+            'BOLD': '\033[1m',
+        }
+        ICONS = {'INFO': 'ℹ️ ', 'SUCCESS': '✅', 'WARNING': '⚠️ ', 'ERROR': '❌'}
     
     @staticmethod
     def header(msg):
@@ -36,19 +56,19 @@ class Logger:
     
     @staticmethod
     def info(msg):
-        print(f"{Logger.COLORS['BLUE']}ℹ️  {msg}{Logger.COLORS['END']}")
+        print(f"{Logger.COLORS['BLUE']}{Logger.ICONS['INFO']} {msg}{Logger.COLORS['END']}")
     
     @staticmethod
     def success(msg):
-        print(f"{Logger.COLORS['GREEN']}✅ {msg}{Logger.COLORS['END']}")
+        print(f"{Logger.COLORS['GREEN']}{Logger.ICONS['SUCCESS']} {msg}{Logger.COLORS['END']}")
     
     @staticmethod
     def warning(msg):
-        print(f"{Logger.COLORS['YELLOW']}⚠️  {msg}{Logger.COLORS['END']}")
+        print(f"{Logger.COLORS['YELLOW']}{Logger.ICONS['WARNING']} {msg}{Logger.COLORS['END']}")
     
     @staticmethod
     def error(msg):
-        print(f"{Logger.COLORS['RED']}❌ {msg}{Logger.COLORS['END']}")
+        print(f"{Logger.COLORS['RED']}{Logger.ICONS['ERROR']} {msg}{Logger.COLORS['END']}")
     
     @staticmethod
     def step(num, msg):
@@ -301,18 +321,21 @@ def generate_summary(results):
         'import': results.get('import', False),
     }
     
+    ok_icon = Logger.ICONS['SUCCESS'] if not IS_WINDOWS else '[PASS]'
+    fail_icon = Logger.ICONS['ERROR'] if not IS_WINDOWS else '[FAIL]'
+    
     for key, status in status_map.items():
-        icon = "✅" if status else "❌"
+        icon = ok_icon if status else fail_icon
         print(f"{icon} {key.upper()}: {'通过' if status else '失败'}")
     
     all_passed = all(status_map.values())
     
     if all_passed:
-        Logger.header("🎉 所有检查通过！DOCX 导入功能正常")
+        Logger.header("所有检查通过！DOCX 导入功能正常")
         Logger.info("您现在可以在浏览器中使用 DOCX 导入功能了")
         Logger.info("如仍有问题，请清除浏览器缓存 (Ctrl+F5)")
     else:
-        Logger.header("⚠️  部分检查未通过")
+        Logger.header("部分检查未通过")
         Logger.info("请将此日志输出发送给开发者以获得帮助")
 
 def main():
