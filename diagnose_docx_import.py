@@ -3,6 +3,7 @@
 """
 DOCX 导入功能 - 一键部署和诊断脚本
 运行此脚本将自动完成部署并测试 DOCX 导入功能
+所有输出将同时显示在控制台和保存到 diagnose_log.txt
 """
 
 import os
@@ -17,9 +18,28 @@ from pathlib import Path
 # 配置
 BACKEND_URL = "http://localhost:5000"
 PROJECT_ROOT = Path(__file__).parent.absolute()
+LOG_FILE = PROJECT_ROOT / "diagnose_log.txt"
 
 # Windows 环境检测
 IS_WINDOWS = platform.system() == 'Windows'
+
+# Tee-like output class: writes to both stdout and file
+class TeeOutput:
+    def __init__(self, file_path):
+        self.terminal = sys.stdout
+        self.log = open(file_path, 'w', encoding='utf-8')
+    
+    def write(self, message):
+        self.terminal.write(message)
+        self.log.write(message)
+        self.log.flush()  # Ensure immediate write
+    
+    def flush(self):
+        self.terminal.flush()
+        self.log.flush()
+    
+    def close(self):
+        self.log.close()
 
 # 设置 Windows 控制台编码
 if IS_WINDOWS:
@@ -340,24 +360,33 @@ def generate_summary(results):
 
 def main():
     """主函数"""
-    Logger.header("DOCX 导入功能 - 自动部署和诊断")
+    # Initialize log output
+    tee = TeeOutput(LOG_FILE)
+    original_stdout = sys.stdout
+    sys.stdout = tee
     
-    results = {}
-    
-    # 检查 Git 状态
-    results['git'] = check_git_status()
-    if not results['git']:
-        Logger.error("Git 检查失败，请确保在项目根目录运行此脚本")
-        return 1
-    
-    # 部署最新代码
-    results['deploy'] = deploy_latest_code()
-    if not results['deploy']:
-        Logger.error("代码部署失败")
-        return 1
-    
-    # 检查后端服务
-    results['backend'] = check_backend_service()
+    try:
+        Logger.header("DOCX 导入功能 - 自动部署和诊断")
+        print(f"日志文件: {LOG_FILE}")
+        print(f"开始时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        print()
+        
+        results = {}
+        
+        # 检查 Git 状态
+        results['git'] = check_git_status()
+        if not results['git']:
+            Logger.error("Git 检查失败，请确保在项目根目录运行此脚本")
+            return 1
+        
+        # 部署最新代码
+        results['deploy'] = deploy_latest_code()
+        if not results['deploy']:
+            Logger.error("代码部署失败")
+            return 1
+        
+        # 检查后端服务
+        results['backend'] = check_backend_service()
     if not results['backend']:
         Logger.error("后端服务检查失败")
         return 1
@@ -368,10 +397,18 @@ def main():
     # 测试 DOCX 导入
     results['import'] = test_docx_import()
     
-    # 生成摘要
-    generate_summary(results)
+        # 生成摘要
+        generate_summary(results)
+        
+        print()
+        Logger.success(f"诊断完成！日志已保存到: {LOG_FILE}")
+        
+        return 0 if all(results.values()) else 1
     
-    return 0 if all(results.values()) else 1
+    finally:
+        # Restore original stdout and close log file
+        sys.stdout = original_stdout
+        tee.close()
 
 if __name__ == "__main__":
     try:
