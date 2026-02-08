@@ -20,6 +20,7 @@ interface HomeInputViewProps {
     onWordCanvas: () => void;
     onFastCanvas: () => void;
     onFileSearch: () => void;
+    onConnectAnythingLLM: () => void;
     executionMode: ExecutionMode;
     setExecutionMode: (mode: ExecutionMode) => void;
 }
@@ -41,6 +42,7 @@ export const HomeInputView: React.FC<HomeInputViewProps> = ({
     onWordCanvas,
     onFastCanvas,
     onFileSearch,
+    onConnectAnythingLLM,
     executionMode,
     setExecutionMode,
 }) => {
@@ -197,29 +199,38 @@ export const HomeInputView: React.FC<HomeInputViewProps> = ({
                         </select>
                     </div>
                     <div className="config-group">
+                        <h4>知识库连接</h4>
+                        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '10px' }}>
+                            <button
+                                className="btn btn-primary"
+                                onClick={onConnectAnythingLLM}
+                                disabled={isKbLoading}
+                                style={{ width: '100%' }}
+                            >
+                                {isKbLoading ? '连接中...' : '🔌 连接 AnythingLLM / 刷新'}
+                            </button>
+                        </div>
+
                         <h4>选择知识库</h4>
-                        {isKbLoading && <div className="spinner-container" style={{ padding: '10px 0' }}><p>正在加载知识库...</p></div>}
-                        {kbError && <div className="error-message" style={{ textAlign: 'left' }}>{kbError}</div>}
-                        {!isKbLoading && !kbError && (
-                            knowledgeBases.length > 0 ? (
-                                <select
-                                    className="home-select"
-                                    id="kb-selector"
-                                    name="kbSelect"
-                                    value={selectedKnowledgeBase || ''}
-                                    onChange={(e) => setSelectedKnowledgeBase(e.target.value)}
-                                    disabled={isProcessing}
-                                >
-                                    <option value="" disabled>-- 请选择知识库 --</option>
-                                    {knowledgeBases.map(kb => (
-                                        <option key={kb.id} value={kb.id}>
-                                            {kb.name}
-                                        </option>
-                                    ))}
-                                </select>
-                            ) : (
-                                <p className="instruction-text">未找到可用的知识库。请检查后端服务和 Milvus 连接。</p>
-                            )
+                        {kbError && !isKbLoading && <div className="error-message" style={{ textAlign: 'left', marginBottom: '5px' }}>{kbError}</div>}
+
+                        <select
+                            className="home-select"
+                            id="kb-selector"
+                            name="kbSelect"
+                            value={selectedKnowledgeBase || ''}
+                            onChange={(e) => setSelectedKnowledgeBase(e.target.value)}
+                            disabled={isProcessing || knowledgeBases.length === 0}
+                        >
+                            <option value="" disabled>-- 请选择知识库 --</option>
+                            {knowledgeBases.map(kb => (
+                                <option key={kb.id} value={kb.id}>
+                                    {kb.name}
+                                </option>
+                            ))}
+                        </select>
+                        {knowledgeBases.length === 0 && !isKbLoading && (
+                            <p className="instruction-text" style={{ marginTop: '5px' }}>暂无可用知识库，请先点击连接。</p>
                         )}
                     </div>
                 </div>

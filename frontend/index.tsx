@@ -1599,56 +1599,78 @@ const App = () => {
         }
     }, [executionMode, selectedModel]);
 
-    useEffect(() => {
-        const fetchKnowledgeBases = async () => {
-            setIsKbLoading(true);
-            setKbError(null);
+    const fetchKnowledgeBases = async (includeAnythingLLM: boolean) => {
+        setIsKbLoading(true);
+        setKbError(null);
 
-            let formattedKbs: KnowledgeBase[] = [];
+        let formattedKbs: KnowledgeBase[] = [];
 
-            // 1. Try to fetch AnythingLLM Workspaces
+        // 1. Try to fetch AnythingLLM Workspaces (Conditional)
+        if (includeAnythingLLM) {
             try {
                 const anythingResponse = await fetch(`${API_BASE_URL}/agent-anything/workspaces`);
                 if (anythingResponse.ok) {
                     const data = await anythingResponse.json();
                     const workspaces: KnowledgeBase[] = data.workspaces || [];
                     formattedKbs = [...workspaces]; // Add AnythingLLM workspaces first
+                } else {
+                    console.warn("AnythingLLM connection returned non-OK status");
+                    // Only show error if explicitly requested
+                    if (includeAnythingLLM) {
+                        // Optional: could set a specific error here or just log it
+                    }
                 }
             } catch (error: any) {
                 console.warn("AnythingLLM connection failed, skipping...", error);
             }
+        }
 
-            // 2. Try to fetch Milvus Collections
-            try {
-                const response = await fetch(`${API_BASE_URL}/list-collections`);
-                if (response.ok) {
-                    const data = await response.json();
-                    const collections: string[] = data.collections || [];
-                    const milvusKbs = collections.map(name => ({ id: name, name }));
-                    formattedKbs = [...formattedKbs, ...milvusKbs]; // Append Milvus collections
-                }
-            } catch (error: any) {
-                console.warn("Milvus connection failed, skipping...", error);
+        // 2. Try to fetch Milvus Collections (Always)
+        try {
+            const response = await fetch(`${API_BASE_URL}/list-collections`);
+            if (response.ok) {
+                const data = await response.json();
+                const collections: string[] = data.collections || [];
+                const milvusKbs = collections.map(name => ({ id: name, name }));
+                formattedKbs = [...formattedKbs, ...milvusKbs]; // Append Milvus collections
             }
+        } catch (error: any) {
+            console.warn("Milvus connection failed, skipping...", error);
+        }
 
-            // Update state
-            setKnowledgeBases(formattedKbs);
+        // Update state
+        setKnowledgeBases(formattedKbs);
 
-            // Auto-select first knowledge base if available
-            if (formattedKbs.length > 0) {
-                const existingIds = formattedKbs.map(kb => kb.id);
-                if (!selectedKnowledgeBase || !existingIds.includes(selectedKnowledgeBase)) {
-                    setSelectedKnowledgeBase(formattedKbs[0].id);
-                }
-            } else {
+        // Auto-select first knowledge base if available
+        if (formattedKbs.length > 0) {
+            const existingIds = formattedKbs.map(kb => kb.id);
+            if (!selectedKnowledgeBase || !existingIds.includes(selectedKnowledgeBase)) {
+                setSelectedKnowledgeBase(formattedKbs[0].id);
+            }
+        } else {
+            // Only clear selected if we have NO kbs
+            if (!selectedKnowledgeBase) {
                 setSelectedKnowledgeBase(null);
-                setKbError("无法连接到任何知识库服务。请检查后端配置。");
             }
 
-            setIsKbLoading(false);
-        };
-        fetchKnowledgeBases();
-    }, []); // Run only once on component mount
+            if (includeAnythingLLM && formattedKbs.length === 0) {
+                setKbError("无法连接到任何知识库服务（AnythingLLM 或 Milvus）。请检查后端配置。");
+            } else if (formattedKbs.length === 0) {
+                // Initial load silent failure is okay, user can click connect
+                setKbError(null);
+            }
+        }
+
+        setIsKbLoading(false);
+    };
+
+    useEffect(() => {
+        fetchKnowledgeBases(false); // Initial load: Skip AnythingLLM
+    }, []);
+
+    const handleConnectAnythingLLM = () => {
+        fetchKnowledgeBases(true);
+    };
 
 
     const handleAnalysis = async (userThoughts: string) => {
@@ -1794,6 +1816,7 @@ const App = () => {
                         onWordCanvas={handleWordCanvas}
                         onFastCanvas={handleFastCanvas}
                         onFileSearch={handleFileSearch}
+                        onConnectAnythingLLM={handleConnectAnythingLLM}
                         executionMode={executionMode}
                         setExecutionMode={setExecutionMode}
                     />
