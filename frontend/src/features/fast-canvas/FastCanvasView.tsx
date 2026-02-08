@@ -164,6 +164,11 @@ export const FastCanvasView: React.FC<FastCanvasViewProps> = ({
             // Dynamically import service to avoid circular deps if any
             const { importDocxService } = await import('../../services/canvasService');
             const jsonContent = await importDocxService(file);
+            console.log("Imported JSON:", jsonContent);
+
+            if (jsonContent.content && jsonContent.content.length === 0) {
+                alert("导入成功，但这篇文档似乎没有可识别的段落内容（可能是纯表格或图片？目前暂不支持）。");
+            }
 
             if (editorRef.current) {
                 editorRef.current.setContent(jsonContent);

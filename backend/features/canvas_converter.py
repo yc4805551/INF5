@@ -120,6 +120,8 @@ def docx_to_tiptap(file_stream: io.BytesIO) -> Dict[str, Any]:
     doc = Document(file_stream)
     content = []
     
+    print(f"[DEBUG] Reading DOCX: {len(doc.paragraphs)} paragraphs found.")
+    
     for para in doc.paragraphs:
         # 检测标题
         if para.style.name.startswith('Heading'):
@@ -136,6 +138,8 @@ def docx_to_tiptap(file_stream: io.BytesIO) -> Dict[str, Any]:
         else:
             content.append(_para_to_tiptap(para))
     
+    print(f"[DEBUG] Parsed Tiptap content nodes: {len(content)}")
+
     return {
         "type": "doc",
         "content": content
