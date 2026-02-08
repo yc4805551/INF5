@@ -71,12 +71,12 @@ def create_app():
     app.register_blueprint(agent_anything_bp, url_prefix='/api/agent-anything') # /audit
     app.register_blueprint(file_search_bp, url_prefix='/api/file-search') # 智能文件搜索
 
-    # Initialize Milvus Connection
-    try:
-        connections.connect("default", host=os.getenv("MILVUS_HOST", "127.0.0.1"), port=os.getenv("MILVUS_PORT", "19530"))
-        logging.info("Connected to Milvus.")
-    except Exception as e:
-        logging.error(f"Failed to connect to Milvus on startup: {e}")
+    # Initialize Milvus Connection (Disabled for manual connection preference)
+    # try:
+    #     connections.connect("default", host=os.getenv("MILVUS_HOST", "127.0.0.1"), port=os.getenv("MILVUS_PORT", "19530"))
+    #     logging.info("Connected to Milvus.")
+    # except Exception as e:
+    #     logging.error(f"Failed to connect to Milvus on startup: {e}")
 
     return app
 
