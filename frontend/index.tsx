@@ -1609,7 +1609,7 @@ const App = () => {
         setIsAnythingLoading(true);
         setKbError(null);
         try {
-            const anythingResponse = await fetch(`${API_BASE_URL}/agent-anything/workspaces`);
+            const anythingResponse = await fetch(`${API_BASE_URL}/agent-anything/workspaces?mode=manual`);
             if (anythingResponse.ok) {
                 const data = await anythingResponse.json();
                 const workspaces: KnowledgeBase[] = data.workspaces || [];
