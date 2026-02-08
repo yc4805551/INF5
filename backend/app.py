@@ -102,4 +102,5 @@ if __name__ == "__main__":
     
     # Use standard Flask dev server (WSGI)
     print("Starting Flask Server...")
+    logging.info("--- Deployment Version Check: v2026.02.08-Debug-ForcePush ---")
     app.run(host=host, port=port, debug=True)
