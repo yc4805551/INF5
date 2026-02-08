@@ -168,9 +168,28 @@ export const FastCanvasView: React.FC<FastCanvasViewProps> = ({
 
             if (jsonContent.content && jsonContent.content.length > 0) {
                 // Success case
-                // alert(`成功导入 ${jsonContent.content.length} 个段落`);
             } else {
                 alert("导入警告：文档似乎是空的，或者内容无法被识别（如纯图片文档）。");
+            }
+
+            // Sanitize JSON to prevent Tiptap "Empty text nodes" error
+            const sanitizeContent = (nodes: any[]): any[] => {
+                return nodes.map(node => {
+                    // If text node, check if empty
+                    if (node.type === 'text' && !node.text) {
+                        return null; // Mark for removal
+                    }
+                    // Recursive for nested content
+                    if (node.content) {
+                        node.content = sanitizeContent(node.content);
+                        // If paragraph becomes empty after sanitization, it's fine (Tiptap allows empty paragraphs)
+                    }
+                    return node;
+                }).filter(Boolean); // Remove nulls
+            };
+
+            if (jsonContent.content) {
+                jsonContent.content = sanitizeContent(jsonContent.content);
             }
 
             if (editorRef.current) {
