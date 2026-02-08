@@ -389,14 +389,14 @@ def main():
         results['backend'] = check_backend_service()
     if not results['backend']:
         Logger.error("后端服务检查失败")
-        return 1
-    
-    # 验证前端文件
-    results['frontend'] = check_frontend_files()
-    
-    # 测试 DOCX 导入
-    results['import'] = test_docx_import()
-    
+            return 1
+        
+        # 验证前端文件
+        results['frontend'] = check_frontend_files()
+        
+        # 测试 DOCX 导入
+        results['import'] = test_docx_import()
+        
         # 生成摘要
         generate_summary(results)
         
