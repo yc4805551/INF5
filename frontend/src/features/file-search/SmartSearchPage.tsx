@@ -312,7 +312,18 @@ export const SmartSearchPage: React.FC<SmartSearchPageProps> = ({ modelProvider 
                                     {/* Action 1: Open on Server (Always available as it just triggers local process) */}
                                     <button onClick={() => handleOpen(file, 'open')} title="在服务器打开 (Open on Server)">📂</button>
 
-                                    {/* Action 2 & 3: Remote Preview/Download (Only for Files, not Folders) */}
+                                    {/* Action 2 & 3: Remote Preview/Download */}
+
+                                    {/* 场景 A: 文件夹 (只允许下载 Zip, 不允许预览) */}
+                                    {!file.name.includes('.') && (
+                                        <button onClick={() => {
+                                            const encodedPath = encodeURIComponent(file.path);
+                                            // Trigger force download (Backend will zip it)
+                                            window.open(`/api/file-search/preview?path=${encodedPath}&download=1`, '_blank');
+                                        }} title="打包下载 (Download as Zip)">📦⬇️</button>
+                                    )}
+
+                                    {/* 场景 B: 文件 (允许预览 + 下载) */}
                                     {file.name.includes('.') && (
                                         <>
                                             <button onClick={() => {

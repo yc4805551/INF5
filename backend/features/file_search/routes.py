@@ -458,17 +458,50 @@ def preview_file():
         # Fallback for other non-allowed drives
         return f"Access Denied: Drive {drive} is not allowed.", 403
 
-    if not os.path.exists(file_path):
-        return "File not found", 404
+    # Check if force download is requested
+    force_download = request.args.get('download', '0') == '1'
 
-    # Fix: Prevent "Permission denied" when trying to stream a directory
+    # Case 1: Directory Download (Zip it)
     if os.path.isdir(file_path):
-        return "Cannot preview a directory. Please search for specific files.", 400
+        if force_download:
+            try:
+                # Create a zip stream in memory
+                import zipfile
+                import io
+                
+                # Limit zip size/time if necessary (omitted for now)
+                memory_file = io.BytesIO()
+                with zipfile.ZipFile(memory_file, 'w', zipfile.ZIP_DEFLATED) as zf:
+                    # Walk the directory
+                    dirname = os.path.basename(file_path)
+                    for root, dirs, files in os.walk(file_path):
+                        for file in files:
+                            abs_path = os.path.join(root, file)
+                            # Relative path inside zip
+                            rel_path = os.path.relpath(abs_path, os.path.dirname(file_path))
+                            try:
+                                zf.write(abs_path, rel_path)
+                            except Exception as e:
+                                logger.warning(f"Skipped file in zip: {abs_path} ({e})")
+                
+                memory_file.seek(0)
+                return send_file(
+                    memory_file,
+                    mimetype='application/zip',
+                    as_attachment=True,
+                    download_name=f"{os.path.basename(file_path)}.zip"
+                )
+            except Exception as e:
+                logger.error(f"Zip Error: {e}")
+                return f"Failed to zip folder: {str(e)}", 500
+        else:
+            return "Cannot preview a directory. Please use download button.", 400
+
+    # Case 2: File Preview/Download
+    if not os.path.exists(file_path):
+         return "File not found", 404
 
     try:
-        # Check if force download is requested
-        force_download = request.args.get('download', '0') == '1'
-        
         # as_attachment=False attempts inline preview (PDF, Images, Text)
         # as_attachment=True forces download
         return send_file(file_path, as_attachment=force_download)
