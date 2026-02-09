@@ -64,6 +64,14 @@ class FileSearchService:
             )
             
             logger.info(f"Everything returned {len(results)} results")
+
+            # Enrich results with is_dir flag
+            import os
+            for res in results:
+                # Construct full path to check file type
+                # Everything returns 'path' (dir) and 'name' (filename)
+                full_path = os.path.join(res.get('path', ''), res.get('name', ''))
+                res['is_dir'] = os.path.isdir(full_path)
             
             # Step 2: AI 智能排序（如果启用）
             if enable_ai_ranking and results:
