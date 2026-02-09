@@ -461,50 +461,38 @@ def preview_file():
     # Check if force download is requested
     force_download = request.args.get('download', '0') == '1'
 
-    # Case 1: Directory Download (Zip it)
+    # Case 1: Directory Download (Blocked as per user request)
     if os.path.isdir(file_path):
-        if force_download:
-            try:
-                # Create a zip stream in memory
-                import zipfile
-                import io
-                
-                # Limit zip size/time if necessary (omitted for now)
-                memory_file = io.BytesIO()
-                with zipfile.ZipFile(memory_file, 'w', zipfile.ZIP_DEFLATED) as zf:
-                    # Walk the directory
-                    dirname = os.path.basename(file_path)
-                    for root, dirs, files in os.walk(file_path):
-                        for file in files:
-                            abs_path = os.path.join(root, file)
-                            # Relative path inside zip
-                            rel_path = os.path.relpath(abs_path, os.path.dirname(file_path))
-                            try:
-                                zf.write(abs_path, rel_path)
-                            except Exception as e:
-                                logger.warning(f"Skipped file in zip: {abs_path} ({e})")
-                
-                memory_file.seek(0)
-                return send_file(
-                    memory_file,
-                    mimetype='application/zip',
-                    as_attachment=True,
-                    download_name=f"{os.path.basename(file_path)}.zip"
-                )
-            except Exception as e:
-                logger.error(f"Zip Error: {e}")
-                return f"Failed to zip folder: {str(e)}", 500
-        else:
-            return "Cannot preview a directory. Please use download button.", 400
+        return "Folder download is disabled. You can only browse it on the server.", 400
 
     # Case 2: File Preview/Download
     if not os.path.exists(file_path):
          return "File not found", 404
 
     try:
-        # as_attachment=False attempts inline preview (PDF, Images, Text)
-        # as_attachment=True forces download
-        return send_file(file_path, as_attachment=force_download)
+        # Check if force download is requested
+        force_download = request.args.get('download', '0') == '1'
+        
+        if force_download:
+            # Zip the SINGLE file on-the-fly
+            import zipfile
+            import io
+            
+            memory_file = io.BytesIO()
+            with zipfile.ZipFile(memory_file, 'w', zipfile.ZIP_DEFLATED) as zf:
+                # Add file to zip with just its filename (no path)
+                zf.write(file_path, os.path.basename(file_path))
+            
+            memory_file.seek(0)
+            return send_file(
+                memory_file,
+                mimetype='application/zip',
+                as_attachment=True,
+                download_name=f"{os.path.basename(file_path)}.zip"
+            )
+        
+        # as_attachment=False attempts inline preview
+        return send_file(file_path, as_attachment=False)
     except Exception as e:
         logger.error(f"File Stream Error: {e}")
         return f"Error streaming file: {str(e)}", 500
