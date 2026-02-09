@@ -453,10 +453,17 @@ def preview_file():
         # For now, strict block on C: root or system folders
         if drive.lower() == 'c:' and not ('users' in normalized_path.lower() or 'temp' in normalized_path.lower()):
              # logger.warning(f"Blocked access to safe path: {file_path}")
-             pass # Strict mode: allow nothing on C for now unless explicitly added
+             return "Access Denied: Only D/E/F/G drives are allowed for remote preview.", 403
+        
+        # Fallback for other non-allowed drives
+        return f"Access Denied: Drive {drive} is not allowed.", 403
 
     if not os.path.exists(file_path):
         return "File not found", 404
+
+    # Fix: Prevent "Permission denied" when trying to stream a directory
+    if os.path.isdir(file_path):
+        return "Cannot preview a directory. Please search for specific files.", 400
 
     try:
         # as_attachment=False attempts inline preview (PDF, Images, Text)

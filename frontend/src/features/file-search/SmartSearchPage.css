@@ -256,15 +256,15 @@
 .col-actions {
     display: flex;
     gap: 0.5rem;
-    opacity: 0;
-    /* Hide by default */
-    transition: opacity 0.2s;
+    /* Always visible */
+    opacity: 1;
 }
 
+/* Remove hover requirement
 .result-row:hover .col-actions {
     opacity: 1;
-    /* Show on hover */
 }
+*/
 
 .col-actions button {
     background: white;

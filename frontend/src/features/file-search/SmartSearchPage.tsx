@@ -312,7 +312,6 @@ export const SmartSearchPage: React.FC<SmartSearchPageProps> = ({ modelProvider 
                                         const encodedPath = encodeURIComponent(file.path);
                                         window.open(`/api/file-search/preview?path=${encodedPath}`, '_blank');
                                     }} title="预览/下载 (Preview/Download)">👁️</button>
-                                    <button onClick={() => handleCopy(file)} title="复制路径">📋</button>
                                 </div>
                             </div>
                         ))}
