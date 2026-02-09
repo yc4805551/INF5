@@ -64,15 +64,6 @@ class FileSearchService:
             )
             
             logger.info(f"Everything returned {len(results)} results")
-
-            # Enrich results with is_dir flag
-            import os
-            for res in results:
-                # Construct full path to check file type
-                # Everything returns 'path' (dir) and 'name' (filename)
-                full_path = os.path.join(res.get('path', ''), res.get('name', ''))
-                res['is_dir'] = os.path.isdir(full_path)
-            
             # Step 2: AI 智能排序（如果启用）
             if enable_ai_ranking and results:
                 results = self._ai_rank_files(query, results, max_results)
@@ -80,6 +71,13 @@ class FileSearchService:
                 # 只取前 N 个结果
                 results = results[:max_results]
             
+            # Enrich results with is_dir flag (Check on final results to save IO)
+            import os
+            for res in results:
+                # Construct full path to check file type
+                full_path = os.path.join(res.get('path', ''), res.get('name', ''))
+                res['is_dir'] = os.path.isdir(full_path)
+
             # Step 3: 返回结果
             return {
                 'success': True,
