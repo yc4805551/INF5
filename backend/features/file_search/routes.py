@@ -466,9 +466,12 @@ def preview_file():
         return "Cannot preview a directory. Please search for specific files.", 400
 
     try:
+        # Check if force download is requested
+        force_download = request.args.get('download', '0') == '1'
+        
         # as_attachment=False attempts inline preview (PDF, Images, Text)
-        # Browsers will download automatically if they can't preview (Docx, Zip)
-        return send_file(file_path, as_attachment=False)
+        # as_attachment=True forces download
+        return send_file(file_path, as_attachment=force_download)
     except Exception as e:
         logger.error(f"File Stream Error: {e}")
         return f"Error streaming file: {str(e)}", 500

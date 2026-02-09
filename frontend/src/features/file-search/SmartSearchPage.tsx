@@ -275,26 +275,29 @@ export const SmartSearchPage: React.FC<SmartSearchPageProps> = ({ modelProvider 
                             <div key={`${file.path}-${index}`} className={`result-row ${file.score && file.score > 80 ? 'high-score' : ''}`}>
 
                                 <div className="col-icon">
-                                    {file.name.endsWith('.ppt') || file.name.endsWith('.pptx') ? '📊' :
-                                        file.name.endsWith('.doc') || file.name.endsWith('.docx') ? '📝' :
-                                            file.name.endsWith('.pdf') ? '📕' :
-                                                file.name.endsWith('.xls') || file.name.endsWith('.xlsx') ? '📗' :
-                                                    file.name.endsWith('.zip') || file.name.endsWith('.rar') ? '📦' : '📄'}
+                                    {/* Folder Detection: No extension or defined folder names */}
+                                    {(!file.name.includes('.')) ? '📁' :
+                                        file.name.endsWith('.ppt') || file.name.endsWith('.pptx') ? '📊' :
+                                            file.name.endsWith('.doc') || file.name.endsWith('.docx') ? '📝' :
+                                                file.name.endsWith('.pdf') ? '📕' :
+                                                    file.name.endsWith('.xls') || file.name.endsWith('.xlsx') ? '📗' :
+                                                        file.name.endsWith('.zip') || file.name.endsWith('.rar') ? '📦' : '📄'}
                                 </div>
 
                                 <div className="col-name">
                                     <div className="file-name-row">
-                                        <span
-                                            className="file-name"
-                                            title={file.name}
-                                            dangerouslySetInnerHTML={{
-                                                __html: file.name.replace(new RegExp(`(${query.split('').join('|')})`, 'gi'), '<mark>$1</mark>')
-                                            }}
-                                        />
-                                        {file.score && file.score > 80 && <span className="score-badge">✨ 推荐</span>}
-                                        {file.reason && <span className="ai-reason-badge" title={file.reason}>🎯 AI</span>}
+                                        <span className="file-name" title={file.name}>
+                                            {/* Search term highlighting can go here */}
+                                            {file.name}
+                                        </span>
+                                        {file.score && file.score > 80 && (
+                                            <span className="score-badge" title="AI Relevancy Score">
+                                                {file.score}
+                                            </span>
+                                        )}
+                                        {file.reason && <span className="ai-reason-badge" title={file.reason}>AI</span>}
                                     </div>
-                                    <div className="file-path" title={file.path}>{getFullPath(file)}</div>
+                                    <div className="file-path" title={file.path}>{file.path}</div>
                                 </div>
 
                                 <div className="col-date">
@@ -306,12 +309,24 @@ export const SmartSearchPage: React.FC<SmartSearchPageProps> = ({ modelProvider 
                                 </div>
 
                                 <div className="col-actions">
+                                    {/* Action 1: Open on Server (Always available as it just triggers local process) */}
                                     <button onClick={() => handleOpen(file, 'open')} title="在服务器打开 (Open on Server)">📂</button>
-                                    <button onClick={() => {
-                                        // 远程预览/下载
-                                        const encodedPath = encodeURIComponent(file.path);
-                                        window.open(`/api/file-search/preview?path=${encodedPath}`, '_blank');
-                                    }} title="预览/下载 (Preview/Download)">👁️</button>
+
+                                    {/* Action 2 & 3: Remote Preview/Download (Only for Files, not Folders) */}
+                                    {file.name.includes('.') && (
+                                        <>
+                                            <button onClick={() => {
+                                                const encodedPath = encodeURIComponent(file.path);
+                                                window.open(`/api/file-search/preview?path=${encodedPath}`, '_blank');
+                                            }} title="预览 (Preview)">👁️</button>
+
+                                            <button onClick={() => {
+                                                const encodedPath = encodeURIComponent(file.path);
+                                                // Trigger force download
+                                                window.open(`/api/file-search/preview?path=${encodedPath}&download=1`, '_blank');
+                                            }} title="下载 (Download)">⬇️</button>
+                                        </>
+                                    )}
                                 </div>
                             </div>
                         ))}
