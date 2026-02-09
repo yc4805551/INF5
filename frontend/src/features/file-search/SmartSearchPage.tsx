@@ -306,7 +306,12 @@ export const SmartSearchPage: React.FC<SmartSearchPageProps> = ({ modelProvider 
                                 </div>
 
                                 <div className="col-actions">
-                                    <button onClick={() => handleOpen(file, 'open')} title="打开文件">📂</button>
+                                    <button onClick={() => handleOpen(file, 'open')} title="在服务器打开 (Open on Server)">📂</button>
+                                    <button onClick={() => {
+                                        // 远程预览/下载
+                                        const encodedPath = encodeURIComponent(file.path);
+                                        window.open(`/api/file-search/preview?path=${encodedPath}`, '_blank');
+                                    }} title="预览/下载 (Preview/Download)">👁️</button>
                                     <button onClick={() => handleCopy(file)} title="复制路径">📋</button>
                                 </div>
                             </div>

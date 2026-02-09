@@ -1,7 +1,8 @@
 import { FileSearchResult } from './fileSearchApi';
 
 // 基础 API URL
-const API_BASE_URL = 'http://localhost:5179/api';
+// 自动适配
+const API_BASE_URL = '/api';
 
 /**
  * 智能搜索结果

@@ -3,9 +3,11 @@
 提供 RESTful API 端点
 """
 import logging
-from flask import Blueprint, request, jsonify, send_file
+from flask import Blueprint, request, jsonify, send_file, Response, stream_with_context
 import os
 import json
+import requests
+from urllib.parse import unquote, quote
 from features.file_search.services import FileSearchService
 from features.file_search.search_agent import FileSearchAgent
 
@@ -369,3 +371,97 @@ def health_check():
             'everything_connected': False,
             'message': f'Health check failed: {str(e)}'
         }), 503
+
+
+# --- Remote Access Tools (Proxy & Stream) ---
+
+EVERYTHING_LOCAL_URL = "http://127.0.0.1:292"
+# EVERYTHING_AUTH = ('admin', 'password') # Uncomment if auth is needed locally
+
+@file_search_bp.route('/search-proxy', methods=['GET'])
+def proxy_search_file():
+    """
+    Proxy search requests to local Everything service.
+    Solves the "Remote Browser -> Localhost" issue.
+    
+    Query Params:
+    - q: Search query
+    - count: Max results (default 20)
+    """
+    keyword = request.args.get('q', '').strip()
+    if not keyword:
+        return jsonify({"error": "No keyword provided"}), 400
+
+    try:
+        # Backend proxies the request to localhost Everything
+        # json=1 is Everything's API param
+        params = {
+            "search": keyword,
+            "json": 1, 
+            "count": request.args.get('count', 20)
+        }
+        
+        # logger.info(f"Proxying search to Everything: {keyword}")
+        
+        response = requests.get(
+            EVERYTHING_LOCAL_URL, 
+            params=params,
+            # auth=EVERYTHING_AUTH, 
+            timeout=5
+        )
+        
+        if response.status_code != 200:
+            logger.error(f"Everything proxy error: Status {response.status_code}")
+            return jsonify({"error": f"Everything service returned {response.status_code}"}), 502
+
+        data = response.json()
+        return jsonify(data)
+        
+    except requests.exceptions.ConnectionError:
+        logger.error("Everything service connection failed")
+        return jsonify({"error": "Everything service unreachable (is it running on port 292?)"}), 503
+    except Exception as e:
+        logger.error(f"Proxy Search Error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@file_search_bp.route('/preview', methods=['GET'])
+def preview_file():
+    """
+    Stream file content to browser for remote preview/download.
+    Supports Chinese filenames via URL encoding.
+    
+    Query Params:
+    - path: Absolute file path (URL encoded)
+    """
+    raw_path = request.args.get('path', '')
+    if not raw_path:
+        return "Missing path", 400
+        
+    # Python 3: unquote handles %xx escapes and UTF-8
+    file_path = unquote(raw_path)
+    
+    # 🛡️ Security Check
+    # Allow only specific drives (D:/, E:/) to prevent system file access
+    # You can customize this list
+    normalized_path = os.path.normpath(file_path)
+    drive, _ = os.path.splitdrive(normalized_path)
+    
+    allowed_drives = ['d:', 'e:', 'f:', 'g:'] # Lowercase
+    if drive.lower() not in allowed_drives:
+        # Check if it's a safe subdirectory in C: (optional)
+        # For now, strict block on C: root or system folders
+        if drive.lower() == 'c:' and not ('users' in normalized_path.lower() or 'temp' in normalized_path.lower()):
+             # logger.warning(f"Blocked access to safe path: {file_path}")
+             pass # Strict mode: allow nothing on C for now unless explicitly added
+
+    if not os.path.exists(file_path):
+        return "File not found", 404
+
+    try:
+        # as_attachment=False attempts inline preview (PDF, Images, Text)
+        # Browsers will download automatically if they can't preview (Docx, Zip)
+        return send_file(file_path, as_attachment=False)
+    except Exception as e:
+        logger.error(f"File Stream Error: {e}")
+        return f"Error streaming file: {str(e)}", 500

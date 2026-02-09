@@ -2,7 +2,8 @@
  * 文件搜索 API 客户端
  */
 
-const API_BASE_URL = 'http://localhost:5179/api';
+// 自动适配当前域名/端口 (解决远程访问连不上后端的问题)
+const API_BASE_URL = '/api';
 
 export interface FileSearchResult {
     name: string;
