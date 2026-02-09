@@ -14,6 +14,7 @@ export interface SmartSearchResult {
     date_modified?: string;
     score?: number;
     reason?: string;
+    is_dir?: boolean;
     _strategy_desc?: string; // 内部用于调试
 }
 
