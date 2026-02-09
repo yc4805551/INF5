@@ -313,8 +313,9 @@ export const SmartSearchPage: React.FC<SmartSearchPageProps> = ({ modelProvider 
                                     <button onClick={() => handleOpen(file, 'open')} title="在服务器打开 (Open on Server)">📂</button>
 
                                     {/* Action 2: Remote Download (仅文件允许下载) */}
-                                    {/* Strict check: Only show if backend confirms it's NOT a directory */}
-                                    {!file.is_dir && (
+                                    {/* Action 2: Remote Download (仅文件允许下载) */}
+                                    {/* Strict check: Show if verified NOT directory, or fallback to extension check */}
+                                    {(file.is_dir === false || (file.is_dir === undefined && file.name.includes('.'))) && (
                                         <button onClick={() => {
                                             const encodedPath = encodeURIComponent(file.path);
                                             window.open(`/api/file-search/preview?path=${encodedPath}&download=1`, '_blank');
