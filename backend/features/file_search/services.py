@@ -56,8 +56,11 @@ class FileSearchService:
             logger.info(f"Smart search: query='{query}', types={file_types}, date_range={date_range}")
             
             # Step 1: 使用 Everything 快速检索
+            # Apply standard noise reduction: Skip C drive, temp files, trash
+            clean_query = f"{query} !C: !*.tmp !~$* !*.lnk !*.bak !*.chk"
+            
             results = self.everything_client.search_with_filters(
-                keywords=query,
+                keywords=clean_query,
                 file_types=file_types,
                 date_range=date_range,
                 max_results=max_results * 2  # 获取更多候选，供 AI 筛选
