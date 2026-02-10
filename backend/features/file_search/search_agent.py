@@ -265,6 +265,17 @@ class FileSearchAgent:
             
             yield {"type": "intent", "data": intent_data}
 
+            # ---------------------------------------------------------
+            # Refinement: Prioritize Original Query & Skip C Drive
+            # ---------------------------------------------------------
+            # 1. Insert "Original Query" as the absolute first strategy
+            original_strategy = {
+                'keywords': [natural_language_query],
+                'desc': '原始关键词 (Original)'
+            }
+            strategies.insert(0, original_strategy)
+            # ---------------------------------------------------------
+
             all_candidates = []
             seen_paths = set()
             
@@ -281,19 +292,26 @@ class FileSearchAgent:
                 desc = strategy.get('desc')
                 yield {"type": "log", "message": f"尝试策略: {desc} -> 搜索 '{keywords_str}'"}
                 
+                # 2. Append !C: to skip C drive content
+                final_query = f"{keywords_str} !C:"
+
                 # 执行搜索
                 results = everything_search_func(
-                    keywords=keywords_str,
+                    keywords=final_query,
                     file_types=file_types if file_types else None,
                     date_range=time_range if time_range else None,
                     max_results=2000 
                 )
                 
                 # DEBUG: Log exact params
-                yield {"type": "log", "message": f"DEBUG: Strategy='{desc}', Keywords='{keywords_str}', Filters={file_types}, Count={len(results)}"}
+                yield {"type": "log", "message": f"DEBUG: Strategy='{desc}', Keywords='{final_query}', Count={len(results)}"}
 
                 # 实时处理新发现的结果
                 new_items = []
+                # 3. Dynamic Scoring: First strategy gets higher base score
+                is_primary = (strategies.index(strategy) == 0)
+                base_score = 80 if is_primary else 60
+
                 for res in results:
                     # Enrich: Construct full path and Check is_dir
                     # Everything returns 'path' (parent dir) and 'name' (filename)
@@ -305,8 +323,8 @@ class FileSearchAgent:
                     path = res.get('path')
                     if path and path not in seen_paths:
                         res['_strategy_desc'] = desc
-                        res['score'] = 60 # 初始分
-                        res['reason'] = f"包括: {keywords_str}"
+                        res['score'] = base_score # Allow downstream AI to adjust, but start higher
+                        res['reason'] = f"来源: {desc}"
                         all_candidates.append(res)
                         seen_paths.add(path)
                         new_items.append(res)
