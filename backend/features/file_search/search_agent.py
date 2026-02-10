@@ -160,6 +160,19 @@ class FileSearchAgent:
             if len(candidates) <= top_k:
                 return candidates
             
+            # Stage 3 Pre-processing: Hard-filter garbage before AI (Double safety)
+            # 剔除 .tmp, ~$, .lnk 等垃圾文件，确保 AI 拿到的 300 个是高质量的
+            clean_candidates = []
+            for c in candidates:
+                name = c.get('name', '').lower()
+                if name.startswith('~$') or name.endswith('.tmp') or name.endswith('.lnk') or name.endswith('.chk'):
+                    continue
+                clean_candidates.append(c)
+            
+            candidates = clean_candidates
+            if not candidates:
+                 return []
+
             logger.info(f"Filtering {len(candidates)} candidates to top {top_k}")
             
             # 准备文件列表（简化信息）
@@ -293,7 +306,8 @@ class FileSearchAgent:
                 yield {"type": "log", "message": f"尝试策略: {desc} -> 搜索 '{keywords_str}'"}
                 
                 # 2. Append !C: to skip C drive content
-                final_query = f"{keywords_str} !C:"
+                # AND Append exclusions for temp/junk files (Stage 2: Noise Reduction)
+                final_query = f"{keywords_str} !C: !*.tmp !~$* !*.lnk !*.bak !*.chk"
 
                 # 执行搜索
                 results = everything_search_func(
