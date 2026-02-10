@@ -4,6 +4,7 @@ AI 文件搜索助手
 """
 import logging
 import json
+import os
 from typing import List, Dict, Optional
 from core.llm_helper import call_llm
 
@@ -294,6 +295,13 @@ class FileSearchAgent:
                 # 实时处理新发现的结果
                 new_items = []
                 for res in results:
+                    # Enrich: Construct full path and Check is_dir
+                    # Everything returns 'path' (parent dir) and 'name' (filename)
+                    full_path = os.path.join(res.get('path', ''), res.get('name', ''))
+                    res['path'] = full_path # Update to full absolute path
+                    res['is_dir'] = os.path.isdir(full_path)
+
+                    # Use full_path for deduplication!
                     path = res.get('path')
                     if path and path not in seen_paths:
                         res['_strategy_desc'] = desc
