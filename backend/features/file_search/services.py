@@ -76,6 +76,7 @@ class FileSearchService:
             for res in results:
                 # Construct full path to check file type
                 full_path = os.path.join(res.get('path', ''), res.get('name', ''))
+                res['path'] = full_path # Ensure frontend gets full path for download/open
                 res['is_dir'] = os.path.isdir(full_path)
 
             # Step 3: 返回结果
