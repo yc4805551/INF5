@@ -76,11 +76,7 @@ class FileSearchService:
             for res in results:
                 # Construct full path to check file type
                 full_path = os.path.join(res.get('path', ''), res.get('name', ''))
-                is_directory = os.path.isdir(full_path)
-                res['is_dir'] = is_directory
-                # Minimal log for first few results to debug
-                if results.index(res) < 5:
-                     logger.info(f"Check: {full_path} -> is_dir={is_directory}")
+                res['is_dir'] = os.path.isdir(full_path)
 
             # Step 3: 返回结果
             return {
