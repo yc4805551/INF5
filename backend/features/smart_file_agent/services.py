@@ -13,17 +13,42 @@ from PIL import Image
 
 # Core LLM Engine for OCR
 from core.llm_engine import LLMEngine
-from .config import OCR_MODEL_PROVIDER, OCR_MODEL_NAME, OCR_API_KEY
+from .config import OCR_MODEL_PROVIDER, OCR_MODEL_NAME, OCR_API_KEY, OCR_ENDPOINT
 
 logger = logging.getLogger(__name__)
 
 class SmartFileAgent:
-    def __init__(self, use_llm_clean=False, cleaning_model_config=None):
+    def __init__(self, use_llm_clean=False, cleaning_model_config=None, ocr_provider=None):
         self.use_llm_clean = use_llm_clean
         self.cleaning_model_config = cleaning_model_config
         self.merged_buffer = []
+
+        # Resolve OCR Configuration
+        # Priority 1: Direct OCR_* Env Overrides (Dedicated Mode)
+        if OCR_ENDPOINT:
+             self.ocr_api_key = OCR_API_KEY
+             self.ocr_model_name = OCR_MODEL_NAME
+             self.ocr_endpoint = OCR_ENDPOINT
+             self.ocr_provider = "custom"
+        else:
+             # Priority 2: Provider Lookup (via LLMConfigManager)
+             self.ocr_provider = ocr_provider or OCR_MODEL_PROVIDER
+             
+             from core.llm_config import get_llm_config_manager
+             cm = get_llm_config_manager()
+             provider_config = cm.get_provider_config(self.ocr_provider)
+
+             if self.ocr_provider == OCR_MODEL_PROVIDER:
+                 self.ocr_api_key = OCR_API_KEY or provider_config.get("apiKey")
+                 self.ocr_model_name = OCR_MODEL_NAME or provider_config.get("model")
+             else:
+                 self.ocr_api_key = provider_config.get("apiKey")
+                 self.ocr_model_name = provider_config.get("model")
+             
+             self.ocr_endpoint = provider_config.get("endpoint")
+
         # Initialize OCR Engine independently
-        self.ocr_engine = LLMEngine(api_key=OCR_API_KEY)
+        self.ocr_engine = LLMEngine(api_key=self.ocr_api_key)
 
     def process_files(self, files):
         """
@@ -63,7 +88,7 @@ class SmartFileAgent:
                          processed_text = self._process_pdf_as_images(temp_file_path)
 
                 elif ext in ['.png', '.jpg', '.jpeg', '.bmp', '.tiff']:
-                     yield json.dumps({"type": "log", "message": f"  - [{file_name}] Identifying image with {OCR_MODEL_NAME}..."}) + "\n"
+                     yield json.dumps({"type": "log", "message": f"  - [{file_name}] Identifying image with {self.ocr_model_name}..."}) + "\n"
                      processed_text = self._process_image(temp_file_path)
                 elif ext in ['.txt', '.md', '.csv']:
                     with open(temp_file_path, 'rb') as f:
@@ -152,6 +177,7 @@ class SmartFileAgent:
                 
                 prompt = "Please OCR this image. Output strictly in Markdown format. If there are tables, preserve them as Markdown tables. Do not add introductory text."
                 
+                
                 vision_response = self._call_vision_api(b64_img, prompt)
                 full_ocr_text.append(vision_response)
             
@@ -179,11 +205,11 @@ class SmartFileAgent:
         
         headers = {
             "Content-Type": "application/json",
-            "Authorization": f"Bearer {OCR_API_KEY}"
+            "Authorization": f"Bearer {self.ocr_api_key}"
         }
         
         payload = {
-            "model": OCR_MODEL_NAME,
+            "model": self.ocr_model_name,
             "messages": [
                 {
                     "role": "user",
@@ -201,10 +227,12 @@ class SmartFileAgent:
             "max_tokens": 4096
         }
         
-        from core.llm_config import get_llm_config_manager
-        config_manager = get_llm_config_manager()
-        provider_config = config_manager.get_provider_config(OCR_MODEL_PROVIDER)
-        endpoint = provider_config.get("endpoint")
+        # Use pre-resolved endpoint
+        endpoint = self.ocr_endpoint
+        
+        if not endpoint:
+            # Fallback if somehow missing (shouldn't happen given __init__ logic)
+            return "[Error: No Endpoint Configured for OCR Model]"
         
         if not endpoint:
             return "[Error: No Endpoint Configured for OCR Model]"

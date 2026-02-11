@@ -1583,6 +1583,7 @@ const App = () => {
     const [isThoughtsModalOpen, setIsThoughtsModalOpen] = useState(false);
 
     const [selectedModel, setSelectedModel] = useState<ModelProvider>('free');
+    const [selectedOcrModel, setSelectedOcrModel] = useState<ModelProvider>('deepseek');
     const [executionMode, setExecutionMode] = useState<ExecutionMode>('backend');
 
     const [anythingWorkspaces, setAnythingWorkspaces] = useState<KnowledgeBase[]>([]);
@@ -1772,6 +1773,7 @@ const App = () => {
                         // We leave other fields empty to let backend/services handle defaults or lookups
                         // The 'provider' is the critical piece for the "Cleaning Model" selection.
                     }}
+                    ocrProvider={selectedOcrModel}
                     onBack={() => setSmartFileFiles(null)}
                 />
             );
@@ -1830,6 +1832,8 @@ const App = () => {
                         onOrganize={handleTriggerOrganize}
                         selectedModel={selectedModel}
                         setSelectedModel={setSelectedModel}
+                        selectedOcrModel={selectedOcrModel}
+                        setSelectedOcrModel={setSelectedOcrModel}
                         isProcessing={isProcessing}
                         knowledgeBases={knowledgeBases}
                         isKbLoading={isKbLoading}

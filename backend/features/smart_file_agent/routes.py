@@ -22,10 +22,15 @@ def process_files_route():
         except:
             pass
             
+    ocr_provider = None
+    if cleaning_model_config:
+        ocr_provider = cleaning_model_config.get('ocrProvider')
+
     # 3. Initialize Agent
     agent = SmartFileAgent(
         use_llm_clean=False, # Default OFF for now unless UI explicitly requests
-        cleaning_model_config=cleaning_model_config
+        cleaning_model_config=cleaning_model_config,
+        ocr_provider=ocr_provider
     )
 
     # 4. Stream Response

@@ -6,6 +6,7 @@ import { marked } from 'marked';
 interface SmartFileViewProps {
     files: FileList | null;
     cleaningModelConfig: any; // { provider, model, apiKey, endpoint }
+    ocrProvider?: string; // New prop for OCR selection
     onBack: () => void;
 }
 
@@ -16,7 +17,7 @@ interface LogEntry {
     timestamp: string;
 }
 
-export const SmartFileView: React.FC<SmartFileViewProps> = ({ files, cleaningModelConfig, onBack }) => {
+export const SmartFileView: React.FC<SmartFileViewProps> = ({ files, cleaningModelConfig, ocrProvider, onBack }) => {
     const [logs, setLogs] = useState<LogEntry[]>([]);
     const [finalResult, setFinalResult] = useState<string>("");
     const [isProcessing, setIsProcessing] = useState(false);
@@ -43,6 +44,9 @@ export const SmartFileView: React.FC<SmartFileViewProps> = ({ files, cleaningMod
             // For flat merging, filename is enough.
         });
 
+        if (ocrProvider) {
+            cleaningModelConfig.ocrProvider = ocrProvider;
+        }
         formData.append('config', JSON.stringify(cleaningModelConfig));
 
         try {
@@ -111,6 +115,9 @@ export const SmartFileView: React.FC<SmartFileViewProps> = ({ files, cleaningMod
         <div className="smart-file-view" style={{ padding: '20px', height: '100%', display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <div className="header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h2>📂 智能文件处理 (Smart Agent)</h2>
+                <div style={{ fontSize: '0.9em', color: '#888' }}>
+                    OCR Engine: {ocrProvider || 'Default'} | Cleaning: {cleaningModelConfig?.provider || 'Default'}
+                </div>
                 <button className="btn btn-secondary" onClick={onBack} disabled={isProcessing}>
                     返回首页
                 </button>

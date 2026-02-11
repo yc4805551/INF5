@@ -9,6 +9,8 @@ interface HomeInputViewProps {
     onOrganize: () => void;
     selectedModel: ModelProvider;
     setSelectedModel: (model: ModelProvider) => void;
+    selectedOcrModel: ModelProvider;
+    setSelectedOcrModel: (model: ModelProvider) => void;
     isProcessing: boolean;
     knowledgeBases: { id: string; name: string }[];
     isKbLoading: boolean;
@@ -35,6 +37,8 @@ export const HomeInputView: React.FC<HomeInputViewProps> = ({
     onOrganize,
     selectedModel,
     setSelectedModel,
+    selectedOcrModel,
+    setSelectedOcrModel,
     isProcessing,
     knowledgeBases,
     isKbLoading,
@@ -230,6 +234,24 @@ export const HomeInputView: React.FC<HomeInputViewProps> = ({
                             onChange={(e) => setSelectedModel(e.target.value as ModelProvider)}
                             disabled={isProcessing}
                             title="选择模型"
+                        >
+                            {availableModels.map(modelKey => (
+                                <option key={modelKey} value={modelKey}>
+                                    {MODEL_DISPLAY_NAMES[modelKey] || modelKey}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="config-group">
+                        <h4>OCR 模型</h4>
+                        <select
+                            className="home-select"
+                            id="ocr-model-selector"
+                            name="ocrModelSelect"
+                            value={selectedOcrModel}
+                            onChange={(e) => setSelectedOcrModel(e.target.value as ModelProvider)}
+                            disabled={isProcessing}
+                            title="选择OCR模型"
                         >
                             {availableModels.map(modelKey => (
                                 <option key={modelKey} value={modelKey}>

@@ -8,7 +8,10 @@ import os
 # This model is used EXCLUSIVELY for Image/PDF-Scan processing.
 OCR_MODEL_PROVIDER = os.getenv("OCR_MODEL_PROVIDER", "deepseek") 
 OCR_MODEL_NAME = os.getenv("OCR_MODEL_NAME", "deepseek-chat") 
-OCR_API_KEY = os.getenv("OCR_API_KEY") or os.getenv("DEEPSEEK_API_KEY") 
+OCR_MODEL_PROVIDER = os.getenv("OCR_MODEL_PROVIDER", "deepseek") 
+OCR_MODEL_NAME = os.getenv("OCR_MODEL_NAME", "deepseek-chat") 
+OCR_API_KEY = os.getenv("OCR_API_KEY") or os.getenv("DEEPSEEK_API_KEY")
+OCR_ENDPOINT = os.getenv("OCR_ENDPOINT") # Dedicated Endpoint Override 
 
 # 2. Cleaning Model (Global)
 # This is determined dynamically from the frontend request (user selection).
