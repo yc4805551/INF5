@@ -136,8 +136,48 @@ class SmartFileAgent:
             # python-docx supports file-like objects (BytesIO)
             doc = Document(file_stream)
             full_text = []
+            
+            # 1. Extract Paragraphs
             for para in doc.paragraphs:
-                full_text.append(para.text)
+                if para.text.strip():
+                    full_text.append(para.text)
+            
+            # 2. Extract Tables (Append them to ensure data isn't lost)
+            if doc.tables:
+                full_text.append("\n\n--- Tables Extracted from Document ---\n")
+                for table in doc.tables:
+                    # Simple Markdown Table Converter
+                    # Get all rows
+                    rows = []
+                    for row in table.rows:
+                        cells = [cell.text.strip().replace('\n', ' ') for cell in row.cells]
+                        rows.append(cells)
+                    
+                    if not rows:
+                        continue
+
+                    # Determine columns (max length of any row)
+                    # Some merged cells might cause issues, this is a basic approximation
+                    num_cols = max(len(r) for r in rows) if rows else 0
+                    
+                    if num_cols > 0:
+                        # 1. Header
+                        header = rows[0]
+                        # Pad header if needed
+                        header += [''] * (num_cols - len(header))
+                        full_text.append("| " + " | ".join(header) + " |")
+                        
+                        # 2. Separator
+                        full_text.append("| " + " | ".join(['---'] * num_cols) + " |")
+                        
+                        # 3. Body
+                        for row in rows[1:]:
+                            # Pad row if needed
+                            row += [''] * (num_cols - len(row))
+                            full_text.append("| " + " | ".join(row) + " |")
+                        
+                        full_text.append("\n") # Spacing between tables
+
             return "\n".join(full_text)
         except Exception as e:
             return f"[Word Error: {str(e)}]"

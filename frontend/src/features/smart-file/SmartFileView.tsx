@@ -112,6 +112,16 @@ export const SmartFileView: React.FC<SmartFileViewProps> = ({ files, cleaningMod
         document.body.removeChild(link);
     };
 
+    const handleDownloadTxt = () => {
+        const blob = new Blob([finalResult], { type: 'text/plain;charset=utf-8' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `Smart_Process_${new Date().toISOString().split('T')[0]}.txt`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files.length > 0) {
             startProcessing(e.target.files);
@@ -185,9 +195,6 @@ export const SmartFileView: React.FC<SmartFileViewProps> = ({ files, cleaningMod
                 <div style={{ fontSize: '0.9em', color: '#888' }}>
                     Cleaning: {cleaningModelConfig?.provider || 'Default'} | OCR: Server Configured
                 </div>
-                <button className="btn btn-secondary" onClick={onBack} disabled={isProcessing}>
-                    返回首页
-                </button>
             </div>
 
             <div className="content-container" style={{ display: 'flex', gap: '20px', flex: 1, overflow: 'hidden' }}>
@@ -210,6 +217,7 @@ export const SmartFileView: React.FC<SmartFileViewProps> = ({ files, cleaningMod
                         <div style={{ gap: '10px', display: 'flex' }}>
                             <button className="btn btn-secondary" onClick={handleCopy} disabled={!finalResult}>复制</button>
                             <button className="btn btn-primary" onClick={handleDownload} disabled={!finalResult}>下载 Markdown</button>
+                            <button className="btn btn-primary" onClick={handleDownloadTxt} disabled={!finalResult}>下载 TXT</button>
                         </div>
                     </div>
                     <textarea
