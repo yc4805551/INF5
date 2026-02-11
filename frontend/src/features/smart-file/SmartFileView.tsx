@@ -183,7 +183,7 @@ export const SmartFileView: React.FC<SmartFileViewProps> = ({ files, cleaningMod
             <div className="header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h2>📂 智能文件处理 (Smart Agent)</h2>
                 <div style={{ fontSize: '0.9em', color: '#888' }}>
-                    OCR Engine: {ocrProvider || 'Default'} | Cleaning: {cleaningModelConfig?.provider || 'Default'}
+                    Cleaning: {cleaningModelConfig?.provider || 'Default'} | OCR: Server Configured
                 </div>
                 <button className="btn btn-secondary" onClick={onBack} disabled={isProcessing}>
                     返回首页

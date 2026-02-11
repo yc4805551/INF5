@@ -59,6 +59,7 @@ class SmartFileAgent:
         files.sort(key=lambda x: x.filename)
         
         yield json.dumps({"type": "log", "message": f"Found {total_files} files to process..."}) + "\n"
+        yield json.dumps({"type": "log", "message": f"Active OCR Configuration: Provider=[{self.ocr_provider}], Model=[{self.ocr_model_name}]"}) + "\n"
 
         for index, file in enumerate(files):
             file_name = file.filename
