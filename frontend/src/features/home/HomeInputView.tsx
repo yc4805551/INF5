@@ -26,6 +26,7 @@ interface HomeInputViewProps {
     isMilvusLoading?: boolean;
     executionMode: ExecutionMode;
     setExecutionMode: (mode: ExecutionMode) => void;
+    onSmartUpload: (files: FileList) => void;
 }
 
 export const HomeInputView: React.FC<HomeInputViewProps> = ({
@@ -51,6 +52,7 @@ export const HomeInputView: React.FC<HomeInputViewProps> = ({
     isMilvusLoading,
     executionMode,
     setExecutionMode,
+    onSmartUpload,
 }) => {
     const availableModels = getAvailableModels();
     const lastPastedText = useRef('');
@@ -179,7 +181,37 @@ export const HomeInputView: React.FC<HomeInputViewProps> = ({
                         <button className="btn btn-secondary" onClick={handleUploadClick} disabled={isProcessing}>
                             上传文件
                         </button>
+                        <button className="btn btn-primary" onClick={() => {
+                            if (fileInputRef.current) {
+                                fileInputRef.current.setAttribute('webkitdirectory', '');
+                                fileInputRef.current.setAttribute('directory', '');
+                                fileInputRef.current.click();
+                                // Reset after click to allow normal file upload next time? 
+                                // Actually, better to have two inputs or toggle. 
+                                // For V1, let's just make a separate hidden input for folder.
+                            }
+                        }} disabled={isProcessing} title="选择文件夹进行批量智能处理">
+                            📂 智能上传
+                        </button>
                     </div>
+                    {/* Separate Hidden Input for Folders */}
+                    <input
+                        type="file"
+                        id="hidden-folder-input"
+                        ref={(el) => {
+                            if (el) {
+                                el.setAttribute('webkitdirectory', '');
+                                el.setAttribute('directory', '');
+                            }
+                        }}
+                        style={{ display: 'none' }}
+                        onChange={(e) => {
+                            if (e.target.files && e.target.files.length > 0) {
+                                onSmartUpload(e.target.files);
+                                e.target.value = ''; // Reset
+                            }
+                        }}
+                    />
                 </div>
                 <div className="home-panel">
                     <h2>全局配置</h2>

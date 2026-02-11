@@ -19,3 +19,4 @@ Pillow
 pandas
 openpyxl
 google-genai
+pymupdf

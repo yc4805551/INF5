@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import ReactDOM from 'react-dom/client';
 import { HomeInputView } from './src/features/home/HomeInputView';
+import { SmartFileView } from './src/features/smart-file/SmartFileView';
 import { SearchPage, SmartSearchPage } from './src/features/file-search';
 import { marked } from 'marked';
 import {
@@ -1597,6 +1598,8 @@ const App = () => {
 
     const [kbError, setKbError] = useState<string | null>(null);
     const [selectedKnowledgeBase, setSelectedKnowledgeBase] = useState<string | null>(null);
+
+    const [smartFileFiles, setSmartFileFiles] = useState<FileList | null>(null); // New State for Smart File Agent
     const [initialKnowledgeChatQuestion, setInitialKnowledgeChatQuestion] = useState<string | undefined>();
 
     useEffect(() => {
@@ -1745,6 +1748,10 @@ const App = () => {
         setView('file-search');
     };
 
+    const handleSmartUpload = (files: FileList) => {
+        setSmartFileFiles(files);
+    };
+
     const handleCloseThoughtsModal = () => {
         setIsThoughtsModalOpen(false);
     }
@@ -1755,6 +1762,21 @@ const App = () => {
     }
 
     const renderView = () => {
+        // High priority check for Smart File View overlay
+        if (smartFileFiles) {
+            return (
+                <SmartFileView
+                    files={smartFileFiles}
+                    cleaningModelConfig={{
+                        provider: selectedModel,
+                        // We leave other fields empty to let backend/services handle defaults or lookups
+                        // The 'provider' is the critical piece for the "Cleaning Model" selection.
+                    }}
+                    onBack={() => setSmartFileFiles(null)}
+                />
+            );
+        }
+
         switch (view) {
             case 'notes':
                 return <NoteAnalysisView
@@ -1825,6 +1847,7 @@ const App = () => {
                         isMilvusLoading={isMilvusLoading}
                         executionMode={executionMode}
                         setExecutionMode={setExecutionMode}
+                        onSmartUpload={handleSmartUpload}
                     />
                 );
         }
