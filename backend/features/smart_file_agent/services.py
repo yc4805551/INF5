@@ -65,39 +65,36 @@ class SmartFileAgent:
             file_name = file.filename
             yield json.dumps({"type": "log", "message": f"Processing [{index+1}/{total_files}]: {file_name}..."}) + "\n"
             
-            temp_file_path = None
             try:
-                # OPTIMIZATION: Use tempfile to avoid holding large files in RAM
-                # unexpected EOF if we read stream? Flask FileStorage.save() is efficient.
-                fd, temp_file_path = tempfile.mkstemp()
-                os.close(fd) # Close file descriptor, we just need path
-                file.save(temp_file_path)
+                # OPTIMIZATION: Read into memory immediately to detach from Flask request stream
+                # This prevents "I/O operation on closed file" if Flask closes the stream early
+                file_content = file.read() 
+                file_bytes = io.BytesIO(file_content)
                 
-                # 2. Route Processing (Pass PATH or Stream from Disk)
+                # 2. Route Processing (Pass in-memory BytesIO)
                 processed_text = ""
                 ext = os.path.splitext(file_name)[1].lower()
 
                 if ext in ['.xlsx', '.xls']:
-                    processed_text = self._process_excel(temp_file_path)
+                    processed_text = self._process_excel(file_bytes)
                 elif ext == '.docx':
-                    processed_text = self._process_word(temp_file_path)
+                    processed_text = self._process_word(file_bytes)
                 elif ext == '.pdf':
-                     processed_text = self._process_pdf(temp_file_path)
+                     processed_text = self._process_pdf(file_content) # PyMuPDF needs bytes or filename, not BytesIO generally (but fitz.open(stream=...) works)
+                     
                      # If text is too short, process as images (OCR)
                      if len(processed_text) < 50:
                          yield json.dumps({"type": "log", "message": f"  - [{file_name}] text content too short, switching to OCR..."}) + "\n"
-                         processed_text = self._process_pdf_as_images(temp_file_path)
+                         processed_text = self._process_pdf_as_images(file_content)
 
                 elif ext in ['.png', '.jpg', '.jpeg', '.bmp', '.tiff']:
                      yield json.dumps({"type": "log", "message": f"  - [{file_name}] Identifying image with {self.ocr_model_name}..."}) + "\n"
-                     processed_text = self._process_image(temp_file_path)
+                     processed_text = self._process_image(file_content)
                 elif ext in ['.txt', '.md', '.csv']:
-                    with open(temp_file_path, 'rb') as f:
-                        content = f.read()
-                        try:
-                            processed_text = content.decode('utf-8')
-                        except UnicodeDecodeError:
-                            processed_text = content.decode('gbk', errors='ignore')
+                    try:
+                        processed_text = file_content.decode('utf-8')
+                    except UnicodeDecodeError:
+                        processed_text = file_content.decode('gbk', errors='ignore')
 
                 else:
                     processed_text = f"[Skipped unsupported file: {file_name}]"
@@ -112,13 +109,6 @@ class SmartFileAgent:
                 logger.error(traceback.format_exc())
                 yield json.dumps({"type": "log", "message": f"  - [Error] {error_msg}"}) + "\n"
                 self.merged_buffer.append(f"\n\n[Error processing {file_name}]\n")
-            finally:
-                # Cleanup Temp File
-                if temp_file_path and os.path.exists(temp_file_path):
-                    try:
-                        os.remove(temp_file_path)
-                    except:
-                        pass
 
         # 4. Merger
         yield json.dumps({"type": "log", "message": "Merging results..."}) + "\n"
@@ -132,18 +122,18 @@ class SmartFileAgent:
         yield json.dumps({"type": "result", "text": full_text}) + "\n"
         yield json.dumps({"type": "log", "message": "Done."}) + "\n"
 
-    def _process_excel(self, file_path):
+    def _process_excel(self, file_stream):
         try:
-            # pandas read_excel supports path
-            df = pd.read_excel(file_path)
+            # pandas read_excel supports file-like objects (BytesIO)
+            df = pd.read_excel(file_stream)
             return df.to_markdown(index=False)
         except Exception as e:
             return f"[Excel Error: {str(e)}]"
 
-    def _process_word(self, file_path):
+    def _process_word(self, file_stream):
         try:
-            # python-docx supports path
-            doc = Document(file_path)
+            # python-docx supports file-like objects (BytesIO)
+            doc = Document(file_stream)
             full_text = []
             for para in doc.paragraphs:
                 full_text.append(para.text)
@@ -151,10 +141,10 @@ class SmartFileAgent:
         except Exception as e:
             return f"[Word Error: {str(e)}]"
 
-    def _process_pdf(self, file_path):
+    def _process_pdf(self, file_bytes):
         try:
-            # fitz.open supports path
-            doc = fitz.open(file_path)
+            # fitz.open(stream=..., filetype="pdf")
+            doc = fitz.open(stream=file_bytes, filetype="pdf")
             text = ""
             for page in doc:
                 text += page.get_text()
@@ -164,9 +154,9 @@ class SmartFileAgent:
             logger.error(f"PDF Error: {e}")
             return "" 
 
-    def _process_pdf_as_images(self, file_path):
+    def _process_pdf_as_images(self, file_bytes):
         try:
-            doc = fitz.open(file_path)
+            doc = fitz.open(stream=file_bytes, filetype="pdf")
             full_ocr_text = []
             
             for i, page in enumerate(doc):
@@ -178,7 +168,6 @@ class SmartFileAgent:
                 
                 prompt = "Please OCR this image. Output strictly in Markdown format. If there are tables, preserve them as Markdown tables. Do not add introductory text."
                 
-                
                 vision_response = self._call_vision_api(b64_img, prompt)
                 full_ocr_text.append(vision_response)
             
@@ -187,12 +176,10 @@ class SmartFileAgent:
         except Exception as e:
             return f"[PDF OCR Error: {e}]"
 
-    def _process_image(self, file_path):
+    def _process_image(self, file_bytes):
         try:
-            with open(file_path, "rb") as f:
-                content = f.read()
             import base64
-            b64_img = "data:image/png;base64," + base64.b64encode(content).decode('utf-8')
+            b64_img = "data:image/png;base64," + base64.b64encode(file_bytes).decode('utf-8')
             prompt = "Transcribe this image to Markdown."
             return self._call_vision_api(b64_img, prompt)
         except Exception as e:
