@@ -30,7 +30,6 @@ from features.smart_filler.routes import smart_filler_bp
 from features.advisor.routes import advisor_bp
 from features.agent_anything.routes import agent_anything_bp # AnythingLLM Agent
 from features.file_search.routes import file_search_bp  # 智能文件搜索
-from features.file_search.routes import file_search_bp  # 智能文件搜索
 from features.remote_control.routes import remote_control_bp  # OpenClaw Remote Control
 from features.smart_file_agent.routes import smart_file_agent_bp # Smart File Agent (Dual Model)
 
@@ -72,7 +71,6 @@ def create_app():
     app.register_blueprint(smart_filler_bp, url_prefix='/api/smart-filler')
     app.register_blueprint(advisor_bp, url_prefix='/api/advisor') # /suggestions - Fixed from /api/agent
     app.register_blueprint(agent_anything_bp, url_prefix='/api/agent-anything') # /audit
-    app.register_blueprint(file_search_bp, url_prefix='/api/file-search') # 智能文件搜索
     app.register_blueprint(file_search_bp, url_prefix='/api/file-search') # 智能文件搜索
     app.register_blueprint(remote_control_bp, url_prefix='/api/remote-control')  # OpenClaw Remote Control
     app.register_blueprint(smart_file_agent_bp, url_prefix='/api/smart-file') # /process (Smart File Agent)
