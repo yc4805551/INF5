@@ -242,24 +242,7 @@ export const HomeInputView: React.FC<HomeInputViewProps> = ({
                             ))}
                         </select>
                     </div>
-                    <div className="config-group">
-                        <h4>OCR 模型</h4>
-                        <select
-                            className="home-select"
-                            id="ocr-model-selector"
-                            name="ocrModelSelect"
-                            value={selectedOcrModel}
-                            onChange={(e) => setSelectedOcrModel(e.target.value as ModelProvider)}
-                            disabled={isProcessing}
-                            title="选择OCR模型"
-                        >
-                            {availableModels.map(modelKey => (
-                                <option key={modelKey} value={modelKey}>
-                                    {MODEL_DISPLAY_NAMES[modelKey] || modelKey}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
+
                     <div className="config-group">
                         <h4>知识库连接</h4>
                         <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '10px' }}>

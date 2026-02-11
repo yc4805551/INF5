@@ -25,7 +25,7 @@ export const SmartFileView: React.FC<SmartFileViewProps> = ({ files, cleaningMod
 
     useEffect(() => {
         if (files && files.length > 0 && !isProcessing && logs.length === 0) {
-            startProcessing();
+            startProcessing(files);
         }
     }, [files]);
 
@@ -33,12 +33,12 @@ export const SmartFileView: React.FC<SmartFileViewProps> = ({ files, cleaningMod
         logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [logs]);
 
-    const startProcessing = async () => {
+    const startProcessing = async (filesToProcess: FileList) => {
         setIsProcessing(true);
         setLogs([{ type: 'log', message: 'Starting upload and processing...', timestamp: new Date().toLocaleTimeString() }]);
 
         const formData = new FormData();
-        Array.from(files!).forEach(file => {
+        Array.from(filesToProcess).forEach(file => {
             formData.append('files', file);
             // Note: webkitdirectory uploads relative paths, but standard File object usually just has name.
             // For flat merging, filename is enough.
@@ -110,6 +110,72 @@ export const SmartFileView: React.FC<SmartFileViewProps> = ({ files, cleaningMod
         link.click();
         document.body.removeChild(link);
     };
+
+    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files.length > 0) {
+            startProcessing(e.target.files);
+        }
+    };
+
+    // Render Upload UI if no files are processing/processed yet
+    if ((!files || files.length === 0) && logs.length === 0 && !isProcessing) {
+        return (
+            <div className="smart-file-view" style={{ padding: '20px', height: '100%', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <div className="header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <h2>📂 智能文件处理 / 文本识别</h2>
+                    <button className="btn btn-secondary" onClick={onBack}>
+                        返回首页
+                    </button>
+                </div>
+                <div
+                    className="upload-container"
+                    style={{
+                        flex: 1,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        border: '2px dashed #444',
+                        borderRadius: '8px',
+                        color: '#888',
+                        gap: '20px'
+                    }}
+                    onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = '#007bff'; }}
+                    onDragLeave={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = '#444'; }}
+                    onDrop={(e) => {
+                        e.preventDefault();
+                        e.currentTarget.style.borderColor = '#444';
+                        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                            startProcessing(e.dataTransfer.files);
+                        }
+                    }}
+                >
+                    <div style={{ fontSize: '3em' }}>☁️</div>
+                    <p>拖放文件或文件夹到此处</p>
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                        <label className="btn btn-primary" style={{ cursor: 'pointer' }}>
+                            选择文件
+                            <input type="file" multiple style={{ display: 'none' }} onChange={handleFileSelect} />
+                        </label>
+                        <label className="btn btn-secondary" style={{ cursor: 'pointer' }}>
+                            选择文件夹
+                            <input
+                                type="file"
+                                style={{ display: 'none' }}
+                                onChange={handleFileSelect}
+                                ref={(el) => {
+                                    if (el) {
+                                        el.setAttribute('webkitdirectory', '');
+                                        el.setAttribute('directory', '');
+                                    }
+                                }}
+                            />
+                        </label>
+                    </div>
+                </div>
+            </div>
+        )
+    }
 
     return (
         <div className="smart-file-view" style={{ padding: '20px', height: '100%', display: 'flex', flexDirection: 'column', gap: '20px' }}>

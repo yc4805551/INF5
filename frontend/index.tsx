@@ -1812,9 +1812,13 @@ const App = () => {
                 />;
 
             case 'ocr':
-                return <TextRecognitionView
-                    provider={selectedModel}
-                    executionMode={executionMode}
+                return <SmartFileView
+                    files={smartFileFiles}
+                    cleaningModelConfig={{
+                        provider: selectedModel,
+                    }}
+                    ocrProvider={selectedOcrModel} // Still pass it if we have it, or remove if we want strictly backend
+                    onBack={() => setView('home')}
                 />;
 
             case 'word-canvas':
