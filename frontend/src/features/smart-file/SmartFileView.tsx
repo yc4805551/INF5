@@ -36,6 +36,7 @@ export const SmartFileView: React.FC<SmartFileViewProps> = ({ files, cleaningMod
     const startProcessing = async (filesToProcess: FileList) => {
         setIsProcessing(true);
         setLogs([{ type: 'log', message: 'Starting upload and processing...', timestamp: new Date().toLocaleTimeString() }]);
+        setFinalResult(""); // Clear previous results to prevent duplication
 
         const formData = new FormData();
         Array.from(filesToProcess).forEach(file => {
