@@ -50,25 +50,26 @@ class SmartFileAgent:
         # Initialize OCR Engine independently
         self.ocr_engine = LLMEngine(api_key=self.ocr_api_key)
 
-    def process_files(self, files):
+    def process_files(self, files_data):
         """
         Generator function to yield progress logs and final result.
+        files_data: List of dicts {'filename': str, 'content': bytes}
         """
-        total_files = len(files)
+        total_files = len(files_data)
         # Sort files by name to ensure consistent order
-        files.sort(key=lambda x: x.filename)
+        files_data.sort(key=lambda x: x['filename'])
         
         yield json.dumps({"type": "log", "message": f"Found {total_files} files to process..."}) + "\n"
         yield json.dumps({"type": "log", "message": f"Active OCR Configuration: Provider=[{self.ocr_provider}], Model=[{self.ocr_model_name}]"}) + "\n"
 
-        for index, file in enumerate(files):
-            file_name = file.filename
+        for index, file_info in enumerate(files_data):
+            file_name = file_info['filename']
+            file_content = file_info['content']
+            
             yield json.dumps({"type": "log", "message": f"Processing [{index+1}/{total_files}]: {file_name}..."}) + "\n"
             
             try:
-                # OPTIMIZATION: Read into memory immediately to detach from Flask request stream
-                # This prevents "I/O operation on closed file" if Flask closes the stream early
-                file_content = file.read() 
+                # Content is already bytes
                 file_bytes = io.BytesIO(file_content)
                 
                 # 2. Route Processing (Pass in-memory BytesIO)

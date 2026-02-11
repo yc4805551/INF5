@@ -12,6 +12,16 @@ def process_files_route():
     if not files:
         return {"error": "No files provided"}, 400
 
+    # OPTIMIZATION: Read all files into memory immediately to detach from Flask's request stream.
+    # This prevents "I/O operation on closed file" errors if Werkzeug closes the temporary files
+    # while the generator is still running.
+    file_data = []
+    for f in files:
+        file_data.append({
+            "filename": f.filename,
+            "content": f.read()
+        })
+
     # 2. Get Config (Cleaning Model)
     # Passed as JSON string in form-data 'config' or just use global
     import json
@@ -35,6 +45,6 @@ def process_files_route():
 
     # 4. Stream Response
     return Response(
-        stream_with_context(agent.process_files(files)),
+        stream_with_context(agent.process_files(file_data)),
         mimetype='application/x-ndjson'
     )
