@@ -70,7 +70,7 @@ class LLMConfigManager:
                 },
                 "aliyun": {
                     "api_key": "",
-                    "endpoint": "",
+                    "endpoint": "https://dashscope.aliyuncs.com/compatible-mode/v1",
                     "model": "qwen-plus"
                 }
             }
@@ -97,8 +97,8 @@ class LLMConfigManager:
             "gemini": ("GOOGLE", "GEMINI"),
             "openai": ("OPENAI",),
             "deepseek": ("DEEPSEEK",),
-            "aliyun": ("ALI",),
-            "ali": ("ALI",),
+            "aliyun": ("ALI", "DASHSCOPE"),
+            "ali": ("ALI", "DASHSCOPE"),
             "free": ("FREE",),
             "doubao": ("DOUBAO",),
             "depocr": ("DEPOCR",),
