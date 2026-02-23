@@ -267,11 +267,12 @@ def call_ali_proxy(data):
     if not api_key:
         return jsonify({"error": "ALI_API_KEY 未设置"}), 500
     
-    # Handle endpoint formatting
-    if target_url.endswith('/chat/completions'):
-        url = target_url
-    else:
-        url = f"{target_url.rstrip('/')}/v1/chat/completions"
+    # Handle endpoint formatting robustly
+    url = target_url.rstrip('/')
+    if not url.endswith('/chat/completions'):
+        if not url.endswith('/v1'):
+            url = f"{url}/v1"
+        url = f"{url}/chat/completions"
     
     headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {api_key}'}
     messages = []
@@ -305,11 +306,12 @@ def stream_ali_proxy(user_prompt, system_instruction, history, model_config=None
         yield "[Error: ALI_API_KEY 未设置]"
         return
     
-    # Handle endpoint formatting
-    if target_url.endswith('/chat/completions'):
-        url = target_url
-    else:
-        url = f"{target_url.rstrip('/')}/v1/chat/completions"
+    # Handle endpoint formatting robustly
+    url = target_url.rstrip('/')
+    if not url.endswith('/chat/completions'):
+        if not url.endswith('/v1'):
+            url = f"{url}/v1"
+        url = f"{url}/chat/completions"
     
     headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {api_key}'}
     messages = []
