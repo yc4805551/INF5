@@ -46,23 +46,22 @@ def call_llm(
                 endpoint = model_config.get("endpoint")
         
         # 2. 从环境变量读取兜底（Fallback）
+        # 2. 从环境变量读取兜底（Fallback）
+        provider_upper = provider.upper()
+        api_key = api_key or os.getenv(f"{provider_upper}_API_KEY") or os.getenv(f"VITE_{provider_upper}_API_KEY")
+        endpoint = endpoint or os.getenv(f"{provider_upper}_ENDPOINT") or os.getenv(f"VITE_{provider_upper}_ENDPOINT")
+        model = model or os.getenv(f"{provider_upper}_MODEL") or os.getenv(f"VITE_{provider_upper}_MODEL")
+
+        # 为了兼容历史特定环境变量配置，依旧可以保留特殊的默认 fallback
         if provider == "gemini":
-            api_key = api_key or os.getenv("GEMINI_API_KEY") or os.getenv("VITE_GEMINI_API_KEY")
-            endpoint = endpoint or os.getenv("GEMINI_ENDPOINT") or os.getenv("VITE_GEMINI_ENDPOINT") or "https://generativelanguage.googleapis.com/v1beta/models"
-            model = model or os.getenv("GEMINI_MODEL") or os.getenv("VITE_GEMINI_MODEL") or "gemini-2.0-flash-exp"
+            endpoint = endpoint or "https://generativelanguage.googleapis.com/v1beta/models"
+            model = model or "gemini-2.0-flash-exp"
         elif provider == "openai":
-            api_key = api_key or os.getenv("OPENAI_API_KEY") or os.getenv("VITE_OPENAI_API_KEY")
-            endpoint = endpoint or os.getenv("OPENAI_ENDPOINT") or os.getenv("VITE_OPENAI_ENDPOINT") or "https://api.openai.com/v1"
-            model = model or os.getenv("OPENAI_MODEL") or os.getenv("VITE_OPENAI_MODEL") or "gpt-4"
+            endpoint = endpoint or "https://api.openai.com/v1"
+            model = model or "gpt-4"
         elif provider == "deepseek":
-            api_key = api_key or os.getenv("DEEPSEEK_API_KEY") or os.getenv("VITE_DEEPSEEK_API_KEY")
-            endpoint = endpoint or os.getenv("DEEPSEEK_ENDPOINT") or os.getenv("VITE_DEEPSEEK_ENDPOINT") or "https://api.deepseek.com/v1"
-            model = model or os.getenv("DEEPSEEK_MODEL") or os.getenv("VITE_DEEPSEEK_MODEL") or "deepseek-chat"
-        elif provider == "free":
-            # Support for custom 'free' provider defined in .env.local
-            api_key = api_key or os.getenv("FREE_API_KEY") or os.getenv("VITE_FREE_API_KEY")
-            endpoint = endpoint or os.getenv("FREE_ENDPOINT") or os.getenv("VITE_FREE_ENDPOINT")
-            model = model or os.getenv("FREE_MODEL") or os.getenv("VITE_FREE_MODEL")
+            endpoint = endpoint or "https://api.deepseek.com/v1"
+            model = model or "deepseek-chat"
         
         if not api_key:
             raise ValueError(f"API key for {provider} not found in modelConfig or environment variables")
@@ -75,20 +74,15 @@ def call_llm(
         
         # 使用 LLMEngine 调用模型
         engine = LLMEngine()
-        model_config = {
-            "provider": provider,
-            "apiKey": api_key,
-            "endpoint": endpoint,
-            "model": model
-        }
         
         # 根据提供商选择调用方法
-        if provider == "gemini":
+        if provider == "gemini" and endpoint and "googleapis.com" in endpoint:
+            # 如果是官方 gemini endpoint, 使用旧有 google gemini SDK 逻辑
             response = engine._call_google_gemini(api_key, full_prompt, endpoint, model)
-        elif provider in ["openai", "deepseek", "free"]:
-            response = engine._call_openai_compatible(api_key, endpoint, model, full_prompt)
         else:
-            raise ValueError(f"Unsupported provider: {provider}")
+            # 默认所有未显式定义特殊处理的模型，或者使用了代理endpoint的Gemini，视为 OpenAI 兼容格式
+            logger.info(f"Using OpenAI-compatible logic for File Search provider: {provider}")
+            response = engine._call_openai_compatible(api_key, endpoint, model, full_prompt)
         
         return response
     
