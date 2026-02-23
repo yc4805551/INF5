@@ -4,7 +4,17 @@ import requests
 import json
 from flask import jsonify, Response, stream_with_context
 
-# Configs
+def _format_url(target_url):
+    """Robust OpenAI-compatible endpoint formatter"""
+    if not target_url:
+        return ""
+    url = target_url.rstrip('/')
+    if not url.endswith('/chat/completions'):
+        if not url.endswith('/v1'):
+            url = f"{url}/v1"
+        url = f"{url}/chat/completions"
+    return url
+
 # Configs
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("VITE_GEMINI_API_KEY")
 GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai"
@@ -32,8 +42,8 @@ def call_gemini_openai_proxy(data):
     if not api_key: 
         return jsonify({"error": "GEMINI_API_KEY 未设置"}), 500 
     
-    base_url = GEMINI_BASE_URL.rstrip('/')
-    url = f"{base_url}/chat/completions"
+    base_url = model_config.get('endpoint') or GEMINI_BASE_URL
+    url = _format_url(base_url)
     headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {api_key}'}
     
     messages = []
@@ -72,8 +82,8 @@ def stream_gemini_openai_proxy(user_prompt, system_instruction, history, model_c
         yield "[错误: GEMINI_API_KEY 未设置]"
         return
 
-    base_url = GEMINI_BASE_URL.rstrip('/')
-    url = f"{base_url}/chat/completions"
+    base_url = model_config.get('endpoint') or GEMINI_BASE_URL
+    url = _format_url(base_url)
     headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {api_key}'}
     
     messages = []
@@ -114,9 +124,7 @@ def call_openai_proxy(data):
     if not api_key:
         return jsonify({"error": "API Key not provided"}), 400
     
-    # Ensure endpoint ends with /chat/completions
-    if not endpoint.endswith('/chat/completions'):
-        endpoint = endpoint.rstrip('/') + '/chat/completions'
+    url = _format_url(endpoint)
     
     headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {api_key}'}
     messages = []
@@ -132,7 +140,7 @@ def call_openai_proxy(data):
     # Add response_format for JSON mode if requested
     if data.get('jsonResponse'):
         payload['response_format'] = {'type': 'json_object'}
-    response = requests.post(endpoint, headers=headers, json=payload, timeout=180)
+    response = requests.post(url, headers=headers, json=payload, timeout=180)
     response.raise_for_status()
     # IMPORTANT: Return plain text, NOT jsonify() to avoid double-encoding
     content = response.json()['choices'][0]['message']['content']
@@ -150,9 +158,7 @@ def stream_openai_proxy(user_prompt, system_instruction, history, model_config=N
         yield "[Error: API Key not provided]"
         return
     
-    # Ensure endpoint ends with /chat/completions
-    if not endpoint.endswith('/chat/completions'):
-        endpoint = endpoint.rstrip('/') + '/chat/completions'
+    url = _format_url(endpoint)
     
     headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {api_key}'}
     messages = []
@@ -165,7 +171,7 @@ def stream_openai_proxy(user_prompt, system_instruction, history, model_config=N
     messages.append({"role": "user", "content": user_prompt})
     payload = {"model": model, "messages": messages, "temperature": 0.7, "stream": True}
     try:
-        with requests.post(endpoint, headers=headers, json=payload, stream=True, timeout=180) as r:
+        with requests.post(url, headers=headers, json=payload, stream=True, timeout=180) as r:
             r.raise_for_status()
             for line in r.iter_lines():
                 if line:
@@ -191,9 +197,7 @@ def call_deepseek_proxy(data):
     if not api_key:
         return jsonify({"error": "DEEPSEEK_API_KEY 未设置"}), 500
     
-    url = endpoint
-    if not url.endswith('/chat/completions'):
-        url = url.rstrip('/') + '/chat/completions'
+    url = _format_url(endpoint)
         
     headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {api_key}'}
     messages = []
@@ -226,9 +230,7 @@ def stream_deepseek_proxy(user_prompt, system_instruction, history, model_config
         yield "[Error: DEEPSEEK_API_KEY 未设置]"
         return
     
-    url = endpoint
-    if not url.endswith('/chat/completions'):
-        url = url.rstrip('/') + '/chat/completions'
+    url = _format_url(endpoint)
 
     headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {api_key}'}
     messages = []
@@ -268,11 +270,7 @@ def call_ali_proxy(data):
         return jsonify({"error": "ALI_API_KEY 未设置"}), 500
     
     # Handle endpoint formatting robustly
-    url = target_url.rstrip('/')
-    if not url.endswith('/chat/completions'):
-        if not url.endswith('/v1'):
-            url = f"{url}/v1"
-        url = f"{url}/chat/completions"
+    url = _format_url(target_url)
     
     headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {api_key}'}
     messages = []
@@ -307,11 +305,7 @@ def stream_ali_proxy(user_prompt, system_instruction, history, model_config=None
         return
     
     # Handle endpoint formatting robustly
-    url = target_url.rstrip('/')
-    if not url.endswith('/chat/completions'):
-        if not url.endswith('/v1'):
-            url = f"{url}/v1"
-        url = f"{url}/chat/completions"
+    url = _format_url(target_url)
     
     headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {api_key}'}
     messages = []
