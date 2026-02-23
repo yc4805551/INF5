@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { smartSearch, smartSearchStream, openFileLocation, copyTextToClipboard, SmartSearchResult } from './smartSearchApi';
+import { frontendApiConfig } from '../../services/ai';
 import './SmartSearchPage.css';
 
 /**
@@ -85,6 +86,7 @@ export const SmartSearchPage: React.FC<SmartSearchPageProps> = ({ modelProvider 
                 }
             }, {
                 modelProvider,
+                modelConfig: frontendApiConfig[modelProvider || 'gemini'],
                 maxResults: 500 // Increased from default 20
             });
 

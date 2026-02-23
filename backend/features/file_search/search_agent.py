@@ -106,14 +106,16 @@ class FileSearchAgent:
 请仅返回 JSON 数组，不要包含其他解释。
 """
     
-    def __init__(self, model_provider: str = "openai"):
+    def __init__(self, model_provider: str = "openai", model_config: dict = None):
         """
         初始化 AI 搜索助手
         
         Args:
             model_provider: LLM 提供商（gemini/openai/deepseek等）
+            model_config: 可选的具体模型配置信息（apiKey, endpoint, model 等）
         """
         self.model_provider = model_provider
+        self.model_config = model_config
     
     def understand_query(self, natural_language_query: str) -> Dict:
         """
@@ -127,7 +129,8 @@ class FileSearchAgent:
                 system_prompt=self.INTENT_UNDERSTANDING_PROMPT,
                 user_prompt=f"用户查询: {natural_language_query}",
                 temperature=0.3,
-                json_mode=True
+                json_mode=True,
+                model_config=self.model_config
             )
             
             intent_data = self._parse_json_response(response)
@@ -198,7 +201,8 @@ class FileSearchAgent:
                 system_prompt="你是一个专业的文件搜索助手。",
                 user_prompt=prompt,
                 temperature=0.3,
-                json_mode=True
+                json_mode=True,
+                model_config=self.model_config
             )
             
             filtered_results = self._parse_json_response(response)

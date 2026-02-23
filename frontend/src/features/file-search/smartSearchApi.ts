@@ -33,7 +33,7 @@ export interface SmartSearchResponse {
  */
 export const smartSearch = async (
     query: string,
-    options: { maxResults?: number; modelProvider?: string } = {}
+    options: { maxResults?: number; modelProvider?: string; modelConfig?: any } = {}
 ): Promise<SmartSearchResponse> => {
     try {
         const response = await fetch(`${API_BASE_URL}/file-search/smart`, {
@@ -44,7 +44,8 @@ export const smartSearch = async (
             body: JSON.stringify({
                 query,
                 maxResults: options.maxResults || 20,
-                modelProvider: options.modelProvider || 'gemini'
+                modelProvider: options.modelProvider || 'gemini',
+                modelConfig: options.modelConfig
             }),
         });
 
@@ -79,7 +80,7 @@ export const smartSearchStream = async (
         onAnalysis?: (text: string) => void;
         onError?: (error: string) => void;
     },
-    options: { maxResults?: number; modelProvider?: string } = {}
+    options: { maxResults?: number; modelProvider?: string; modelConfig?: any } = {}
 ) => {
     try {
         const response = await fetch(`${API_BASE_URL}/file-search/smart`, {
@@ -91,7 +92,8 @@ export const smartSearchStream = async (
                 query,
                 maxResults: options.maxResults || 20,
                 maxCandidates: 3000,
-                modelProvider: options.modelProvider || 'gemini'
+                modelProvider: options.modelProvider || 'gemini',
+                modelConfig: options.modelConfig
             }),
         });
 

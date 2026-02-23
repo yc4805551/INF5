@@ -40,12 +40,13 @@ def smart_search():
         
         max_results = min(data.get('maxResults', 10), 1000)
         model_provider = data.get('modelProvider', 'gemini')
+        model_config = data.get('modelConfig', None)
         max_candidates = min(data.get('maxCandidates', 2000), 10000)
         
         logger.info(f"AI Smart search (Stream): query='{query}'")
         
         def generate():
-            agent = FileSearchAgent(model_provider=model_provider)
+            agent = FileSearchAgent(model_provider=model_provider, model_config=model_config)
             try:
                 # 调用生成器
                 for event in agent.smart_search(
