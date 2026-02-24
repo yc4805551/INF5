@@ -40,8 +40,8 @@ export const SmartFileView: React.FC<SmartFileViewProps> = ({ files, cleaningMod
     }, [logs]);
 
     const handleLocalFileSelect = (newFiles: FileList) => {
+        const arr = Array.from(newFiles);
         setSelectedFiles(prev => {
-            const arr = Array.from(newFiles);
             const existingNames = new Set(prev.map(f => f.name));
             const uniqueNewFiles = arr.filter(f => !existingNames.has(f.name));
             return [...prev, ...uniqueNewFiles];
