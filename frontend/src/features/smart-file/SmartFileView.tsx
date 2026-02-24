@@ -204,9 +204,14 @@ export const SmartFileView: React.FC<SmartFileViewProps> = ({ files, cleaningMod
                         <h3>已添加待处理的文件 ({selectedFiles.length})</h3>
                         <div style={{ flex: 1, overflowY: 'auto', background: '#1e1e1e', padding: '10px', borderRadius: '8px' }}>
                             <ul style={{ margin: 0, paddingLeft: '20px' }}>
-                                {selectedFiles.map((f, i) => (
-                                    <li key={i} style={{ color: '#ccc', marginBottom: '5px' }}>{f.name}</li>
+                                {selectedFiles.slice(0, 100).map((f, i) => (
+                                    <li key={i} style={{ color: '#ccc', marginBottom: '5px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.name}</li>
                                 ))}
+                                {selectedFiles.length > 100 && (
+                                    <li style={{ color: '#888', fontStyle: 'italic', marginTop: '10px', listStyleType: 'none', marginLeft: '-20px', paddingLeft: '20px' }}>
+                                        ...等其余 {selectedFiles.length - 100} 个文件
+                                    </li>
+                                )}
                             </ul>
                         </div>
                         <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
