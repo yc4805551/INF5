@@ -18,14 +18,20 @@ interface LogEntry {
 }
 
 export const SmartFileView: React.FC<SmartFileViewProps> = ({ files, cleaningModelConfig, ocrProvider, onBack }) => {
+    const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
     const [logs, setLogs] = useState<LogEntry[]>([]);
     const [finalResult, setFinalResult] = useState<string>("");
     const [isProcessing, setIsProcessing] = useState(false);
     const logsEndRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        if (files && files.length > 0 && !isProcessing && logs.length === 0) {
-            startProcessing(files);
+        if (files && files.length > 0) {
+            setSelectedFiles(prev => {
+                const newFiles = Array.from(files);
+                const existingNames = new Set(prev.map(f => f.name));
+                const uniqueNewFiles = newFiles.filter(f => !existingNames.has(f.name));
+                return [...prev, ...uniqueNewFiles];
+            });
         }
     }, [files]);
 
@@ -33,13 +39,23 @@ export const SmartFileView: React.FC<SmartFileViewProps> = ({ files, cleaningMod
         logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [logs]);
 
-    const startProcessing = async (filesToProcess: FileList) => {
+    const handleLocalFileSelect = (newFiles: FileList) => {
+        setSelectedFiles(prev => {
+            const arr = Array.from(newFiles);
+            const existingNames = new Set(prev.map(f => f.name));
+            const uniqueNewFiles = arr.filter(f => !existingNames.has(f.name));
+            return [...prev, ...uniqueNewFiles];
+        });
+    };
+
+    const startProcessing = async () => {
+        if (selectedFiles.length === 0) return;
         setIsProcessing(true);
         setLogs([{ type: 'log', message: 'Starting upload and processing...', timestamp: new Date().toLocaleTimeString() }]);
         setFinalResult(""); // Clear previous results to prevent duplication
 
         const formData = new FormData();
-        Array.from(filesToProcess).forEach(file => {
+        selectedFiles.forEach(file => {
             formData.append('files', file);
             // Note: webkitdirectory uploads relative paths, but standard File object usually just has name.
             // For flat merging, filename is enough.
@@ -122,26 +138,24 @@ export const SmartFileView: React.FC<SmartFileViewProps> = ({ files, cleaningMod
         document.body.removeChild(link);
     };
 
-    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files.length > 0) {
-            startProcessing(e.target.files);
-        }
+    const handleReset = () => {
+        setLogs([]);
+        setFinalResult("");
+        setSelectedFiles([]);
     };
 
     // Render Upload UI if no files are processing/processed yet
-    if ((!files || files.length === 0) && logs.length === 0 && !isProcessing) {
+    if (logs.length === 0 && !isProcessing && finalResult === "") {
         return (
             <div className="smart-file-view" style={{ padding: '20px', height: '100%', display: 'flex', flexDirection: 'column', gap: '20px' }}>
                 <div className="header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <h2>📂 智能文件处理 / 文本识别</h2>
-                    <button className="btn btn-secondary" onClick={onBack}>
-                        返回首页
-                    </button>
+                    {/* duplicate back button removed, main layout handles it */}
                 </div>
                 <div
                     className="upload-container"
                     style={{
-                        flex: 1,
+                        padding: '40px',
                         display: 'flex',
                         flexDirection: 'column',
                         justifyContent: 'center',
@@ -157,23 +171,23 @@ export const SmartFileView: React.FC<SmartFileViewProps> = ({ files, cleaningMod
                         e.preventDefault();
                         e.currentTarget.style.borderColor = '#444';
                         if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-                            startProcessing(e.dataTransfer.files);
+                            handleLocalFileSelect(e.dataTransfer.files);
                         }
                     }}
                 >
                     <div style={{ fontSize: '3em' }}>☁️</div>
-                    <p>拖放文件或文件夹到此处</p>
+                    <p>拖放文件或文件夹到此处添加</p>
                     <div style={{ display: 'flex', gap: '10px' }}>
                         <label className="btn btn-primary" style={{ cursor: 'pointer' }}>
-                            选择文件
-                            <input type="file" multiple style={{ display: 'none' }} onChange={handleFileSelect} />
+                            添加文件
+                            <input type="file" multiple style={{ display: 'none' }} onChange={(e) => { if (e.target.files) handleLocalFileSelect(e.target.files); e.target.value = ''; }} />
                         </label>
                         <label className="btn btn-secondary" style={{ cursor: 'pointer' }}>
-                            选择文件夹
+                            添加文件夹
                             <input
                                 type="file"
                                 style={{ display: 'none' }}
-                                onChange={handleFileSelect}
+                                onChange={(e) => { if (e.target.files) handleLocalFileSelect(e.target.files); e.target.value = ''; }}
                                 ref={(el) => {
                                     if (el) {
                                         el.setAttribute('webkitdirectory', '');
@@ -184,6 +198,23 @@ export const SmartFileView: React.FC<SmartFileViewProps> = ({ files, cleaningMod
                         </label>
                     </div>
                 </div>
+
+                {selectedFiles.length > 0 && (
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '10px', overflow: 'hidden' }}>
+                        <h3>已添加待处理的文件 ({selectedFiles.length})</h3>
+                        <div style={{ flex: 1, overflowY: 'auto', background: '#1e1e1e', padding: '10px', borderRadius: '8px' }}>
+                            <ul style={{ margin: 0, paddingLeft: '20px' }}>
+                                {selectedFiles.map((f, i) => (
+                                    <li key={i} style={{ color: '#ccc', marginBottom: '5px' }}>{f.name}</li>
+                                ))}
+                            </ul>
+                        </div>
+                        <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                            <button className="btn btn-secondary" onClick={() => setSelectedFiles([])}>清空列表</button>
+                            <button className="btn btn-primary" onClick={startProcessing}>开始处理</button>
+                        </div>
+                    </div>
+                )}
             </div>
         )
     }
@@ -191,9 +222,10 @@ export const SmartFileView: React.FC<SmartFileViewProps> = ({ files, cleaningMod
     return (
         <div className="smart-file-view" style={{ padding: '20px', height: '100%', display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <div className="header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h2>📂 智能文件处理 (Smart Agent)</h2>
-                <div style={{ fontSize: '0.9em', color: '#888' }}>
-                    Cleaning: {cleaningModelConfig?.provider || 'Default'} | OCR: Server Configured
+                <h2>📂 智能文件处理 / 文本识别</h2>
+                <div style={{ fontSize: '0.9em', color: '#888', display: 'flex', alignItems: 'center', gap: '15px' }}>
+                    <span>Cleaning: {cleaningModelConfig?.provider || 'Default'} | OCR: Server Configured</span>
+                    {!isProcessing && <button className="btn btn-secondary" onClick={handleReset}>继续添加 / 重新开始</button>}
                 </div>
             </div>
 

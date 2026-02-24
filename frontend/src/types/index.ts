@@ -48,7 +48,7 @@ export type NoteChatMessage = {
     isComplete?: boolean;
 };
 
-export type ModelProvider = 'free' | 'gemini' | 'openai' | 'deepseek' | 'ali' | 'depOCR' | 'doubao' | 'anything';
+export type ModelProvider = 'free' | 'gemini' | 'openai' | 'deepseek' | 'ali' | 'depOCR' | 'doubao' | 'anything' | 'siliconflow';
 
 export type ChatMessage = {
     role: 'user' | 'model';

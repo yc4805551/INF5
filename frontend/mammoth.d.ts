@@ -33,6 +33,9 @@ interface ImportMetaEnv {
   readonly VITE_FREE_ENDPOINT?: string;
   readonly VITE_FREE_TARGET_URL?: string;
   readonly VITE_FREE_MODEL?: string;
+  readonly VITE_SILICONFLOW_API_KEY?: string;
+  readonly VITE_SILICONFLOW_ENDPOINT?: string;
+  readonly VITE_SILICONFLOW_MODEL?: string;
 }
 
 interface ImportMeta {

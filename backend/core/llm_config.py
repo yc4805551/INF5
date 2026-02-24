@@ -72,6 +72,11 @@ class LLMConfigManager:
                     "api_key": "",
                     "endpoint": "https://dashscope.aliyuncs.com/compatible-mode/v1",
                     "model": "qwen-plus"
+                },
+                "siliconflow": {
+                    "api_key": "",
+                    "endpoint": "https://api.siliconflow.cn/v1/chat/completions",
+                    "model": "PaddlePaddle/PaddleOCR-VL-1.5"
                 }
             }
         }
@@ -102,7 +107,8 @@ class LLMConfigManager:
             "free": ("FREE",),
             "doubao": ("DOUBAO",),
             "depocr": ("DEPOCR",),
-            "depOCR": ("DEPOCR",)
+            "depOCR": ("DEPOCR",),
+            "siliconflow": ("SILICONFLOW",)
         }
         
         env_prefixes = env_prefix_map.get(provider, ())

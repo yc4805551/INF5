@@ -55,6 +55,11 @@ export const frontendApiConfig: Record<string, {
         endpoint: cleanEnv(import.meta.env?.VITE_DOUBAO_ENDPOINT),
         model: cleanEnv(import.meta.env?.VITE_DOUBAO_MODEL),
     },
+    siliconflow: {
+        apiKey: cleanEnv(import.meta.env?.VITE_SILICONFLOW_API_KEY),
+        endpoint: cleanEnv(import.meta.env?.VITE_SILICONFLOW_ENDPOINT) || 'https://api.siliconflow.cn/v1/chat/completions',
+        model: cleanEnv(import.meta.env?.VITE_SILICONFLOW_MODEL) || 'PaddlePaddle/PaddleOCR-VL-1.5',
+    }
 };
 
 export const MODEL_DISPLAY_NAMES: Record<ModelProvider, string> = {
@@ -65,7 +70,8 @@ export const MODEL_DISPLAY_NAMES: Record<ModelProvider, string> = {
     depOCR: frontendApiConfig.depOCR.model || 'DeepSeek-OCR',
     doubao: frontendApiConfig.doubao.model || '豆包',
     free: frontendApiConfig.free.model || 'FREE',
-    anything: 'AnythingLLM'
+    anything: 'AnythingLLM',
+    siliconflow: 'SiliconFlow (PaddleOCR)'
 };
 
 export const getAvailableModels = (): ModelProvider[] => {

@@ -24,27 +24,23 @@ class SmartFileAgent:
         self.merged_buffer = []
 
         # Resolve OCR Configuration
-        # Priority 1: Direct OCR_* Env Overrides (Dedicated Mode)
-        if OCR_ENDPOINT:
+        self.ocr_provider = ocr_provider or OCR_MODEL_PROVIDER
+        
+        from core.llm_config import get_llm_config_manager
+        cm = get_llm_config_manager()
+        provider_config = cm.get_provider_config(self.ocr_provider)
+
+        # Priority 1: Direct OCR_* Env Overrides (Dedicated Mode) 
+        # Only use these overrides if they are explicitly configured AND we are using the default/env provider
+        if OCR_ENDPOINT and self.ocr_provider == OCR_MODEL_PROVIDER and getattr(self, 'use_legacy_ocr', False):
              self.ocr_api_key = OCR_API_KEY
              self.ocr_model_name = OCR_MODEL_NAME
              self.ocr_endpoint = OCR_ENDPOINT
              self.ocr_provider = "custom"
         else:
              # Priority 2: Provider Lookup (via LLMConfigManager)
-             self.ocr_provider = ocr_provider or OCR_MODEL_PROVIDER
-             
-             from core.llm_config import get_llm_config_manager
-             cm = get_llm_config_manager()
-             provider_config = cm.get_provider_config(self.ocr_provider)
-
-             if self.ocr_provider == OCR_MODEL_PROVIDER:
-                 self.ocr_api_key = OCR_API_KEY or provider_config.get("apiKey")
-                 self.ocr_model_name = OCR_MODEL_NAME or provider_config.get("model")
-             else:
-                 self.ocr_api_key = provider_config.get("apiKey")
-                 self.ocr_model_name = provider_config.get("model")
-             
+             self.ocr_api_key = provider_config.get("apiKey")
+             self.ocr_model_name = provider_config.get("model")
              self.ocr_endpoint = provider_config.get("endpoint")
 
         # Initialize OCR Engine independently
@@ -207,7 +203,13 @@ class SmartFileAgent:
                 import base64
                 b64_img = "data:image/png;base64," + base64.b64encode(img_data).decode('utf-8')
                 
-                prompt = "Please OCR this image. Output strictly in Markdown format. If there are tables, preserve them as Markdown tables. Do not add introductory text."
+                prompt = (
+                    "你是一个专业的中文文档和表格排版专家。请将图片中的内容精准地转换为 Markdown 格式。\n"
+                    "要求：\n"
+                    "1. 请修正可能由于扫描造成的错别字或折叠。\n"
+                    "2. 如果图片中包含表格，请务必使用标准的 Markdown 表格语法 ('|---|') 进行严谨的还原，不要漏掉合并单元格或表头。\n"
+                    "3. 不要输出任何开场白或解释文字，直接输出转换后的 Markdown。"
+                )
                 
                 vision_response = self._call_vision_api(b64_img, prompt)
                 full_ocr_text.append(vision_response)
@@ -221,7 +223,13 @@ class SmartFileAgent:
         try:
             import base64
             b64_img = "data:image/png;base64," + base64.b64encode(file_bytes).decode('utf-8')
-            prompt = "Transcribe this image to Markdown."
+            prompt = (
+                "你是一个专业的中文文档和表格排版专家。请将图片中的内容精准地转换为 Markdown 格式。\n"
+                "要求：\n"
+                "1. 请修正可能由于扫描造成的错别字或折叠。\n"
+                "2. 如果图片中包含表格，请务必使用标准的 Markdown 表格语法 ('|---|') 进行严谨的还原，不要漏掉合并单元格或表头。\n"
+                "3. 不要输出任何开场白或解释文字，直接输出转换后的 Markdown。"
+            )
             return self._call_vision_api(b64_img, prompt)
         except Exception as e:
             return f"[Image Processing Error: {str(e)}]"
