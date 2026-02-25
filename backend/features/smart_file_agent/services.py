@@ -216,7 +216,6 @@ class SmartFileAgent:
                     )
                     
                     vision_response = self._slice_and_ocr_image(img_data, prompt)
-                    vision_response = self._scrub_ghosts(vision_response)
                     full_ocr_text.append(vision_response)
                 else:
                     full_ocr_text.append(page_text)
@@ -228,10 +227,14 @@ class SmartFileAgent:
             yield {"text": f"[PDF Extract Error: {e}]"}
 
     def _scrub_ghosts(self, text):
-        ghost_signatures = ["[UNREADABLE]", "畜牧兽医", "<|LOC_", "omoData", "阴夜雨", "重夜雨", "لن قم المو", "Employee"]
+        # "[UNREADABLE]" is deliberately removed from this list because it's our requested output for 
+        # completely dead spaces. It shouldn't trigger a verbose error message replacing valid text.
+        ghost_signatures = ["畜牧兽医", "<|LOC_", "omoData", "阴夜雨", "重夜雨", "لن قم المو", "Employee"]
         if any(ghost in text for ghost in ghost_signatures):
-            return "【系统提醒】本部分可能由于分辨率过低、全白页面或隐藏乱码图层，导致识别引擎输出了无意义字符，已被系统自动屏蔽。"
-        return text
+            return "" # Silently drop the hallucinated text
+        
+        # Strip out localized [UNREADABLE] markers so they don't clutter the final markdown
+        return text.replace("[UNREADABLE]", "").strip()
     def _is_image_mostly_blank(self, pil_img, min_pixel_threshold=240, max_color_diff=15):
         try:
             from PIL import Image, ImageStat
@@ -285,7 +288,7 @@ class SmartFileAgent:
                 buffered = io.BytesIO()
                 img.save(buffered, format="JPEG", quality=85)
                 b64_img = "data:image/jpeg;base64," + base64.b64encode(buffered.getvalue()).decode('utf-8')
-                return self._call_vision_api(b64_img, prompt)
+                return self._scrub_ghosts(self._call_vision_api(b64_img, prompt))
                 
             # Image is too large. Slice it horizontally to preserve resolution.
             num_slices = (width * height // max_pixels) + 1
@@ -314,7 +317,9 @@ class SmartFileAgent:
                     slice_prompt += f"\n\n（注意：这是超长图的第 {i+1}/{num_slices} 部分截图，请直接输出图里的内容文本，由于可能截断了部分图形不要擅自发散废话。如果由于切片导致本片完全是空白或者乱码，请仅输出 [UNREADABLE]）"
                 
                 response = self._call_vision_api(b64_img, slice_prompt)
-                full_text.append(response)
+                scrubbed_response = self._scrub_ghosts(response)
+                if scrubbed_response:
+                    full_text.append(scrubbed_response)
                 
             return "\n\n".join(full_text)
         except Exception as e:
@@ -323,7 +328,7 @@ class SmartFileAgent:
             logging.error(f"Image slice processing error: {e}")
             # Fallback to direct call, hoping for the best
             b64_img = "data:image/png;base64," + base64.b64encode(img_bytes).decode('utf-8')
-            return self._call_vision_api(b64_img, prompt)
+            return self._scrub_ghosts(self._call_vision_api(b64_img, prompt))
 
 
 
@@ -337,7 +342,7 @@ class SmartFileAgent:
                 "3. 不要输出任何开场白或解释文字，直接输出转换后的 Markdown。\n"
                 "4. 如果图片内容完全无法辨认、或者包含大量无意义的乱码和符号，请直接输出 '[UNREADABLE]'，不要强行编造或输出乱码。"
             )
-            return self._scrub_ghosts(self._slice_and_ocr_image(file_bytes, prompt))
+            return self._slice_and_ocr_image(file_bytes, prompt)
         except Exception as e:
             return f"[Image Processing Error: {str(e)}]"
 
