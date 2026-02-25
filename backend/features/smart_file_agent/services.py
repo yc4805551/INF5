@@ -96,10 +96,6 @@ class SmartFileAgent:
                     processed_text = f"[Skipped unsupported file: {file_name}]"
 
                 # 3. Format and Append
-                ghost_signatures = ["[UNREADABLE]", "畜牧兽医", "<|LOC_", "omoData", "阴夜雨", "重夜雨"]
-                if any(ghost in processed_text for ghost in ghost_signatures):
-                    processed_text = f"【系统提醒】文档内容可能由于分辨率过低、全白页面或隐藏乱码图层，导致识别引擎输出了无意义字符，已被系统自动屏蔽忽略。"
-                
                 formatted_section = f"\n\n{'='*20}\n文件名: {file_name}\n{'='*20}\n\n{processed_text}"
                 self.merged_buffer.append(formatted_section)
                 
@@ -220,6 +216,7 @@ class SmartFileAgent:
                     )
                     
                     vision_response = self._slice_and_ocr_image(img_data, prompt)
+                    vision_response = self._scrub_ghosts(vision_response)
                     full_ocr_text.append(vision_response)
                 else:
                     full_ocr_text.append(page_text)
@@ -229,6 +226,12 @@ class SmartFileAgent:
         except Exception as e:
             logger.error(f"PDF Error: {e}")
             yield {"text": f"[PDF Extract Error: {e}]"}
+
+    def _scrub_ghosts(self, text):
+        ghost_signatures = ["[UNREADABLE]", "畜牧兽医", "<|LOC_", "omoData", "阴夜雨", "重夜雨", "لن قم المو", "Employee"]
+        if any(ghost in text for ghost in ghost_signatures):
+            return "【系统提醒】本部分可能由于分辨率过低、全白页面或隐藏乱码图层，导致识别引擎输出了无意义字符，已被系统自动屏蔽。"
+        return text
     def _is_image_mostly_blank(self, pil_img, min_pixel_threshold=240, max_color_diff=15):
         try:
             from PIL import Image, ImageStat
@@ -334,7 +337,7 @@ class SmartFileAgent:
                 "3. 不要输出任何开场白或解释文字，直接输出转换后的 Markdown。\n"
                 "4. 如果图片内容完全无法辨认、或者包含大量无意义的乱码和符号，请直接输出 '[UNREADABLE]'，不要强行编造或输出乱码。"
             )
-            return self._slice_and_ocr_image(file_bytes, prompt)
+            return self._scrub_ghosts(self._slice_and_ocr_image(file_bytes, prompt))
         except Exception as e:
             return f"[Image Processing Error: {str(e)}]"
 
