@@ -377,8 +377,10 @@ class SmartFileAgent:
                 }
             ],
             "max_tokens": 4096,
-            "temperature": 0.0,
-            "top_p": 0.1
+            "temperature": 0.2, # Slightly > 0 to prevent infinite loops on degenerate inputs
+            "top_p": 0.9,
+            "presence_penalty": 0.5, # Prevent endless repetition of characters like `}}}}` or `1.1.`
+            "frequency_penalty": 0.5
         }
         
         # Use pre-resolved endpoint
