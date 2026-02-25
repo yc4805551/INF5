@@ -191,7 +191,7 @@ class SmartFileAgent:
             logger.error(f"PDF Error: {e}")
             return "" 
 
-    def _resize_image_for_vision(self, img_bytes, max_dimension=1536):
+    def _slice_and_ocr_image(self, img_bytes, prompt, max_pixels=2000000, max_width=2000):
         try:
             from PIL import Image
             import io
@@ -201,24 +201,55 @@ class SmartFileAgent:
             if img.mode != 'RGB':
                 img = img.convert('RGB')
                 
-            width, height = img.size
-            if width > max_dimension or height > max_dimension:
-                if width > height:
-                    new_width = max_dimension
-                    new_height = int(max_dimension * (height / width))
-                else:
-                    new_height = max_dimension
-                    new_width = int(max_dimension * (width / height))
+            orig_width, orig_height = img.size
+            # Cap the maximum width to 2000 pixels (very high res) to avoid excessive slice counts on 4K/8K scans
+            if orig_width > max_width:
+                new_width = max_width
+                new_height = int((max_width / orig_width) * orig_height)
                 img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
                 
-            buffered = io.BytesIO()
-            img.save(buffered, format="JPEG", quality=85)
-            return "data:image/jpeg;base64," + base64.b64encode(buffered.getvalue()).decode('utf-8')
+            width, height = img.size
+            if width * height <= max_pixels:
+                # Image is small enough, process as usual but convert to JPEG to save bandwidth
+                buffered = io.BytesIO()
+                img.save(buffered, format="JPEG", quality=85)
+                b64_img = "data:image/jpeg;base64," + base64.b64encode(buffered.getvalue()).decode('utf-8')
+                return self._call_vision_api(b64_img, prompt)
+                
+            # Image is too large. Slice it horizontally to preserve resolution.
+            num_slices = (width * height // max_pixels) + 1
+            slice_height = height // num_slices
+            
+            full_text = []
+            for i in range(num_slices):
+                top = i * slice_height
+                bottom = height if i == num_slices - 1 else (i + 1) * slice_height
+                
+                # Add a 60-pixel overlap to avoid cutting text lines in half completely
+                overlap = 60 if i > 0 else 0
+                box = (0, max(0, top - overlap), width, bottom)
+                
+                slice_img = img.crop(box)
+                
+                buffered = io.BytesIO()
+                slice_img.save(buffered, format="JPEG", quality=85)
+                b64_img = "data:image/jpeg;base64," + base64.b64encode(buffered.getvalue()).decode('utf-8')
+                
+                slice_prompt = prompt
+                if num_slices > 1:
+                    slice_prompt += f"\n\n（注意：这是超长图的第 {i+1}/{num_slices} 部分截图，请直接输出图里的内容文本，由于可能截断了部分图形不要擅自发散废话。）"
+                
+                response = self._call_vision_api(b64_img, slice_prompt)
+                full_text.append(response)
+                
+            return "\n\n".join(full_text)
         except Exception as e:
             import base64
             import logging
-            logging.error(f"Image resize error: {e}")
-            return "data:image/png;base64," + base64.b64encode(img_bytes).decode('utf-8')
+            logging.error(f"Image slice processing error: {e}")
+            # Fallback to direct call, hoping for the best
+            b64_img = "data:image/png;base64," + base64.b64encode(img_bytes).decode('utf-8')
+            return self._call_vision_api(b64_img, prompt)
 
     def _process_pdf_as_images(self, file_bytes):
         try:
@@ -226,11 +257,9 @@ class SmartFileAgent:
             full_ocr_text = []
             
             for i, page in enumerate(doc):
-                # We can also limit DPI here by rendering with a lower matrix, but `_resize` handles it strictly.
+                # We extract at standard resolution, if it's too big, slicing will handle it.
                 pix = page.get_pixmap()
                 img_data = pix.tobytes("png")
-                
-                b64_img = self._resize_image_for_vision(img_data)
                 
                 prompt = (
                     "你是一个专业的中文文档和表格排版专家。请将图片中的内容精准地转换为 Markdown 格式。\n"
@@ -240,7 +269,7 @@ class SmartFileAgent:
                     "3. 不要输出任何开场白或解释文字，直接输出转换后的 Markdown。"
                 )
                 
-                vision_response = self._call_vision_api(b64_img, prompt)
+                vision_response = self._slice_and_ocr_image(img_data, prompt)
                 full_ocr_text.append(vision_response)
             
             doc.close()
@@ -250,7 +279,6 @@ class SmartFileAgent:
 
     def _process_image(self, file_bytes):
         try:
-            b64_img = self._resize_image_for_vision(file_bytes)
             prompt = (
                 "你是一个专业的中文文档和表格排版专家。请将图片中的内容精准地转换为 Markdown 格式。\n"
                 "要求：\n"
@@ -258,7 +286,7 @@ class SmartFileAgent:
                 "2. 如果图片中包含表格，请务必使用标准的 Markdown 表格语法 ('|---|') 进行严谨的还原，不要漏掉合并单元格或表头。\n"
                 "3. 不要输出任何开场白或解释文字，直接输出转换后的 Markdown。"
             )
-            return self._call_vision_api(b64_img, prompt)
+            return self._slice_and_ocr_image(file_bytes, prompt)
         except Exception as e:
             return f"[Image Processing Error: {str(e)}]"
 
