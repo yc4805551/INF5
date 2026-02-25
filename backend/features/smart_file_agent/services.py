@@ -97,6 +97,9 @@ class SmartFileAgent:
                     processed_text = f"[Skipped unsupported file: {file_name}]"
 
                 # 3. Format and Append
+                if "[UNREADABLE]" in processed_text or "畜牧兽医" in processed_text:
+                    processed_text = f"【系统提醒】文档内容可能由于分辨率问题或图片无法解析，包含大量无意义的乱码或符号，已被系统自动忽略。"
+                
                 formatted_section = f"\n\n{'='*20}\n文件名: {file_name}\n{'='*20}\n\n{processed_text}"
                 self.merged_buffer.append(formatted_section)
                 
@@ -237,7 +240,7 @@ class SmartFileAgent:
                 
                 slice_prompt = prompt
                 if num_slices > 1:
-                    slice_prompt += f"\n\n（注意：这是超长图的第 {i+1}/{num_slices} 部分截图，请直接输出图里的内容文本，由于可能截断了部分图形不要擅自发散废话。）"
+                    slice_prompt += f"\n\n（注意：这是超长图的第 {i+1}/{num_slices} 部分截图，请直接输出图里的内容文本，由于可能截断了部分图形不要擅自发散废话。如果由于切片导致本片完全是空白或者乱码，请仅输出 [UNREADABLE]）"
                 
                 response = self._call_vision_api(b64_img, slice_prompt)
                 full_text.append(response)
@@ -266,7 +269,8 @@ class SmartFileAgent:
                     "要求：\n"
                     "1. 请修正可能由于扫描造成的错别字或折叠。\n"
                     "2. 如果图片中包含表格，请务必使用标准的 Markdown 表格语法 ('|---|') 进行严谨的还原，不要漏掉合并单元格或表头。\n"
-                    "3. 不要输出任何开场白或解释文字，直接输出转换后的 Markdown。"
+                    "3. 不要输出任何开场白或解释文字，直接输出转换后的 Markdown。\n"
+                    "4. 如果图片内容完全无法辨认、或者包含大量无意义的乱码和符号，请直接输出 '[UNREADABLE]'，不要强行编造或输出乱码。"
                 )
                 
                 vision_response = self._slice_and_ocr_image(img_data, prompt)
@@ -284,7 +288,8 @@ class SmartFileAgent:
                 "要求：\n"
                 "1. 请修正可能由于扫描造成的错别字或折叠。\n"
                 "2. 如果图片中包含表格，请务必使用标准的 Markdown 表格语法 ('|---|') 进行严谨的还原，不要漏掉合并单元格或表头。\n"
-                "3. 不要输出任何开场白或解释文字，直接输出转换后的 Markdown。"
+                "3. 不要输出任何开场白或解释文字，直接输出转换后的 Markdown。\n"
+                "4. 如果图片内容完全无法辨认、或者包含大量无意义的乱码和符号，请直接输出 '[UNREADABLE]'，不要强行编造或输出乱码。"
             )
             return self._slice_and_ocr_image(file_bytes, prompt)
         except Exception as e:
