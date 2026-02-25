@@ -231,10 +231,16 @@ class SmartFileAgent:
             yield {"text": f"[PDF Extract Error: {e}]"}
     def _is_image_mostly_blank(self, pil_img, min_pixel_threshold=240, max_color_diff=15):
         try:
-            from PIL import ImageStat
+            from PIL import Image, ImageStat
             # Convert to grayscale to check brightness and variance
             gray = pil_img.convert('L')
-            stat = ImageStat.Stat(gray)
+            
+            # Low-pass filter: resize to a tiny thumbnail using Bilinear interpolation.
+            # This completely annihilates microscopic scanner dust/noise (averaging it out to white)
+            # but preserves the larger structural gray bands created by actual text.
+            tiny = gray.resize((100, 100), Image.Resampling.BILINEAR)
+            
+            stat = ImageStat.Stat(tiny)
             min_val, max_val = stat.extrema[0]
             
             # If the darkest pixel is very bright white/gray (e.g. >= 240)
