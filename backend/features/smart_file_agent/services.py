@@ -227,11 +227,18 @@ class SmartFileAgent:
             yield {"text": f"[PDF Extract Error: {e}]"}
 
     def _scrub_ghosts(self, text):
+        import re
         # "[UNREADABLE]" is deliberately removed from this list because it's our requested output for 
         # completely dead spaces. It shouldn't trigger a verbose error message replacing valid text.
         ghost_signatures = ["畜牧兽医", "<|LOC_", "omoData", "阴夜雨", "重夜雨", "لن قم المو", "Employee"]
         if any(ghost in text for ghost in ghost_signatures):
             return "" # Silently drop the hallucinated text
+        
+        # Scrub generative VLM token loops (e.g. }}}}}}} or 1.1.1.1.1.)
+        text = re.sub(r'(\}\s*){5,}', '', text)
+        text = re.sub(r'(\{\s*){5,}', '', text)
+        text = re.sub(r'(1\.\s*){5,}', '', text)
+        text = re.sub(r'(-\s*){10,}', '', text)
         
         # Strip out localized [UNREADABLE] markers so they don't clutter the final markdown
         return text.replace("[UNREADABLE]", "").strip()
@@ -262,7 +269,7 @@ class SmartFileAgent:
         except Exception:
             return False
 
-    def _slice_and_ocr_image(self, img_bytes, prompt, max_pixels=2000000, max_width=1600):
+    def _slice_and_ocr_image(self, img_bytes, prompt, max_pixels=4000000, max_width=1600):
         try:
             from PIL import Image
             import io
