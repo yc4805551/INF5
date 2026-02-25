@@ -78,12 +78,16 @@ class SmartFileAgent:
                     processed_text = self._process_word(file_bytes)
                 elif ext == '.pdf':
                      processed_text = self._process_pdf(file_content) # PyMuPDF needs bytes or filename, not BytesIO generally (but fitz.open(stream=...) works)
+                     # PyMuPDF often extracts garbage characters (e.g. invalid Unicode boxes) if the PDF encoding is stripped or scanned
+                     # Use a heuristic to detect gibberish: if < 50 chars, OR valid Chinese/Alphanumeric makes up less than 20% of non-whitespace
+                     import re
+                     non_ws_text = re.sub(r'\s+', '', processed_text)
+                     valid_chars = re.findall(r'[\u4e00-\u9fa5A-Za-z0-9]', non_ws_text)
+                     is_gibberish = len(non_ws_text) == 0 or (len(valid_chars) / len(non_ws_text)) < 0.2
                      
-                     # If text is too short, process as images (OCR)
-                     if len(processed_text) < 50:
-                         yield json.dumps({"type": "log", "message": f"  - [{file_name}] text content too short, switching to OCR..."}) + "\n"
+                     if len(processed_text) < 50 or is_gibberish:
+                         yield json.dumps({"type": "log", "message": f"  - [{file_name}] text content garbled or too short, switching to OCR..."}) + "\n"
                          processed_text = self._process_pdf_as_images(file_content)
-
                 elif ext in ['.png', '.jpg', '.jpeg', '.bmp', '.tiff']:
                      yield json.dumps({"type": "log", "message": f"  - [{file_name}] Identifying image with {self.ocr_model_name}..."}) + "\n"
                      processed_text = self._process_image(file_content)
@@ -341,7 +345,7 @@ class SmartFileAgent:
              endpoint = endpoint.rstrip("/") + "/chat/completions"
 
         try:
-            response = requests.post(endpoint, headers=headers, json=payload, timeout=60)
+            response = requests.post(endpoint, headers=headers, json=payload, timeout=180)
             if response.status_code == 200:
                 res_json = response.json()
                 return res_json['choices'][0]['message']['content']
