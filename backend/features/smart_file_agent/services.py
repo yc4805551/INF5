@@ -229,6 +229,26 @@ class SmartFileAgent:
         except Exception as e:
             logger.error(f"PDF Error: {e}")
             yield {"text": f"[PDF Extract Error: {e}]"}
+    def _is_image_mostly_blank(self, pil_img, min_pixel_threshold=240, max_color_diff=15):
+        try:
+            from PIL import ImageStat
+            # Convert to grayscale to check brightness and variance
+            gray = pil_img.convert('L')
+            stat = ImageStat.Stat(gray)
+            min_val, max_val = stat.extrema[0]
+            
+            # If the darkest pixel is very bright white/gray (e.g. >= 240)
+            if min_val >= min_pixel_threshold:
+                return True
+                
+            # Or if there is almost no contrast (difference between darkest and lightest pixel is tiny)
+            # This catches solid gray/black/colored boxes that have no text or features
+            if (max_val - min_val) < max_color_diff:
+                return True
+                
+            return False
+        except Exception:
+            return False
 
     def _slice_and_ocr_image(self, img_bytes, prompt, max_pixels=2000000, max_width=1600):
         try:
@@ -249,6 +269,9 @@ class SmartFileAgent:
                 
             width, height = img.size
             if width * height <= max_pixels:
+                if self._is_image_mostly_blank(img):
+                    return "" # Skip entirely blank images before OCR to prevent hallucinations
+                
                 # Image is small enough, process as usual but convert to JPEG to save bandwidth
                 buffered = io.BytesIO()
                 img.save(buffered, format="JPEG", quality=85)
@@ -269,6 +292,9 @@ class SmartFileAgent:
                 box = (0, max(0, top - overlap), width, bottom)
                 
                 slice_img = img.crop(box)
+                
+                if self._is_image_mostly_blank(slice_img):
+                    continue # Skip this slice if it's completely blank
                 
                 buffered = io.BytesIO()
                 slice_img.save(buffered, format="JPEG", quality=85)
