@@ -284,10 +284,11 @@ class SmartFileAgent:
                 if self._is_image_mostly_blank(img):
                     return "" # Skip entirely blank images before OCR to prevent hallucinations
                 
-                # Image is small enough, process as usual but convert to JPEG to save bandwidth
+                # Image is small enough, process as usual but convert to PNG to preserve sharp text edges
+                # (Generative VLMs often hallucinate on JPEG compression artifacts around text)
                 buffered = io.BytesIO()
-                img.save(buffered, format="JPEG", quality=85)
-                b64_img = "data:image/jpeg;base64," + base64.b64encode(buffered.getvalue()).decode('utf-8')
+                img.save(buffered, format="PNG")
+                b64_img = "data:image/png;base64," + base64.b64encode(buffered.getvalue()).decode('utf-8')
                 return self._scrub_ghosts(self._call_vision_api(b64_img, prompt))
                 
             # Image is too large. Slice it horizontally to preserve resolution.
@@ -309,8 +310,8 @@ class SmartFileAgent:
                     continue # Skip this slice if it's completely blank
                 
                 buffered = io.BytesIO()
-                slice_img.save(buffered, format="JPEG", quality=85)
-                b64_img = "data:image/jpeg;base64," + base64.b64encode(buffered.getvalue()).decode('utf-8')
+                slice_img.save(buffered, format="PNG")
+                b64_img = "data:image/png;base64," + base64.b64encode(buffered.getvalue()).decode('utf-8')
                 
                 slice_prompt = prompt
                 if num_slices > 1:
@@ -375,7 +376,9 @@ class SmartFileAgent:
                     "content": content_payload
                 }
             ],
-            "max_tokens": 4096
+            "max_tokens": 4096,
+            "temperature": 0.0,
+            "top_p": 0.1
         }
         
         # Use pre-resolved endpoint
