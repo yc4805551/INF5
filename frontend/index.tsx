@@ -1583,7 +1583,7 @@ const App = () => {
     const [isThoughtsModalOpen, setIsThoughtsModalOpen] = useState(false);
 
     const [selectedModel, setSelectedModel] = useState<ModelProvider>('free');
-    const [selectedOcrModel, setSelectedOcrModel] = useState<ModelProvider>('deepseek');
+    const [selectedOcrModel, setSelectedOcrModel] = useState<ModelProvider>('siliconflow');
     const [executionMode, setExecutionMode] = useState<ExecutionMode>('backend');
 
     const [anythingWorkspaces, setAnythingWorkspaces] = useState<KnowledgeBase[]>([]);
