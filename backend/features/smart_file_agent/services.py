@@ -83,7 +83,16 @@ class SmartFileAgent:
                      import re
                      non_ws_text = re.sub(r'\s+', '', processed_text)
                      valid_chars = re.findall(r'[\u4e00-\u9fa5A-Za-z0-9]', non_ws_text)
-                     is_gibberish = len(non_ws_text) == 0 or (len(valid_chars) / len(non_ws_text)) < 0.2
+                     chinese_chars = re.findall(r'[\u4e00-\u9fa5]', non_ws_text)
+                     
+                     is_gibberish = False
+                     if len(non_ws_text) > 0:
+                         # Gibberish if it's mostly random symbols
+                         if (len(valid_chars) / len(non_ws_text)) < 0.2:
+                             is_gibberish = True
+                         # Or if it purportedly extracted text from a Chinese doc but hit corrupt alphanumeric font maps
+                         elif len(chinese_chars) < 5 and len(valid_chars) > 50:
+                             is_gibberish = True
                      
                      if len(processed_text) < 50 or is_gibberish:
                          yield json.dumps({"type": "log", "message": f"  - [{file_name}] text content garbled or too short, switching to OCR..."}) + "\n"
@@ -101,8 +110,9 @@ class SmartFileAgent:
                     processed_text = f"[Skipped unsupported file: {file_name}]"
 
                 # 3. Format and Append
-                if "[UNREADABLE]" in processed_text or "畜牧兽医" in processed_text:
-                    processed_text = f"【系统提醒】文档内容可能由于分辨率问题或图片无法解析，包含大量无意义的乱码或符号，已被系统自动忽略。"
+                ghost_signatures = ["[UNREADABLE]", "畜牧兽医", "<|LOC_", "omoData", "阴夜雨", "重夜雨"]
+                if any(ghost in processed_text for ghost in ghost_signatures):
+                    processed_text = f"【系统提醒】文档内容可能由于分辨率过低、全白页面或隐藏乱码图层，导致识别引擎输出了无意义字符，已被系统自动屏蔽忽略。"
                 
                 formatted_section = f"\n\n{'='*20}\n文件名: {file_name}\n{'='*20}\n\n{processed_text}"
                 self.merged_buffer.append(formatted_section)
