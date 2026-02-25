@@ -245,20 +245,29 @@ class SmartFileAgent:
             "Authorization": f"Bearer {self.ocr_api_key}"
         }
         
+        content_payload = []
+        if self.ocr_provider == "siliconflow" or "deepseek" in self.ocr_model_name.lower():
+            # Many SiliconFlow VL models (like DeepSeek-VL or PaddleOCR-VL) don't strictly support the array `image_url` object format
+            # They expect a single string containing '<image>\n{base64}\n{text}'
+            content_payload = f"<image>\n{b64_image}\n{prompt}"
+        else:
+            # Standard OpenAI Vision format
+            content_payload = [
+                {"type": "text", "text": prompt},
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": b64_image
+                    }
+                }
+            ]
+
         payload = {
             "model": self.ocr_model_name,
             "messages": [
                 {
                     "role": "user",
-                    "content": [
-                        {"type": "text", "text": prompt},
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": b64_image
-                            }
-                        }
-                    ]
+                    "content": content_payload
                 }
             ],
             "max_tokens": 4096
