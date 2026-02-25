@@ -77,26 +77,12 @@ class SmartFileAgent:
                 elif ext == '.docx':
                     processed_text = self._process_word(file_bytes)
                 elif ext == '.pdf':
-                     processed_text = self._process_pdf(file_content) # PyMuPDF needs bytes or filename, not BytesIO generally (but fitz.open(stream=...) works)
-                     # PyMuPDF often extracts garbage characters (e.g. invalid Unicode boxes) if the PDF encoding is stripped or scanned
-                     # Use a heuristic to detect gibberish: if < 50 chars, OR valid Chinese/Alphanumeric makes up less than 20% of non-whitespace
-                     import re
-                     non_ws_text = re.sub(r'\s+', '', processed_text)
-                     valid_chars = re.findall(r'[\u4e00-\u9fa5A-Za-z0-9]', non_ws_text)
-                     chinese_chars = re.findall(r'[\u4e00-\u9fa5]', non_ws_text)
-                     
-                     is_gibberish = False
-                     if len(non_ws_text) > 0:
-                         # Gibberish if it's mostly random symbols
-                         if (len(valid_chars) / len(non_ws_text)) < 0.2:
-                             is_gibberish = True
-                         # Or if it purportedly extracted text from a Chinese doc but hit corrupt alphanumeric font maps
-                         elif len(chinese_chars) < 5 and len(valid_chars) > 50:
-                             is_gibberish = True
-                     
-                     if len(processed_text) < 50 or is_gibberish:
-                         yield json.dumps({"type": "log", "message": f"  - [{file_name}] text content garbled or too short, switching to OCR..."}) + "\n"
-                         processed_text = self._process_pdf_as_images(file_content)
+                     processed_text = ""
+                     for update in self._process_pdf_smart(file_content, file_name):
+                         if isinstance(update, dict):
+                             processed_text = update.get("text", "")
+                         else:
+                             yield update
                 elif ext in ['.png', '.jpg', '.jpeg', '.bmp', '.tiff']:
                      yield json.dumps({"type": "log", "message": f"  - [{file_name}] Identifying image with {self.ocr_model_name}..."}) + "\n"
                      processed_text = self._process_image(file_content)
@@ -195,20 +181,56 @@ class SmartFileAgent:
         except Exception as e:
             return f"[Word Error: {str(e)}]"
 
-    def _process_pdf(self, file_bytes):
+    def _process_pdf_smart(self, file_bytes, file_name):
         try:
-            # fitz.open(stream=..., filetype="pdf")
+            import fitz
+            import re
+            
             doc = fitz.open(stream=file_bytes, filetype="pdf")
-            text = ""
-            for page in doc:
-                text += page.get_text()
+            full_ocr_text = []
+            
+            for i, page in enumerate(doc):
+                page_text = page.get_text()
+                
+                # Heuristic to detect gibberish per page
+                non_ws_text = re.sub(r'\s+', '', page_text)
+                valid_chars = re.findall(r'[\u4e00-\u9fa5A-Za-z0-9]', non_ws_text)
+                chinese_chars = re.findall(r'[\u4e00-\u9fa5]', non_ws_text)
+                
+                is_gibberish = False
+                if len(non_ws_text) > 0:
+                    if (len(valid_chars) / len(non_ws_text)) < 0.2:
+                        is_gibberish = True
+                    elif len(chinese_chars) < 5 and len(valid_chars) > 50:
+                        is_gibberish = True
+                
+                if len(page_text) < 20 or is_gibberish:
+                    yield json.dumps({"type": "log", "message": f"  - [{file_name}] 第 {i+1} 页为扫描件或乱码，启动 OCR 引擎..."}) + "\n"
+                    # We extract at standard resolution, if it's too big, slicing will handle it.
+                    pix = page.get_pixmap()
+                    img_data = pix.tobytes("png")
+                    
+                    prompt = (
+                        "你是一个专业的中文文档和表格排版专家。请将图片中的内容精准地转换为 Markdown 格式。\n"
+                        "要求：\n"
+                        "1. 请修正可能由于扫描造成的错别字或折叠。\n"
+                        "2. 如果图片中包含表格，请务必使用标准的 Markdown 表格语法 ('|---|') 进行严谨的还原，不要漏掉合并单元格或表头。\n"
+                        "3. 不要输出任何开场白或解释文字，直接输出转换后的 Markdown。\n"
+                        "4. 如果图片内容完全无法辨认、或者包含大量无意义的乱码和符号，请直接输出 '[UNREADABLE]'，不要强行编造或输出乱码。"
+                    )
+                    
+                    vision_response = self._slice_and_ocr_image(img_data, prompt)
+                    full_ocr_text.append(vision_response)
+                else:
+                    full_ocr_text.append(page_text)
+            
             doc.close()
-            return text
+            yield {"text": "\n\n".join(full_ocr_text)}
         except Exception as e:
             logger.error(f"PDF Error: {e}")
-            return "" 
+            yield {"text": f"[PDF Extract Error: {e}]"}
 
-    def _slice_and_ocr_image(self, img_bytes, prompt, max_pixels=2000000, max_width=2000):
+    def _slice_and_ocr_image(self, img_bytes, prompt, max_pixels=2000000, max_width=1600):
         try:
             from PIL import Image
             import io
@@ -219,7 +241,7 @@ class SmartFileAgent:
                 img = img.convert('RGB')
                 
             orig_width, orig_height = img.size
-            # Cap the maximum width to 2000 pixels (very high res) to avoid excessive slice counts on 4K/8K scans
+            # Cap the maximum width to 1600 pixels (very high res) to avoid excessive slice counts on 4K/8K scans
             if orig_width > max_width:
                 new_width = max_width
                 new_height = int((max_width / orig_width) * orig_height)
@@ -268,32 +290,7 @@ class SmartFileAgent:
             b64_img = "data:image/png;base64," + base64.b64encode(img_bytes).decode('utf-8')
             return self._call_vision_api(b64_img, prompt)
 
-    def _process_pdf_as_images(self, file_bytes):
-        try:
-            doc = fitz.open(stream=file_bytes, filetype="pdf")
-            full_ocr_text = []
-            
-            for i, page in enumerate(doc):
-                # We extract at standard resolution, if it's too big, slicing will handle it.
-                pix = page.get_pixmap()
-                img_data = pix.tobytes("png")
-                
-                prompt = (
-                    "你是一个专业的中文文档和表格排版专家。请将图片中的内容精准地转换为 Markdown 格式。\n"
-                    "要求：\n"
-                    "1. 请修正可能由于扫描造成的错别字或折叠。\n"
-                    "2. 如果图片中包含表格，请务必使用标准的 Markdown 表格语法 ('|---|') 进行严谨的还原，不要漏掉合并单元格或表头。\n"
-                    "3. 不要输出任何开场白或解释文字，直接输出转换后的 Markdown。\n"
-                    "4. 如果图片内容完全无法辨认、或者包含大量无意义的乱码和符号，请直接输出 '[UNREADABLE]'，不要强行编造或输出乱码。"
-                )
-                
-                vision_response = self._slice_and_ocr_image(img_data, prompt)
-                full_ocr_text.append(vision_response)
-            
-            doc.close()
-            return "\n\n".join(full_ocr_text)
-        except Exception as e:
-            return f"[PDF OCR Error: {e}]"
+
 
     def _process_image(self, file_bytes):
         try:
