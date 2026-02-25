@@ -191,17 +191,46 @@ class SmartFileAgent:
             logger.error(f"PDF Error: {e}")
             return "" 
 
+    def _resize_image_for_vision(self, img_bytes, max_dimension=1536):
+        try:
+            from PIL import Image
+            import io
+            import base64
+            
+            img = Image.open(io.BytesIO(img_bytes))
+            if img.mode != 'RGB':
+                img = img.convert('RGB')
+                
+            width, height = img.size
+            if width > max_dimension or height > max_dimension:
+                if width > height:
+                    new_width = max_dimension
+                    new_height = int(max_dimension * (height / width))
+                else:
+                    new_height = max_dimension
+                    new_width = int(max_dimension * (width / height))
+                img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+                
+            buffered = io.BytesIO()
+            img.save(buffered, format="JPEG", quality=85)
+            return "data:image/jpeg;base64," + base64.b64encode(buffered.getvalue()).decode('utf-8')
+        except Exception as e:
+            import base64
+            import logging
+            logging.error(f"Image resize error: {e}")
+            return "data:image/png;base64," + base64.b64encode(img_bytes).decode('utf-8')
+
     def _process_pdf_as_images(self, file_bytes):
         try:
             doc = fitz.open(stream=file_bytes, filetype="pdf")
             full_ocr_text = []
             
             for i, page in enumerate(doc):
+                # We can also limit DPI here by rendering with a lower matrix, but `_resize` handles it strictly.
                 pix = page.get_pixmap()
                 img_data = pix.tobytes("png")
                 
-                import base64
-                b64_img = "data:image/png;base64," + base64.b64encode(img_data).decode('utf-8')
+                b64_img = self._resize_image_for_vision(img_data)
                 
                 prompt = (
                     "你是一个专业的中文文档和表格排版专家。请将图片中的内容精准地转换为 Markdown 格式。\n"
@@ -221,8 +250,7 @@ class SmartFileAgent:
 
     def _process_image(self, file_bytes):
         try:
-            import base64
-            b64_img = "data:image/png;base64," + base64.b64encode(file_bytes).decode('utf-8')
+            b64_img = self._resize_image_for_vision(file_bytes)
             prompt = (
                 "你是一个专业的中文文档和表格排版专家。请将图片中的内容精准地转换为 Markdown 格式。\n"
                 "要求：\n"
@@ -245,22 +273,15 @@ class SmartFileAgent:
             "Authorization": f"Bearer {self.ocr_api_key}"
         }
         
-        content_payload = []
-        if self.ocr_provider == "siliconflow" or "deepseek" in self.ocr_model_name.lower():
-            # Many SiliconFlow VL models (like DeepSeek-VL or PaddleOCR-VL) don't strictly support the array `image_url` object format
-            # They expect a single string containing '<image>\n{base64}\n{text}'
-            content_payload = f"<image>\n{b64_image}\n{prompt}"
-        else:
-            # Standard OpenAI Vision format
-            content_payload = [
-                {"type": "text", "text": prompt},
-                {
-                    "type": "image_url",
-                    "image_url": {
-                        "url": b64_image
-                    }
+        content_payload = [
+            {"type": "text", "text": prompt},
+            {
+                "type": "image_url",
+                "image_url": {
+                    "url": b64_image
                 }
-            ]
+            }
+        ]
 
         payload = {
             "model": self.ocr_model_name,
