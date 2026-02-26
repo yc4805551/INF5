@@ -256,6 +256,19 @@ class SmartFileAgent:
         text = re.sub(r'(\{\s*){5,}', '', text)
         text = re.sub(r'(1\.\s*){5,}', '', text)
         text = re.sub(r'(-\s*){10,}', '', text)
+        text = re.sub(r'(\]\s*){5,}', '', text)
+        text = re.sub(r'(\\\s*\]\s*){5,}', '', text)
+        
+        # Aggressive filter for DeepSeek-OCR / PaddleOCR table artifacts
+        # e.g. \end{array}\right\} repeated 10 times
+        text = re.sub(r'(\\end\{array\}\\right\\\}\$\s*){3,}', '', text) 
+        text = re.sub(r'(\\begin\{array\}\\right\\\}\$\s*){3,}', '', text)
+        
+        # The Ultimate Wildcard Filter:
+        # Matches ANY sequence of 1 to 50 characters that repeats identically at least 8 times in a row.
+        # This completely wipes out generative model infinite token loops (like `}}]}}]}}]}}`) 
+        # without hardcoding the exact symbols.
+        text = re.sub(r'(.{1,50}?)\1{8,}', '', text)
         
         # Strip out localized [UNREADABLE] markers so they don't clutter the final markdown
         return text.replace("[UNREADABLE]", "").strip()
