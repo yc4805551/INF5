@@ -181,47 +181,64 @@ class SmartFileAgent:
         try:
             import fitz
             import re
+            import concurrent.futures
             
             doc = fitz.open(stream=file_bytes, filetype="pdf")
-            full_ocr_text = []
+            results = [None] * len(doc)
+            ocr_prompt = (
+                "你是一个专业的中文文档和表格排版专家。请将图片中的内容精准地转换为 Markdown 格式。\n"
+                "要求：\n"
+                "1. 请修正可能由于扫描造成的错别字或折叠。\n"
+                "2. 如果图片中包含表格，请务必使用标准的 Markdown 表格语法 ('|---|') 进行严谨的还原，不要漏掉合并单元格或表头。\n"
+                "3. 不要输出任何开场白或解释文字，直接输出转换后的 Markdown。\n"
+                "4. 如果图片内容完全无法辨认、或者包含大量无意义的乱码和符号，请直接输出 '[UNREADABLE]'，不要强行编造或输出乱码。"
+            )
             
-            for i, page in enumerate(doc):
-                page_text = page.get_text()
+            # Using ThreadPoolExecutor to run OCR concurrently.
+            # Max_workers=5 is a safe threshold for SiliconFlow's concurrent rate limits.
+            with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+                futures = {}
                 
-                # Heuristic to detect gibberish per page
-                non_ws_text = re.sub(r'\s+', '', page_text)
-                valid_chars = re.findall(r'[\u4e00-\u9fa5A-Za-z0-9]', non_ws_text)
-                chinese_chars = re.findall(r'[\u4e00-\u9fa5]', non_ws_text)
-                
-                is_gibberish = False
-                if len(non_ws_text) > 0:
-                    if (len(valid_chars) / len(non_ws_text)) < 0.2:
-                        is_gibberish = True
-                    elif len(chinese_chars) < 5 and len(valid_chars) > 50:
-                        is_gibberish = True
-                
-                if len(page_text) < 20 or is_gibberish:
-                    yield json.dumps({"type": "log", "message": f"  - [{file_name}] 第 {i+1} 页为扫描件或乱码，启动 OCR 引擎..."}) + "\n"
-                    # We extract at standard resolution, if it's too big, slicing will handle it.
-                    pix = page.get_pixmap()
-                    img_data = pix.tobytes("png")
+                for i, page in enumerate(doc):
+                    page_text = page.get_text()
                     
-                    prompt = (
-                        "你是一个专业的中文文档和表格排版专家。请将图片中的内容精准地转换为 Markdown 格式。\n"
-                        "要求：\n"
-                        "1. 请修正可能由于扫描造成的错别字或折叠。\n"
-                        "2. 如果图片中包含表格，请务必使用标准的 Markdown 表格语法 ('|---|') 进行严谨的还原，不要漏掉合并单元格或表头。\n"
-                        "3. 不要输出任何开场白或解释文字，直接输出转换后的 Markdown。\n"
-                        "4. 如果图片内容完全无法辨认、或者包含大量无意义的乱码和符号，请直接输出 '[UNREADABLE]'，不要强行编造或输出乱码。"
-                    )
+                    # Heuristic to detect gibberish per page
+                    non_ws_text = re.sub(r'\s+', '', page_text)
+                    valid_chars = re.findall(r'[\u4e00-\u9fa5A-Za-z0-9]', non_ws_text)
+                    chinese_chars = re.findall(r'[\u4e00-\u9fa5]', non_ws_text)
                     
-                    vision_response = self._slice_and_ocr_image(img_data, prompt)
-                    full_ocr_text.append(vision_response)
-                else:
-                    full_ocr_text.append(page_text)
+                    is_gibberish = False
+                    if len(non_ws_text) > 0:
+                        if (len(valid_chars) / len(non_ws_text)) < 0.2:
+                            is_gibberish = True
+                        elif len(chinese_chars) < 5 and len(valid_chars) > 50:
+                            is_gibberish = True
+                    
+                    if len(page_text) < 20 or is_gibberish:
+                        yield json.dumps({"type": "log", "message": f"  - [{file_name}] 第 {i+1} 页为扫描件或乱码，排队等待 OCR..."}) + "\n"
+                        # Extract the image up front so we can pass bytes to the thread (avoiding PyMuPDF thread-safety issues with doc)
+                        pix = page.get_pixmap()
+                        img_data = pix.tobytes("png")
+                        
+                        future = executor.submit(self._slice_and_ocr_image, img_data, ocr_prompt)
+                        futures[future] = i
+                    else:
+                        results[i] = page_text
+                
+                # As each page finishes OCR, yield progress to the UI
+                for future in concurrent.futures.as_completed(futures):
+                    page_idx = futures[future]
+                    try:
+                        vision_response = future.result()
+                        results[page_idx] = vision_response
+                        yield json.dumps({"type": "log", "message": f"  - [{file_name}] 第 {page_idx+1} 页 OCR 识别完成！"}) + "\n"
+                    except Exception as e:
+                        results[page_idx] = f"[OCR Error on page {page_idx+1}: {e}]"
+                        yield json.dumps({"type": "log", "message": f"  - [{file_name}] 第 {page_idx+1} 页 OCR 识别失败：{e}"}) + "\n"
             
             doc.close()
-            yield {"text": "\n\n".join(full_ocr_text)}
+            # Join the results precisely in page order
+            yield {"text": "\n\n".join(filter(None, results))}
         except Exception as e:
             logger.error(f"PDF Error: {e}")
             yield {"text": f"[PDF Extract Error: {e}]"}
@@ -354,8 +371,9 @@ class SmartFileAgent:
             num_slices = (width * height // max_pixels) + 1
             slice_height = height // num_slices
             
-            full_text = []
-            for i in range(num_slices):
+            full_text = [None] * num_slices
+            
+            def process_slice(i):
                 top = i * slice_height
                 bottom = height if i == num_slices - 1 else (i + 1) * slice_height
                 
@@ -366,7 +384,7 @@ class SmartFileAgent:
                 slice_img = img.crop(box)
                 
                 if self._is_image_mostly_blank(slice_img):
-                    continue # Skip this slice if it's completely blank
+                    return "" # Skip this slice if it's completely blank
                 
                 buffered = io.BytesIO()
                 slice_img.save(buffered, format="PNG")
@@ -377,11 +395,23 @@ class SmartFileAgent:
                     slice_prompt += f"\n\n（注意：这是超长图的第 {i+1}/{num_slices} 部分截图，请直接输出图里的内容文本，由于可能截断了部分图形不要擅自发散废话。如果由于切片导致本片完全是空白或者乱码，请仅输出 [UNREADABLE]）"
                 
                 response = self._call_vision_api(b64_img, slice_prompt)
-                scrubbed_response = self._scrub_ghosts(response)
-                if scrubbed_response:
-                    full_text.append(scrubbed_response)
+                return self._scrub_ghosts(response)
+
+            import concurrent.futures
+            # Process slices concurrently (up to 3 at a time to avoid heavy rate limits if called within a loop)
+            with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+                futures = {executor.submit(process_slice, i): i for i in range(num_slices)}
+                for future in concurrent.futures.as_completed(futures):
+                    i = futures[future]
+                    try:
+                        res = future.result()
+                        full_text[i] = res
+                    except Exception as e:
+                        import logging
+                        logging.error(f"Image slice {i} error: {e}")
+                        full_text[i] = ""
                 
-            return "\n\n".join(full_text)
+            return "\n\n".join(filter(None, full_text))
         except Exception as e:
             import base64
             import logging
