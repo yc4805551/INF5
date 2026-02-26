@@ -485,12 +485,27 @@ class SmartFileAgent:
         if "/chat/completions" not in endpoint:
              endpoint = endpoint.rstrip("/") + "/chat/completions"
 
-        try:
-            response = requests.post(endpoint, headers=headers, json=payload, timeout=180)
-            if response.status_code == 200:
-                res_json = response.json()
-                return res_json['choices'][0]['message']['content']
-            else:
-                return f"[OCR API Error {response.status_code}: {response.text}]"
-        except Exception as e:
-            return f"[OCR Request Failed: {str(e)}]"
+        import time
+        max_retries = 2
+        for attempt in range(max_retries):
+            try:
+                # Shorter 30-second timeout. Generative VLMs can sometimes hang indefinitely on bad inputs.
+                # If it takes >30s, it's better to fail fast and retry/skip rather than deadlocking the ThreadPool.
+                response = requests.post(endpoint, headers=headers, json=payload, timeout=30)
+                if response.status_code == 200:
+                    res_json = response.json()
+                    return res_json['choices'][0]['message']['content']
+                elif response.status_code == 429: # Too Many Requests
+                    if attempt < max_retries - 1:
+                        time.sleep(2 * (attempt + 1)) # Exponential backoff
+                        continue
+                    return f"[OCR API Rate Limit (429): Please try again later.]"
+                else:
+                    return f"[OCR API Error {response.status_code}: {response.text}]"
+            except requests.exceptions.Timeout:
+                if attempt < max_retries - 1:
+                    logger.warning(f"OCR API Timeout, retrying... ({attempt+1}/{max_retries})")
+                    continue
+                return f"[OCR Request Timed Out after 30s]"
+            except Exception as e:
+                return f"[OCR Request Failed: {str(e)}]"
