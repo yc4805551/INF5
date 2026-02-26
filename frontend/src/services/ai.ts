@@ -71,7 +71,7 @@ export const MODEL_DISPLAY_NAMES: Record<ModelProvider, string> = {
     doubao: frontendApiConfig.doubao.model || '豆包',
     free: frontendApiConfig.free.model || 'FREE',
     anything: 'AnythingLLM',
-    siliconflow: 'SiliconFlow (PaddleOCR)'
+    siliconflow: frontendApiConfig.siliconflow.model || 'SiliconFlow'
 };
 
 export const getAvailableModels = (): ModelProvider[] => {
