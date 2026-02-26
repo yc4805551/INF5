@@ -269,6 +269,54 @@ class SmartFileAgent:
         except Exception:
             return False
 
+    def _auto_crop_whitespace(self, pil_img):
+        try:
+            import numpy as np
+            from PIL import Image
+            
+            # Convert to grayscale to evaluate pixel intensity
+            gray = pil_img.convert('L')
+            arr = np.array(gray)
+            
+            # Threshold: pixels darker than 200 are considered 'ink'
+            ink_threshold = 200
+            
+            # Count how many ink pixels are in each row
+            ink_pixels_per_row = np.sum(arr < ink_threshold, axis=1)
+            
+            # A row is considered to have 'text' if it has at least 10 ink pixels 
+            # (This ignores single specks of dust, staple marks, or scanner noise)
+            text_rows = np.where(ink_pixels_per_row > 10)[0]
+            
+            if len(text_rows) > 0:
+                top = text_rows[0]
+                bottom = text_rows[-1]
+                
+                # Do the same for columns, but only within the y-bounds we just found
+                ink_pixels_per_col = np.sum(arr[top:bottom, :] < ink_threshold, axis=0)
+                text_cols = np.where(ink_pixels_per_col > 10)[0]
+                
+                if len(text_cols) > 0:
+                    left = text_cols[0]
+                    right = text_cols[-1]
+                    
+                    # Add a comfortable margin of 40 pixels so descenders aren't clipped
+                    margin = 40
+                    h, w = arr.shape
+                    top = max(0, int(top - margin))
+                    bottom = min(h, int(bottom + margin))
+                    left = max(0, int(left - margin))
+                    right = min(w, int(right + margin))
+                    
+                    # If the cropped area is extremely tiny (like a single smudge), don't crop
+                    if (bottom - top) < 50 or (right - left) < 50:
+                        return pil_img
+                        
+                    return pil_img.crop((left, top, right, bottom))
+            return pil_img
+        except Exception as e:
+            return pil_img
+
     def _slice_and_ocr_image(self, img_bytes, prompt, max_pixels=4000000, max_width=1600):
         try:
             from PIL import Image
@@ -278,6 +326,10 @@ class SmartFileAgent:
             img = Image.open(io.BytesIO(img_bytes))
             if img.mode != 'RGB':
                 img = img.convert('RGB')
+                
+            # Smart Auto-Crop: Remove extreme whitespace from document borders (especially the bottom)
+            # This absolutely prevents "Prompt Bleeding" / "Instruction Hallucination" from VLMs like PaddleOCR
+            img = self._auto_crop_whitespace(img)
                 
             orig_width, orig_height = img.size
             # Cap the maximum width to 1600 pixels (very high res) to avoid excessive slice counts on 4K/8K scans
