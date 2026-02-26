@@ -215,12 +215,12 @@ class SmartFileAgent:
                             is_gibberish = True
                     
                     if len(page_text) < 20 or is_gibberish:
-                        yield json.dumps({"type": "log", "message": f"  - [{file_name}] 第 {i+1} 页为扫描件或乱码，排队等待 OCR..."}) + "\n"
+                        yield json.dumps({"type": "log", "message": f"  - [{file_name}] 第 {i+1} 页启用 Tesseract虚拟切片 混合识别..."}) + "\n"
                         # Extract the image up front so we can pass bytes to the thread (avoiding PyMuPDF thread-safety issues with doc)
                         pix = page.get_pixmap()
                         img_data = pix.tobytes("png")
                         
-                        future = executor.submit(self._slice_and_ocr_image, img_data, ocr_prompt)
+                        future = executor.submit(self._process_page_virtual_slicing, img_data, ocr_prompt)
                         futures[future] = i
                     else:
                         results[i] = page_text
@@ -299,6 +299,79 @@ class SmartFileAgent:
         except Exception:
             return False
 
+    def _filter_headers_footers(self, blocks, img_height, margin_percent=0.08):
+        """Scalpel 1: Remove blocks that appear in the extreme top/bottom margins."""
+        clean = []
+        top_threshold = img_height * margin_percent
+        bottom_threshold = img_height * (1.0 - margin_percent)
+        for b in blocks:
+            y_center = b['y'] + (b['h'] / 2)
+            if top_threshold < y_center < bottom_threshold:
+                clean.append(b)
+        return clean
+
+    def _cluster_x_axis(self, blocks):
+        """Scalpel 2: Detect and sort multi-column layouts based on X-coordinates."""
+        if not blocks:
+            return []
+        
+        # Simple clustering: if the centers of blocks fall cleanly into 
+        # left-half vs right-half, they are likely columns.
+        # A more robust solution for academic papers uses K-Means or Histograms. 
+        # Here we do a 2-column heuristic check based on page width.
+        
+        # Get overall page bounds from remaining blocks
+        min_x = min(b['x'] for b in blocks)
+        max_x = max(b['x'] + b['w'] for b in blocks)
+        page_width = max_x - min_x
+        mid_point = min_x + (page_width / 2)
+        
+        col_left = []
+        col_right = []
+        
+        for b in blocks:
+            x_center = b['x'] + (b['w'] / 2)
+            if x_center < mid_point:
+                col_left.append(b)
+            else:
+                col_right.append(b)
+                
+        # Sort each column individually top-to-bottom
+        col_left.sort(key=lambda x: x['y'])
+        col_right.sort(key=lambda x: x['y'])
+        
+        return col_left + col_right # Read left column entirely, then right column
+
+    def _stitch_y_axis(self, blocks, max_line_gap_ratio=1.5):
+        """Scalpel 3: Reassemble paragraphs by calculating Y-gaps between consecutive sorted blocks."""
+        if not blocks:
+            return []
+            
+        paragraphs = []
+        current_para = [blocks[0]]
+        
+        for i in range(1, len(blocks)):
+            prev = blocks[i-1]
+            curr = blocks[i]
+            
+            # Distance from bottom of prev to top of curr
+            delta_y = curr['y'] - (prev['y'] + prev['h'])
+            avg_height = (prev['h'] + curr['h']) / 2
+            
+            # If the gap is small (like a normal line break), it belongs to the same paragraph
+            # Allow delta_y to be slightly negative for overlapping lines or slight tilts
+            if delta_y < (avg_height * max_line_gap_ratio):
+                current_para.append(curr)
+            else:
+                # Gap is too big, start a new paragraph
+                paragraphs.append(current_para)
+                current_para = [curr]
+                
+        if current_para:
+            paragraphs.append(current_para)
+            
+        return paragraphs
+
     def _auto_crop_whitespace(self, pil_img):
         try:
             import numpy as np
@@ -346,6 +419,114 @@ class SmartFileAgent:
             return pil_img
         except Exception as e:
             return pil_img
+
+    def _process_page_virtual_slicing(self, img_bytes, prmpt):
+        try:
+            import pytesseract
+            from pytesseract import Output
+            import cv2
+            import numpy as np
+            import os
+            
+            # Setup environment Tesseract Path if provided (For remote deployments)
+            tess_path = os.getenv("VITE_TESSERACT_PATH")
+            if tess_path and os.path.exists(tess_path):
+                pytesseract.pytesseract.tesseract_cmd = tess_path
+            
+            # 1. Convert Img Bytes to OpenCV format
+            nparr = np.frombuffer(img_bytes, np.uint8)
+            cv_img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            img_height, img_width = cv_img.shape[:2]
+            
+            # 2. Call Tesseract for "Full Radar Scan" (Fast local OCR)
+            scan_data = pytesseract.image_to_data(cv_img, lang='chi_sim', output_type=Output.DICT)
+            
+            blocks = []
+            for i in range(len(scan_data['text'])):
+                conf = scan_data['conf'][i]
+                text = scan_data['text'][i].strip()
+                # Accept conf > 10 to catch small texts, or any valid string if conf fails parsing
+                if (isinstance(conf, str) and conf != '-1') or (isinstance(conf, (int, float)) and conf > 10):
+                    if text:
+                        blocks.append({
+                            'text': text,
+                            'x': scan_data['left'][i],
+                            'y': scan_data['top'][i],
+                            'w': scan_data['width'][i],
+                            'h': scan_data['height'][i]
+                        })
+            
+            # If Tesseract completely fails to find anything, fallback to whole-page vision API
+            if not blocks:
+                return self._slice_and_ocr_image(img_bytes, prmpt)
+                
+            # 3. Apply the Three Scalpels (Pure Math Spatial Clustering)
+            blocks = self._filter_headers_footers(blocks, img_height) # Scalpel 1: Y-axis Header cut
+            columns = self._cluster_x_axis(blocks)                    # Scalpel 2: X-axis Columns
+            paragraphs = self._stitch_y_axis(columns)                 # Scalpel 3: Y-axis Stitching
+            
+            final_markdown = ""
+            for para in paragraphs:
+                if not para:
+                    continue
+                    
+                # Calculate the bounding box for this entire stitched paragraph
+                min_x = min(b['x'] for b in para)
+                min_y = min(b['y'] for b in para)
+                max_x = max(b['x'] + b['w'] for b in para)
+                max_y = max(b['y'] + b['h'] for b in para)
+                
+                # Heuristic for Table Anomaly Detection:
+                # If a "paragraph" contains a massive amount of strictly separated small blocks
+                # grouped tightly together in a wide array, it's likely a complex graphical table.
+                # Thresholds: More than 15 independent blocks in a single stitched paragraph
+                # AND total width is quite wide (> 40% of page width).
+                para_width = max_x - min_x
+                if len(para) > 15 and para_width > (img_width * 0.4):
+                    # HYBRID ROUTING: Snip out the anomaly and send ONLY this tight bounding box to DeepSeek API
+                    # Add 10px margin padding
+                    p_min_y = max(0, min_y - 10)
+                    p_max_y = min(img_height, max_y + 10)
+                    p_min_x = max(0, min_x - 10)
+                    p_max_x = min(img_width, max_x + 10)
+                    
+                    table_snipe = cv_img[p_min_y:p_max_y, p_min_x:p_max_x]
+                    
+                    # Convert cv2 image back to bytes for the API call
+                    success, buffer = cv2.imencode('.png', table_snipe)
+                    if success:
+                        table_bytes = buffer.tobytes()
+                        # Call DeepSeek/Paddle API
+                        vlm_result = self._call_vision_api(table_bytes, "这是一个表格局部截图，严格输出Markdown表格。不要解释。")
+                        final_markdown += vlm_result + "\n\n"
+                    else:
+                        # Fallback to Tesseract chunks if encoding fails
+                        final_markdown += " ".join([b['text'] for b in para]) + "\n\n"
+                else:
+                    # Normal Text Paragraph: Use the instant, free Tesseract extraction
+                    para_text = ""
+                    for i, b in enumerate(para):
+                        if i > 0:
+                            # If there's a tiny x-gap between words within the same para, add a little space
+                            prev = para[i-1]
+                            if b['x'] - (prev['x'] + prev['w']) > b['h'] * 0.5:
+                                para_text += " "
+                        para_text += b['text']
+                    
+                    final_markdown += para_text + "\n\n"
+            
+            return final_markdown
+            
+        except ImportError as ie:
+            # If Remote server hasn't installed pytesseract/opencv, gracefully fallback to physical slice mode
+            import logging
+            logging.warning(f"Virtual Slicing Dependencies missing, falling back to basic OCR: {ie}")
+            return self._slice_and_ocr_image(img_bytes, prmpt)
+        except Exception as e:
+            import logging
+            logging.error(f"Virtual Slicing failed: {e}")
+            # Fallback on any mathematical error
+            return self._slice_and_ocr_image(img_bytes, prmpt)
 
     def _slice_and_ocr_image(self, img_bytes, prompt, max_pixels=4000000, max_width=1600):
         try:
