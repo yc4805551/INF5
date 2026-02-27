@@ -277,3 +277,125 @@
         box-shadow: 0 12px 32px rgba(102, 126, 234, 0.4);
     }
 }
+/* Markdown Styles in Chat */
+.chat-markdown-body {
+    font-size: 14.5px;
+    line-height: 1.6;
+}
+
+.chat-markdown-body p {
+    margin: 0 0 12px 0;
+}
+
+.chat-markdown-body p:last-child {
+    margin-bottom: 0;
+}
+
+.chat-markdown-body a {
+    color: #667eea;
+    text-decoration: none;
+}
+
+.chat-markdown-body a:hover {
+    text-decoration: underline;
+}
+
+.chat-markdown-body strong {
+    font-weight: 600;
+}
+
+.chat-markdown-body em {
+    font-style: italic;
+}
+
+.chat-markdown-body code {
+    background: rgba(0, 0, 0, 0.05);
+    padding: 2px 4px;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 85%;
+}
+
+.chat-message.user .chat-markdown-body code {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.chat-markdown-body pre {
+    background: #1f2937;
+    color: #f9fafb;
+    padding: 12px;
+    border-radius: 8px;
+    overflow-x: auto;
+    margin: 12px 0;
+}
+
+.chat-message.user .chat-markdown-body pre {
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.chat-markdown-body pre code {
+    background: transparent;
+    padding: 0;
+    color: inherit;
+    font-size: 13px;
+}
+
+/* Base list styles */
+.chat-markdown-body ul,
+.chat-markdown-body ol {
+    margin: 8px 0 12px 0;
+    padding-left: 24px;
+}
+
+.chat-markdown-body li {
+    margin-bottom: 4px;
+}
+
+.chat-markdown-body li > p {
+    margin: 0;
+}
+
+/* Tables */
+.chat-markdown-body table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 12px 0;
+    font-size: 14px;
+}
+
+.chat-markdown-body th,
+.chat-markdown-body td {
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    padding: 8px 12px;
+    text-align: left;
+}
+
+.chat-message.user .chat-markdown-body th,
+.chat-message.user .chat-markdown-body td {
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+.chat-markdown-body th {
+    background: rgba(0, 0, 0, 0.05);
+    font-weight: 600;
+}
+
+.chat-message.user .chat-markdown-body th {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* Blockquotes */
+.chat-markdown-body blockquote {
+    margin: 12px 0;
+    padding: 4px 16px;
+    border-left: 4px solid #667eea;
+    background: rgba(102, 126, 234, 0.05);
+    border-radius: 0 4px 4px 0;
+    color: #4b5563;
+}
+
+.chat-message.user .chat-markdown-body blockquote {
+    border-left-color: rgba(255, 255, 255, 0.5);
+    background: rgba(0, 0, 0, 0.1);
+    color: rgba(255, 255, 255, 0.9);
+}

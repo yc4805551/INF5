@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Send, User, Bot, AlertCircle, Loader, Sparkles } from 'lucide-react';
 import { ChatMessage } from '../../types';
 import { FileSearchResultCard, parseFileSearchResult, hasFileSearchResult } from '../../../../components/FileSearchResultCard';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import './ChatMode.css';
 
 interface ChatModeProps {
@@ -86,9 +88,13 @@ export const ChatMode: React.FC<ChatModeProps> = ({
                                     <FileSearchResultCard data={fileSearchData} />
                                 ) : (
                                     // 普通文本消息
-                                    msg.parts.map((part, pIdx) => (
-                                        <p key={pIdx}>{part.text}</p>
-                                    ))
+                                    <div className="chat-markdown-body">
+                                        <ReactMarkdown
+                                            remarkPlugins={[remarkGfm]}
+                                        >
+                                            {msg.parts.map(p => p.text).join('\n')}
+                                        </ReactMarkdown>
+                                    </div>
                                 )}
                             </div>
                         </div>
