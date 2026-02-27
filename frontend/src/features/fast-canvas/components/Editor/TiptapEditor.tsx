@@ -21,6 +21,7 @@ export interface TiptapEditorRef {
     replaceText: (original: string, replacement: string) => boolean;
     selectText: (text: string) => boolean;
     setContent: (content: any) => boolean;
+    insertContent: (content: string) => boolean;
 }
 
 export const TiptapEditor = React.forwardRef<TiptapEditorRef, TiptapEditorProps>(({
@@ -160,6 +161,14 @@ export const TiptapEditor = React.forwardRef<TiptapEditorRef, TiptapEditorProps>
         setContent: (content: any) => {
             if (editor) {
                 editor.commands.setContent(content);
+                return true;
+            }
+            return false;
+        },
+        insertContent: (content: string) => {
+            if (editor) {
+                // Focus at the end of the document and insert
+                editor.chain().focus().insertContent(content).run();
                 return true;
             }
             return false;

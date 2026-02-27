@@ -356,11 +356,10 @@ export const FastCanvasView: React.FC<FastCanvasViewProps> = ({
                         lastCheckResult={lastCheckResult}
                         smartWrite={smartWrite}
                         onInsert={(text) => {
-                            // Append text to editor
-                            const newText = editorText + '\n\n' + text;
-                            setEditorText(newText);
-                            setEditorHtml(newText.replace(/\n/g, '<br/>'));
-                            // Optional: notify success
+                            // Insert text securely at cursor/end via Tiptap
+                            if (editorRef.current) {
+                                editorRef.current.insertContent(text);
+                            }
                         }}
                     />
                 </div>
