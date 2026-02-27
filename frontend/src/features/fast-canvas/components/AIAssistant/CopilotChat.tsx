@@ -2,6 +2,9 @@ import React, { useRef, useEffect, useState } from 'react';
 import { Send, Square } from 'lucide-react';
 import { ChatMessage, AuditResult, AISuggestion } from '../../types';
 import './CopilotChat.css'; // We'll keep the CSS import but override with inline styles
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import './ChatMode.css';
 
 interface CopilotChatProps {
     history: ChatMessage[];
@@ -67,7 +70,13 @@ export const CopilotChat: React.FC<CopilotChatProps> = ({
                     }
                 } catch (e) { }
             }
-            return <div key={pIdx} style={{ whiteSpace: 'pre-wrap' }}>{part.text}</div>;
+            return (
+                <div key={pIdx} className="chat-markdown-body">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        {part.text}
+                    </ReactMarkdown>
+                </div>
+            );
         });
     };
 
@@ -109,8 +118,7 @@ export const CopilotChat: React.FC<CopilotChatProps> = ({
                                 border: 'none', // Removed Border
                                 boxShadow: '0 2px 4px rgba(0,0,0,0.3)', // Basic Shadow
                                 fontSize: '14px',
-                                lineHeight: '1.6',
-                                whiteSpace: 'pre-wrap'
+                                lineHeight: '1.6'
                             }}>
                                 {renderMessageContent(msg)}
                             </div>
