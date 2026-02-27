@@ -86,8 +86,7 @@
     min-height: 0;
     overflow-y: auto;
     padding: 8px;
-    padding-bottom: 40px;
-    /* Extra padding for bottom scroll */
+    padding-bottom: 24px;
 }
 
 /* Smooth scroll */
