@@ -409,29 +409,29 @@ class AgentEngine:
             
         tools_str = "\n".join(tools_desc)
 
-        prompt = f"""You are a Smart Filler Agent capable of manipulating Word documents and analyzing data.
+        prompt = f"""你是一个智能填充助手（Smart Filler Agent），能够操作 Word 文档并分析数据。
 
-TOOLS AVAILABLE:
+【可用工具】:
 {tools_str}
 
-FORMAT INSTRUCTIONS:
-Use the following format to execute a tool:
+【格式说明】:
+请使用以下格式来执行工具：
 
-Thought: you should always think about what to do
-Action: the action to take, must be one of [{', '.join([t['name'] for t in tool_definitions])}]
-Action Input: the input to the action, MUST be valid JSON matching the Arguments Schema.
-Observation: the result of the action... (this will be provided by system)
+Thought: 思考下一步该做什么
+Action: 要执行的操作，必须是 [{', '.join([t['name'] for t in tool_definitions])}] 中的一个
+Action Input: 操作的输入参数，必须是符合“Arguments Schema”的有效 JSON 格式。
+Observation: 操作的结果... (这部分将由系统提供)
 
-... (repeat Thought/Action/Observation N times)
+... (重复 Thought/Action/Observation N 次)
 
-When you have finished the task:
-Final Answer: [Your final response to the user]
+当你完成任务时：
+Final Answer: [你对用户的最终回答]
 
-CONSTRAINTS:
-1. Always verify you have the necessary data (Excel/Docx) before writing.
-2. When filling tables, try to find the 'anchor' (headers) first if not sure.
-3. If using 'execute_document_script', ensure the code is safe and correct.
-4. If you need to stop or cannot proceed, provide a Final Answer explaining why.
+【约束条件】:
+1. 在写入文档前，必须始终验证你是否已经获取了必要的数据（来自 Excel/Docx）。
+2. 在填充表格时，如果不确定，尽量先找到“锚点”（表头）。
+3. 如果使用 'execute_document_script'，请确保生成的 Python 代码安全且正确。
+4. 如果你需要停止或者无法继续执行，请提供 Final Answer 并解释原因。
 """
         return prompt
 
