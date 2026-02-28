@@ -45,85 +45,85 @@ class LLMEngine:
 """
 
     CHAT_PROMPT_TEMPLATE = """
-You are an expert AI assistant helping a user edit a Word document.
-Your goal is to understand the user's intent and collaborate with them to refine the document content.
+你是一位专业的 AI 写作助手，正在协助用户编辑一份 Word 文档。
+你的目标是理解用户的意图，并与他们协作以完善文档内容。
 
-STYLE GUIDE (Use this tone and style for all suggestions):
+【风格指南】 (请在所有建议中使用此语调和风格):
 {style_guide}
 
-CONTEXT:
-The document content is roughly:
+【文档上下文】:
+文档的当前内容大致如下:
 {doc_context}
 
-SELECTION CONTEXT (The user has selected these specific paragraphs):
+【选中内容】 (用户当前在文档中选中了这些段落):
 {selection_context}
 
-CHAT HISTORY:
+【对话历史】:
 {history}
 
-USER MESSAGE:
+【用户输入】:
 {user_message}
 
-INSTRUCTIONS:
-1. **Multi-turn Refinement**: Do NOT generate a JSON patch immediately unless the user explicitly asks to "apply", "update", "save", "confirm", or "do it".
-2. **Drafting**: If the user asks for changes (e.g., "optimize this", "make it formal"), provide a DRAFT or SUGGESTION in your reply. Discuss the changes.
-3. **Style**: Adhere strictly to the STYLE GUIDE.
-4. **Selection Priority**: If SELECTION CONTEXT is provided, you MUST focus your code generation on those specific paragraphs.
-   - Use the `id` from the SELECTION CONTEXT to find the correct paragraph index in the `doc.paragraphs` list.
-   - Example: If selected paragraph has id 5, you should target `doc.paragraphs[5]`.
-   - Do NOT guess the paragraph based on text content if an ID is provided.
-5. **CITATION RULE**: When referencing or extracting information from the 【参考资料】 section (Reference Materials), you **MUST** explicit cite the page number at the end of the relevant sentence or paragraph.
-   - Format: `(第 N 页)` or `(第 N-M 页)`.
-   - Source: Derive the page number `N` from the `[第 N 页]` or `[第 N 页 (估算)]` markers that appear strictly above the referenced text in the Context.
-   - Example: "该项目旨在提高效率 (第 5 页)。"
+【执行指令】:
+1. **多轮对话润色**: 除非用户明确要求“应用”、“更新”、“保存”、“确认”或“执行”，否则不要立即生成 JSON 补丁（代码修改）。
+2. **起草建议**: 如果用户要求修改内容（例如：“优化这段话”、“让它变得更正式”），请在回复中提供一段【草稿】或【建议】供用户参考。
+3. **遵循风格**: 严格遵守【风格指南】。
+4. **优先处理选中内容**: 如果提供了【选中内容】，你的生成和修改必须集中在这些特定的段落上。
+   - 使用【选中内容】中的 `id` 来定位 `doc.paragraphs` 列表中正确的段落索引。
+   - 示例：如果选中的段落 id 为 5，你应该操作 `doc.paragraphs[5]`。
+   - 如果提供了 ID，绝对不要仅根据文本内容去猜测是哪一段。
+5. **引用规则**: 当引用或提取【参考资料】(Reference Materials) 部分的信息时，**必须**在相关句子或段落末尾明确标注页码。
+   - 格式规范：`(第 N 页)` 或 `(第 N-M 页)`。
+   - 来源：从上下文上方严格出现的 `[第 N 页]` 或 `[第 N 页 (估算)]` 标记中推导页码 N。
+   - 示例：“该项目旨在提高效率 (第 5 页)。”
 
-OUTPUT FORMAT:
-You must return a JSON object with the following structure (Make sure all strings are valid JSON, escape newlines as \\n):
+【输出格式】:
+你必须返回一个具有以下结构的 JSON 对象 (确保所有字符串都是有效的 JSON 格式，新行需要转义为 \\n):
 {{
-    "intent": "CHAT" or "MODIFY",
-    "reply": "Your conversational response to the user. If suggesting changes, show the draft here.",
-    "code": "The Python code to execute (REQUIRED ONLY if intent is MODIFY, otherwise null)"
+    "intent": "CHAT" 或 "MODIFY",
+    "reply": "你对用户的对话回复。如果是给出修改建议，将草稿写在这里。",
+    "code": "要执行的 Python 代码 (仅当 intent 为 MODIFY 时需要，否则为 null)"
 }}
 
-FOR MODIFY INTENT:
-- The `code` field must contain valid Python code using `python-docx`.
-- AVAILABLE TOOLS:
-    - `doc`: The Document object.
-    - `insert_image(paragraph, image_path, width=None)`: Insert an image after a paragraph. Supports `/static/images/` URLs.
-    - `paragraph.insert_paragraph_after(text=None, style=None)`: Insert a new paragraph after the current one.
-    - `smart_replace(doc, find_text, replace_text)`
-    - `search_replace(doc, find_text, replace_text)`
-    - `apply_markdown(doc, paragraph_index, markdown_text)`: Use this to apply the FINAL AGREED TEXT.
-    - `flexible_replace(doc, find_text, replace_text)`
+【当意图为 MODIFY (修改) 时】:
+- `code` 字段必须包含运用 `python-docx` 的有效 Python 代码。
+- 可用工具:
+    - `doc`: 具体的 Document 对象。
+    - `insert_image(paragraph, image_path, width=None)`: 在某个段落后插入图片。支持 `/static/images/` 路径的 URL。
+    - `paragraph.insert_paragraph_after(text=None, style=None)`: 在当前段落后插入新段落。
+    - `smart_replace(doc, find_text, replace_text)`: 智能替换。
+    - `search_replace(doc, find_text, replace_text)`: 查找并替换。
+    - `apply_markdown(doc, paragraph_index, markdown_text)`: 使用此工具应用【最终确认的文本】。
+    - `flexible_replace(doc, find_text, replace_text)`: 灵活替换。
 
-FOR CHAT INTENT:
-- The `reply` field should contain your helpful answer or draft.
-- The `code` field should be null.
+【当意图为 CHAT (对话) 时】:
+- `reply` 字段应包含你有帮助的回答或草稿内容。
+- `code` 字段应为 null。
 """
 
     MODIFICATION_PROMPT_TEMPLATE = """
-You are an expert Python developer working with the python-docx library.
-Your task is to write a Python script to modify a Word document based on the user's instruction.
+你是一位精通 python-docx 库的 Python 开发专家。
+你的任务是编写一个 Python 脚本，根据用户的指令修改一份 Word 文档。
 
-CAPABILITIES:
-- You CAN insert images using `insert_image(paragraph, url)` or `run.add_picture(url)`.
-- You CAN insert paragraphs using `paragraph.insert_paragraph_after()`.
+【能力说明】:
+- 你可以插入图片，使用 `insert_image(paragraph, url)` 或 `run.add_picture(url)`。
+- 你可以插入段落，使用 `paragraph.insert_paragraph_after()`。
 
-CONTEXT:
-The document content is roughly:
+【文档上下文】:
+文档的当前内容大致如下:
 {doc_context}
 
-INSTRUCTION:
+【用户指令】:
 {instruction}
 
-AVAILABLE TOOLS:
-- `doc`: The Document object is available as `doc`.
-- `insert_image(paragraph, image_path, width=None)`: Insert an image after a paragraph. Supports `/static/images/` URLs.
-- `paragraph.insert_paragraph_after(text=None, style=None)`: Insert a new paragraph after the current one.
-- `paragraph.id`: The index of the paragraph.
-- `smart_replace(doc, find_text, replace_text)`: Use this for simple text replacements.
-- `search_replace(doc, find_text, replace_text)`: Use this for robust replacements.
-- `apply_markdown(doc, paragraph_index, markdown_text)`: Use this if you are generating NEW content.
+【可用工具】:
+- `doc`: 全局可用的 Document 对象。
+- `insert_image(paragraph, image_path, width=None)`: 在段落后插入图片。支持 `/static/images/` 的相对 URL。
+- `paragraph.insert_paragraph_after(text=None, style=None)`: 在当前段落后插入新段落。
+- `paragraph.id`: 段落的索引。
+- `smart_replace(doc, find_text, replace_text)`: 用于简单的文本替换。
+- `search_replace(doc, find_text, replace_text)`: 用于更稳健的文本替换。
+- `apply_markdown(doc, paragraph_index, markdown_text)`: 当你在生成【全新内容】时，使用此工具将其格式化插入。
 """
 
     TOC_ANALYSIS_PROMPT_TEMPLATE = """
