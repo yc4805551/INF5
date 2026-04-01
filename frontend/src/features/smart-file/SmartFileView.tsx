@@ -22,6 +22,8 @@ export const SmartFileView: React.FC<SmartFileViewProps> = ({ files, cleaningMod
     const [logs, setLogs] = useState<LogEntry[]>([]);
     const [finalResult, setFinalResult] = useState<string>("");
     const [isProcessing, setIsProcessing] = useState(false);
+    const [enableDocConversion, setEnableDocConversion] = useState(true);
+    const [enableExcelProcessing, setEnableExcelProcessing] = useState(true);
     const logsEndRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -51,22 +53,28 @@ export const SmartFileView: React.FC<SmartFileViewProps> = ({ files, cleaningMod
     const startProcessing = async () => {
         if (selectedFiles.length === 0) return;
 
-        const hasLegacyFiles = selectedFiles.some(f => 
-            f.name.toLowerCase().endsWith('.doc') || 
-            f.name.toLowerCase().endsWith('.xls')
-        );
+        // Filter files based on user selection
+        const filesToProcess = selectedFiles.filter(f => {
+            const name = f.name.toLowerCase();
+            const isDoc = name.endsWith('.doc');
+            const isExcel = name.endsWith('.xls') || name.endsWith('.xlsx');
+            
+            if (isDoc && !enableDocConversion) return false;
+            if (isExcel && !enableExcelProcessing) return false;
+            return true;
+        });
 
-        if (hasLegacyFiles) {
-            const proceed = window.confirm("⚠️ 提示：检测到列表中包含老版本的 .doc 或 .xls 文件。\n\n这会触发后台调用底层系统引擎进行强制转码，对于多并发或大文件可能产生稍长的处理时间。\n\n是否确认继续？");
-            if (!proceed) return;
+        if (filesToProcess.length === 0) {
+            alert("所选配置下没有需要处理的文件，请尝试勾选特殊文件选项或添加新的文档！");
+            return;
         }
 
         setIsProcessing(true);
-        setLogs([{ type: 'log', message: 'Starting upload and processing...', timestamp: new Date().toLocaleTimeString() }]);
+        setLogs([{ type: 'log', message: `Starting upload and processing for ${filesToProcess.length} files...`, timestamp: new Date().toLocaleTimeString() }]);
         setFinalResult(""); // Clear previous results to prevent duplication
 
         const formData = new FormData();
-        selectedFiles.forEach(file => {
+        filesToProcess.forEach(file => {
             formData.append('files', file);
             // Note: webkitdirectory uploads relative paths, but standard File object usually just has name.
             // For flat merging, filename is enough.
@@ -225,6 +233,33 @@ export const SmartFileView: React.FC<SmartFileViewProps> = ({ files, cleaningMod
                                 )}
                             </ul>
                         </div>
+                        
+                        {(selectedFiles.some(f => f.name.toLowerCase().endsWith('.doc')) || selectedFiles.some(f => f.name.toLowerCase().endsWith('.xls') || f.name.toLowerCase().endsWith('.xlsx'))) && (
+                            <div style={{ background: '#2d2613', border: '1px solid #cca300', padding: '15px', borderRadius: '8px', color: '#ffd11a', marginTop: '5px' }}>
+                                <h4 style={{ margin: '0 0 10px 0', fontSize: '1.05em' }}>⚠️ 检测到具有深度解析价值的专门文件：</h4>
+                                {selectedFiles.some(f => f.name.toLowerCase().endsWith('.doc')) && (
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', cursor: 'pointer', fontSize: '0.95em' }}>
+                                        <input 
+                                            type="checkbox" 
+                                            checked={enableDocConversion} 
+                                            onChange={(e) => setEnableDocConversion(e.target.checked)} 
+                                        />
+                                        允许系统转化并读取旧版本 .doc 文件 (调用本地 Office 引擎会稍增耗时)
+                                    </label>
+                                )}
+                                {selectedFiles.some(f => f.name.toLowerCase().endsWith('.xls') || f.name.toLowerCase().endsWith('.xlsx')) && (
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.95em' }}>
+                                        <input 
+                                            type="checkbox" 
+                                            checked={enableExcelProcessing} 
+                                            onChange={(e) => setEnableExcelProcessing(e.target.checked)} 
+                                        />
+                                        深度解析其中的 Excel 表格数据并一并混入全文输出流中
+                                    </label>
+                                )}
+                            </div>
+                        )}
+
                         <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
                             <button className="btn btn-secondary" onClick={() => setSelectedFiles([])}>清空列表</button>
                             <button className="btn btn-primary" onClick={startProcessing}>开始处理</button>
