@@ -50,6 +50,17 @@ export const SmartFileView: React.FC<SmartFileViewProps> = ({ files, cleaningMod
 
     const startProcessing = async () => {
         if (selectedFiles.length === 0) return;
+
+        const hasLegacyFiles = selectedFiles.some(f => 
+            f.name.toLowerCase().endsWith('.doc') || 
+            f.name.toLowerCase().endsWith('.xls')
+        );
+
+        if (hasLegacyFiles) {
+            const proceed = window.confirm("⚠️ 提示：检测到列表中包含老版本的 .doc 或 .xls 文件。\n\n这会触发后台调用底层系统引擎进行强制转码，对于多并发或大文件可能产生稍长的处理时间。\n\n是否确认继续？");
+            if (!proceed) return;
+        }
+
         setIsProcessing(true);
         setLogs([{ type: 'log', message: 'Starting upload and processing...', timestamp: new Date().toLocaleTimeString() }]);
         setFinalResult(""); // Clear previous results to prevent duplication
