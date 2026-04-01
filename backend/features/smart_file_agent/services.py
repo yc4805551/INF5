@@ -189,7 +189,7 @@ class SmartFileAgent:
                 "你是一个专业的中文文档和表格排版专家。请将图片中的内容精准地转换为 Markdown 格式。\n"
                 "要求：\n"
                 "1. 请修正可能由于扫描造成的错别字或折叠。\n"
-                "2. 如果图片中包含表格，请务必使用标准的 Markdown 表格语法 ('|---|') 进行严谨的还原，不要漏掉合并单元格或表头。\n"
+                "2. 如果图片中包含真正的图片表格，不仅要识别文字，还必须强制输出为 Markdown 格式的表格（例如：| 列1 | 列2 |），进行严谨的还原，不要漏掉合并单元格或表头。\n"
                 "3. 不要输出任何开场白或解释文字，直接输出转换后的 Markdown。\n"
                 "4. 如果图片内容完全无法辨认、或者包含大量无意义的乱码和符号，请直接输出 '[UNREADABLE]'，不要强行编造或输出乱码。"
             )
@@ -497,7 +497,7 @@ class SmartFileAgent:
                     if success:
                         table_bytes = buffer.tobytes()
                         # Call DeepSeek/Paddle API
-                        vlm_result = self._call_vision_api(table_bytes, "这是一个表格局部截图，严格输出Markdown表格。不要解释。")
+                        vlm_result = self._call_vision_api(table_bytes, "这是一个表格局部截图，不仅要识别文字，还必须强制输出为 Markdown 格式的表格（例如：| 列1 | 列2 |）。不要解释。")
                         final_markdown += vlm_result + "\n\n"
                     else:
                         # Fallback to Tesseract chunks if encoding fails
@@ -622,7 +622,7 @@ class SmartFileAgent:
                 "你是一个专业的中文文档和表格排版专家。请将图片中的内容精准地转换为 Markdown 格式。\n"
                 "要求：\n"
                 "1. 请修正可能由于扫描造成的错别字或折叠。\n"
-                "2. 如果图片中包含表格，请务必使用标准的 Markdown 表格语法 ('|---|') 进行严谨的还原，不要漏掉合并单元格或表头。\n"
+                "2. 如果图片中包含真正的图片表格，不仅要识别文字，还必须强制输出为 Markdown 格式的表格（例如：| 列1 | 列2 |），进行严谨的还原，不要漏掉合并单元格或表头。\n"
                 "3. 不要输出任何开场白或解释文字，直接输出转换后的 Markdown。\n"
                 "4. 如果图片内容完全无法辨认、或者包含大量无意义的乱码和符号，请直接输出 '[UNREADABLE]'，不要强行编造或输出乱码。"
             )
