@@ -77,8 +77,8 @@ class SmartFileAgent:
                 elif ext in ['.docx', '.doc']:
                     try:
                         if ext == '.doc':
-                            yield json.dumps({"type": "log", "message": f"  - [{file_name}] 检测到老版 .doc，正在后台呼叫 Word 引擎静默升级为 .docx..."}) + "\n"
-                            docx_bytes_io = self._convert_doc_to_docx_bytes(file_content)
+                            yield json.dumps({"type": "log", "message": f"  - [{file_name}] 检测到老版 .doc，后台正在升级格式并导出同名 .docx 到临时目录..."}) + "\n"
+                            docx_bytes_io = self._convert_doc_to_docx_bytes(file_content, file_name)
                             processed_text = self._process_word(docx_bytes_io)
                         else:
                             processed_text = self._process_word(file_bytes)
@@ -186,7 +186,7 @@ class SmartFileAgent:
         except Exception as e:
             return f"[Word Error: {str(e)}]"
 
-    def _convert_doc_to_docx_bytes(self, doc_bytes):
+    def _convert_doc_to_docx_bytes(self, doc_bytes, original_filename=None):
         import win32com.client
         import pythoncom
         import tempfile
@@ -225,6 +225,25 @@ class SmartFileAgent:
             # 读取新生成的 docx 字节流
             with open(temp_docx_path, 'rb') as f:
                 docx_data = f.read()
+
+            # 导出同名文件到 static/temp
+            if original_filename:
+                try:
+                    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+                    output_dir = os.path.join(base_dir, 'static', 'temp')
+                    if not os.path.exists(output_dir):
+                        os.makedirs(output_dir, exist_ok=True)
+                    export_name = os.path.basename(original_filename)
+                    if export_name.lower().endswith('.doc'):
+                        export_name = export_name[:-4] + '.docx'
+                    else:
+                        export_name += '.docx'
+                    
+                    export_path = os.path.join(output_dir, export_name)
+                    with open(export_path, 'wb') as ef:
+                        ef.write(docx_data)
+                except Exception as exp_err:
+                    logging.error(f"Failed to export converted docx: {exp_err}")
                 
             return io.BytesIO(docx_data)
         except Exception as e:
