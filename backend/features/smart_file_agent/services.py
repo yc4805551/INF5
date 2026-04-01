@@ -74,8 +74,17 @@ class SmartFileAgent:
 
                 if ext in ['.xlsx', '.xls']:
                     processed_text = self._process_excel(file_bytes)
-                elif ext == '.docx':
-                    processed_text = self._process_word(file_bytes)
+                elif ext in ['.docx', '.doc']:
+                    try:
+                        if ext == '.doc':
+                            yield json.dumps({"type": "log", "message": f"  - [{file_name}] 检测到老版 .doc，正在后台呼叫 Word 引擎静默升级为 .docx..."}) + "\n"
+                            docx_bytes_io = self._convert_doc_to_docx_bytes(file_content)
+                            processed_text = self._process_word(docx_bytes_io)
+                        else:
+                            processed_text = self._process_word(file_bytes)
+                    except Exception as e:
+                        logger.error(f"Doc/Docx Conversion Error: {e}")
+                        processed_text = f"[{ext} Error: 无法解析或转换文档: {str(e)}]"
                 elif ext == '.pdf':
                      processed_text = ""
                      for update in self._process_pdf_smart(file_content, file_name):
@@ -176,6 +185,63 @@ class SmartFileAgent:
             return "\n".join(full_text)
         except Exception as e:
             return f"[Word Error: {str(e)}]"
+
+    def _convert_doc_to_docx_bytes(self, doc_bytes):
+        import win32com.client
+        import pythoncom
+        import tempfile
+        import os
+        import io
+        import logging
+
+        # 确保在使用 COM 对象的当前线程中初始化
+        pythoncom.CoInitialize()
+        
+        temp_dir = tempfile.gettempdir()
+        fd_doc, temp_doc_path = tempfile.mkstemp(suffix='.doc', dir=temp_dir)
+        fd_docx, temp_docx_path = tempfile.mkstemp(suffix='.docx', dir=temp_dir)
+        
+        os.close(fd_doc)
+        os.close(fd_docx) # Word 将覆盖此文件
+        
+        try:
+            with open(temp_doc_path, 'wb') as f:
+                f.write(doc_bytes)
+                
+            # 使用 DispatchEx 可以试图强制创建一个新的独立不可见的 Word 进程
+            word = win32com.client.DispatchEx("Word.Application")
+            word.Visible = False
+            word.DisplayAlerts = 0
+            
+            try:
+                # 打开老的 .doc
+                doc = word.Documents.Open(temp_doc_path)
+                # 另存为 .docx (wdFormatXMLDocument = 16)
+                doc.SaveAs2(temp_docx_path, FileFormat=16)
+                doc.Close()
+            finally:
+                word.Quit()
+                
+            # 读取新生成的 docx 字节流
+            with open(temp_docx_path, 'rb') as f:
+                docx_data = f.read()
+                
+            return io.BytesIO(docx_data)
+        except Exception as e:
+            logging.error(f"win32com convert failed: {e}")
+            raise e
+        finally:
+            # 清理临时文件
+            try:
+                if os.path.exists(temp_doc_path):
+                    os.remove(temp_doc_path)
+                if os.path.exists(temp_docx_path):
+                    os.remove(temp_docx_path)
+            except Exception as e:
+                logging.error(f"Failed to cleanup temp doc documents: {e}")
+            
+            # 使用完毕释放 COM 资源
+            pythoncom.CoUninitialize()
 
     def _process_pdf_smart(self, file_bytes, file_name):
         try:

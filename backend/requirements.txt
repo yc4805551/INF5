@@ -22,3 +22,4 @@ google-genai
 pymupdf
 xlrd>=2.0.1
 tabulate
+pywin32
